@@ -571,7 +571,12 @@ fn live() {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..WindowOptions::default()
             },
-            move |_, cx| {
+            move |window, cx| {
+                eprintln!(
+                    "{}",
+                    json!({"live_mode": mode, "rows": rows, "seconds": seconds,
+                        "gpu": window.gpu_specs()})
+                );
                 let opacity = Rc::new(Cell::new(1.0));
                 let pane = cx.new(|_| Pane {
                     rows: (0..rows)
