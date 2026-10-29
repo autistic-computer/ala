@@ -690,6 +690,9 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
         answers: &[PromptButton],
     ) -> Option<oneshot::Receiver<usize>>;
     fn activate(&self);
+    fn activate_with_token(&self, _token: String) {
+        self.activate();
+    }
     fn request_attention(&self) {}
     fn is_active(&self) -> bool;
     fn visibility(&self) -> WindowVisibility;

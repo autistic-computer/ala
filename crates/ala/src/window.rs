@@ -6694,6 +6694,10 @@ impl Window {
         self.platform_window.activate();
     }
 
+    pub fn activate_window_with_token(&self, token: impl Into<String>) {
+        self.platform_window.activate_with_token(token.into());
+    }
+
     pub fn request_attention(&self) {
         self.platform_window.request_attention();
     }

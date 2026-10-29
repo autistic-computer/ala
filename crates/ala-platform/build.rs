@@ -8,6 +8,14 @@ fn main() {
         macos_build::run();
     }
 
+    #[cfg(not(target_os = "macos"))]
+    if target_os == "macos" {
+        let out = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("cargo sets OUT_DIR"));
+        for name in ["shaders.metallib", "stitched_shaders.metal", "scene.h"] {
+            std::fs::write(out.join(name), b"").expect("OUT_DIR is writable");
+        }
+    }
+
     #[cfg(all(target_os = "windows", not(debug_assertions)))]
     if target_os == "windows" {
         compile_shaders();
