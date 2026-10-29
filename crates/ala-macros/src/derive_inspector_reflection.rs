@@ -1,0 +1,274 @@
+use heck::ToSnakeCase as _;
+use proc_macro::TokenStream;
+use proc_macro2::{Span, TokenStream as TokenStream2};
+use quote::quote;
+use syn::{
+    Attribute, Expr, FnArg, Ident, Item, ItemTrait, Lit, Meta, Path, ReturnType, TraitItem, Type,
+    parse_macro_input, parse_quote,
+    visit_mut::{self, VisitMut},
+};
+
+pub fn derive_inspector_reflection(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let mut item = parse_macro_input!(input as Item);
+
+    match &mut item {
+        Item::Trait(trait_item) => {
+            let mut expander = MacroExpander;
+            expander.visit_item_trait_mut(trait_item);
+        }
+        _ => {
+            return syn::Error::new_spanned(
+                quote!(#item),
+                "#[derive_inspector_reflection] can only be applied to traits",
+            )
+            .to_compile_error()
+            .into();
+        }
+    }
+
+    match item {
+        Item::Trait(trait_item) => generate_reflected_trait(trait_item),
+        _ => unreachable!(),
+    }
+}
+
+fn generate_reflected_trait(trait_item: ItemTrait) -> TokenStream {
+    let trait_name = &trait_item.ident;
+    let vis = &trait_item.vis;
+
+    let call_site = Span::call_site();
+    let inspector_reflection_path = if is_called_from_ala_crate(call_site) {
+        quote! { crate::inspector_reflection }
+    } else {
+        quote! { ::ala::inspector_reflection }
+    };
+
+    let mut method_infos = Vec::new();
+
+    for item in &trait_item.items {
+        if let TraitItem::Fn(method) = item {
+            let method_name = &method.sig.ident;
+
+            let has_valid_self_receiver = method
+                .sig
+                .inputs
+                .iter()
+                .any(|arg| matches!(arg, FnArg::Receiver(r) if r.reference.is_none()));
+
+            let returns_self = match &method.sig.output {
+                ReturnType::Type(_, ty) => {
+                    matches!(**ty, Type::Path(ref path) if path.path.is_ident("Self"))
+                }
+                ReturnType::Default => false,
+            };
+
+            let param_count = method.sig.inputs.len();
+
+            if has_valid_self_receiver && returns_self && param_count == 1 {
+                let doc = extract_doc_comment(&method.attrs);
+                let cfg_attrs = extract_cfg_attributes(&method.attrs);
+                method_infos.push((method_name.clone(), doc, cfg_attrs));
+            }
+        }
+    }
+
+    let reflection_mod_name = Ident::new(
+        &format!("{}_reflection", trait_name.to_string().to_snake_case()),
+        trait_name.span(),
+    );
+
+    let wrapper_functions = method_infos.iter().map(|(method_name, _doc, cfg_attrs)| {
+        let wrapper_name = Ident::new(
+            &format!("__wrapper_{}", method_name),
+            method_name.span(),
+        );
+        quote! {
+            #(#cfg_attrs)*
+            fn #wrapper_name<T: #trait_name + 'static>(value: Box<dyn std::any::Any>) -> Box<dyn std::any::Any> {
+                if let Ok(concrete) = value.downcast::<T>() {
+                    Box::new(concrete.#method_name())
+                } else {
+                    panic!("Type mismatch in reflection wrapper");
+                }
+            }
+        }
+    });
+
+    let method_info_entries = method_infos.iter().map(|(method_name, doc, cfg_attrs)| {
+        let method_name_str = method_name.to_string();
+        let wrapper_name = Ident::new(&format!("__wrapper_{}", method_name), method_name.span());
+        let doc_expr = match doc {
+            Some(doc_str) => quote! { Some(#doc_str) },
+            None => quote! { None },
+        };
+        quote! {
+            #(#cfg_attrs)*
+            #inspector_reflection_path::FunctionReflection {
+                name: #method_name_str,
+                function: #wrapper_name::<T>,
+                documentation: #doc_expr,
+                _type: ::std::marker::PhantomData,
+            }
+        }
+    });
+
+    let output = quote! {
+        #trait_item
+
+        #vis mod #reflection_mod_name {
+            use super::*;
+
+            #(#wrapper_functions)*
+
+            pub fn methods<T: #trait_name + 'static>() -> Vec<#inspector_reflection_path::FunctionReflection<T>> {
+                vec![
+                    #(#method_info_entries),*
+                ]
+            }
+
+            pub fn find_method<T: #trait_name + 'static>(name: &str) -> Option<#inspector_reflection_path::FunctionReflection<T>> {
+                methods::<T>().into_iter().find(|m| m.name == name)
+            }
+        }
+    };
+
+    TokenStream::from(output)
+}
+
+fn extract_doc_comment(attrs: &[Attribute]) -> Option<String> {
+    let mut doc_lines = Vec::new();
+
+    for attr in attrs {
+        if attr.path().is_ident("doc")
+            && let Meta::NameValue(meta) = &attr.meta
+            && let Expr::Lit(expr_lit) = &meta.value
+            && let Lit::Str(lit_str) = &expr_lit.lit
+        {
+            let line = lit_str.value();
+            let line = line.strip_prefix(' ').unwrap_or(&line);
+            doc_lines.push(line.to_string());
+        }
+    }
+
+    if doc_lines.is_empty() {
+        None
+    } else {
+        Some(doc_lines.join("\n"))
+    }
+}
+
+fn extract_cfg_attributes(attrs: &[Attribute]) -> Vec<Attribute> {
+    attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("cfg"))
+        .cloned()
+        .collect()
+}
+
+fn is_called_from_ala_crate(_span: Span) -> bool {
+    std::env::var("CARGO_PKG_NAME").is_ok_and(|name| name == "ala")
+}
+
+struct MacroExpander;
+
+impl VisitMut for MacroExpander {
+    fn visit_item_trait_mut(&mut self, trait_item: &mut ItemTrait) {
+        let mut expanded_items = Vec::new();
+        let mut items_to_keep = Vec::new();
+
+        for item in trait_item.items.drain(..) {
+            match item {
+                TraitItem::Macro(macro_item) => {
+                    if let Some(expanded) = try_expand_macro(&macro_item) {
+                        expanded_items.extend(expanded);
+                    } else {
+                        items_to_keep.push(TraitItem::Macro(macro_item));
+                    }
+                }
+                other => {
+                    items_to_keep.push(other);
+                }
+            }
+        }
+
+        trait_item.items = expanded_items;
+        trait_item.items.extend(items_to_keep);
+
+        visit_mut::visit_item_trait_mut(self, trait_item);
+    }
+}
+
+fn try_expand_macro(macro_item: &syn::TraitItemMacro) -> Option<Vec<TraitItem>> {
+    let path = &macro_item.mac.path;
+
+    let macro_name = path_to_string(path);
+
+    match macro_name.as_str() {
+        "ala_macros::style_helpers" | "style_helpers" => {
+            let tokens = macro_item.mac.tokens.clone();
+            let expanded = crate::styles::style_helpers(TokenStream::from(tokens));
+            parse_expanded_items(expanded)
+        }
+        "ala_macros::visibility_style_methods" | "visibility_style_methods" => {
+            let tokens = macro_item.mac.tokens.clone();
+            let expanded = crate::styles::visibility_style_methods(TokenStream::from(tokens));
+            parse_expanded_items(expanded)
+        }
+        "ala_macros::margin_style_methods" | "margin_style_methods" => {
+            let tokens = macro_item.mac.tokens.clone();
+            let expanded = crate::styles::margin_style_methods(TokenStream::from(tokens));
+            parse_expanded_items(expanded)
+        }
+        "ala_macros::padding_style_methods" | "padding_style_methods" => {
+            let tokens = macro_item.mac.tokens.clone();
+            let expanded = crate::styles::padding_style_methods(TokenStream::from(tokens));
+            parse_expanded_items(expanded)
+        }
+        "ala_macros::position_style_methods" | "position_style_methods" => {
+            let tokens = macro_item.mac.tokens.clone();
+            let expanded = crate::styles::position_style_methods(TokenStream::from(tokens));
+            parse_expanded_items(expanded)
+        }
+        "ala_macros::overflow_style_methods" | "overflow_style_methods" => {
+            let tokens = macro_item.mac.tokens.clone();
+            let expanded = crate::styles::overflow_style_methods(TokenStream::from(tokens));
+            parse_expanded_items(expanded)
+        }
+        "ala_macros::cursor_style_methods" | "cursor_style_methods" => {
+            let tokens = macro_item.mac.tokens.clone();
+            let expanded = crate::styles::cursor_style_methods(TokenStream::from(tokens));
+            parse_expanded_items(expanded)
+        }
+        "ala_macros::border_style_methods" | "border_style_methods" => {
+            let tokens = macro_item.mac.tokens.clone();
+            let expanded = crate::styles::border_style_methods(TokenStream::from(tokens));
+            parse_expanded_items(expanded)
+        }
+        "ala_macros::box_shadow_style_methods" | "box_shadow_style_methods" => {
+            let tokens = macro_item.mac.tokens.clone();
+            let expanded = crate::styles::box_shadow_style_methods(TokenStream::from(tokens));
+            parse_expanded_items(expanded)
+        }
+        _ => None,
+    }
+}
+
+fn path_to_string(path: &Path) -> String {
+    path.segments
+        .iter()
+        .map(|seg| seg.ident.to_string())
+        .collect::<Vec<_>>()
+        .join("::")
+}
+
+fn parse_expanded_items(expanded: TokenStream) -> Option<Vec<TraitItem>> {
+    let tokens = TokenStream2::from(expanded);
+
+    let dummy_trait: ItemTrait = parse_quote! {
+        trait Dummy {
+            #tokens
+        }
+    };
+
+    Some(dummy_trait.items)
+}

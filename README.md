@@ -7,7 +7,7 @@
    //          {{{{     &gt;&gt;        <br>
                                   <br>
 ---                               <br>
-name: gpui                        <br>
+name: ala                         <br>
 description: ui framework         <br>
 author: autistic.computer         <br>
 license: apache-2.0               <br>

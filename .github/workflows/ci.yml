@@ -46,15 +46,15 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Test
-        run: cargo test --workspace --all-features --exclude zz-gpui-platform
+        run: cargo test --workspace --all-features --exclude ala-platform
 
       - name: Test the iOS input logic
         if: runner.os == 'macOS'
-        run: cargo test -p zz-gpui-platform --all-features --test ios
+        run: cargo test -p ala-platform --all-features --test ios
 
-      - name: Test zz-gpui-platform on lavapipe (software Vulkan)
+      - name: Test ala-platform on lavapipe (software Vulkan)
         if: runner.os == 'Linux'
         timeout-minutes: 20
         run: |
           export VK_ICD_FILENAMES=$(echo /usr/share/vulkan/icd.d/lvp_icd*.json)
-          cargo test -p zz-gpui-platform --all-features
+          cargo test -p ala-platform --all-features

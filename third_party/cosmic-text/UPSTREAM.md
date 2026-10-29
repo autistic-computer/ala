@@ -7,7 +7,7 @@ The package uses the MIT or Apache-2.0 license; both license files remain here.
 
 The snapshot includes the library source, README and a standalone manifest.
 It excludes upstream examples, benchmarks, test assets and development dependencies.
-Our cache tests use the existing GPUI Lilex fixture.
+Our cache tests use the existing ala Lilex fixture.
 
 The local patch partitions the existing six-entry shaping-plan FIFO by font face.
 Each font keeps the same plan matching rules for script, direction, language,
@@ -30,6 +30,6 @@ Ordinary one-face text saved only 704 bytes. See the RAM follow-up in
 
 To refresh this snapshot, diff the library source against the pinned release,
 apply the cache, exact-growth and database-invalidation changes, and run the
-plan cache tests plus the GPUI platform text tests. Remove this snapshot when an
+plan cache tests plus the ala platform text tests. Remove this snapshot when an
 upstream release provides equivalent bounded reuse or another measured shaping
 implementation.
