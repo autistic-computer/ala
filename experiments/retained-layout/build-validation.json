@@ -1,0 +1,9 @@
+{
+  "tested_source": "0f1a69201bc2f35e296c22e7d729f7a07f3c448c",
+  "host": "Linux",
+  "target": "x86_64-pc-windows-gnu",
+  "toolchain": "Rust 1.99 / MinGW GCC 14.2",
+  "command": "cargo check --locked -p ala-platform --no-default-features --features bench-support --bench retained_layout --target x86_64-pc-windows-gnu",
+  "result": "passed",
+  "scope": "Rust cross-check only. Native MSVC execution and native-machine measurements remain outstanding."
+}
