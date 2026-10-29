@@ -1,13 +1,3 @@
-//! Cross-platform headless app context for tests that need real text shaping.
-//!
-//! This replaces the macOS-only `HeadlessMetalAppContext` with a platform-neutral
-//! implementation backed by `TestPlatform`. Tests supply a real `PlatformTextSystem`
-//! (e.g. `DirectWriteTextSystem` on Windows, `MacTextSystem` on macOS) to get
-//! accurate glyph measurements while keeping everything else deterministic.
-//!
-//! Optionally, a renderer factory can be provided to enable real GPU rendering
-//! and screenshot capture via [`HeadlessAppContext::capture_screenshot`].
-
 use crate::{
     AnyView, AnyWindowHandle, App, AppCell, AppContext, AssetSource, BackgroundExecutor, Bounds,
     Context, Entity, EntityId, ForegroundExecutor, Global, Pixels, PlatformHeadlessRenderer,
@@ -19,40 +9,19 @@ use anyhow::Result;
 use image::RgbaImage;
 use std::{future::Future, rc::Rc, sync::Arc, time::Duration};
 
-/// A cross-platform headless app context for tests that need real text shaping.
-///
-/// Unlike the old `HeadlessMetalAppContext`, this works on any platform. It uses
-/// `TestPlatform` for deterministic scheduling and accepts a pluggable
-/// `PlatformTextSystem` so tests get real glyph measurements.
-///
-/// # Usage
-///
-/// ```ignore
-/// let text_system = Arc::new(zz_gpui_platform::wgpu::CosmicTextSystem::new("fallback"));
-/// let mut cx = HeadlessAppContext::with_platform(
-///     text_system,
-///     Arc::new(Assets),
-///     || zz_gpui_platform::current_headless_renderer(),
-/// );
-/// ```
 pub struct HeadlessAppContext {
-    /// The underlying app cell.
     pub app: Rc<AppCell>,
-    /// The background executor for running async tasks.
     pub background_executor: BackgroundExecutor,
-    /// The foreground executor for running tasks on the main thread.
     pub foreground_executor: ForegroundExecutor,
     dispatcher: TestDispatcher,
     text_system: Arc<TextSystem>,
 }
 
 impl HeadlessAppContext {
-    /// Creates a new headless app context with the given text system.
     pub fn new(platform_text_system: Arc<dyn PlatformTextSystem>) -> Self {
         Self::with_platform(platform_text_system, Arc::new(()), || Ok(None))
     }
 
-    /// Creates a new headless app context with a custom text system and asset source.
     pub fn with_asset_source(
         platform_text_system: Arc<dyn PlatformTextSystem>,
         asset_source: Arc<dyn AssetSource>,
@@ -60,8 +29,6 @@ impl HeadlessAppContext {
         Self::with_platform(platform_text_system, asset_source, || Ok(None))
     }
 
-    /// Creates a new headless app context with the given text system, asset source,
-    /// and an optional renderer factory for screenshot support.
     pub fn with_platform(
         platform_text_system: Arc<dyn PlatformTextSystem>,
         asset_source: Arc<dyn AssetSource>,
@@ -100,7 +67,6 @@ impl HeadlessAppContext {
         }
     }
 
-    /// Opens a window for headless rendering.
     pub fn open_window<V: Render + 'static>(
         &mut self,
         size: Size<Pixels>,
@@ -125,33 +91,27 @@ impl HeadlessAppContext {
         )
     }
 
-    /// Runs all pending tasks until parked.
     pub fn run_until_parked(&self) {
         self.dispatcher.run_until_parked();
     }
 
-    /// Advances the simulated clock.
     pub fn advance_clock(&self, duration: Duration) {
         self.dispatcher.advance_clock(duration);
     }
 
-    /// Enables parking mode, allowing blocking on real I/O (e.g., async asset loading).
     pub fn allow_parking(&self) {
         self.dispatcher.allow_parking();
     }
 
-    /// Disables parking mode, returning to deterministic test execution.
     pub fn forbid_parking(&self) {
         self.dispatcher.forbid_parking();
     }
 
-    /// Updates app state.
     pub fn update<R>(&mut self, f: impl FnOnce(&mut App) -> R) -> R {
         let mut app = self.app.borrow_mut();
         f(&mut app)
     }
 
-    /// Updates a window and calls draw to render.
     pub fn update_window<R>(
         &mut self,
         window: AnyWindowHandle,
@@ -161,26 +121,19 @@ impl HeadlessAppContext {
         app.update_window(window, f)
     }
 
-    /// Captures a screenshot from a window.
-    ///
-    /// Requires that the context was created with a renderer factory that
-    /// returns `Some` via [`HeadlessAppContext::with_platform`].
     pub fn capture_screenshot(&mut self, window: AnyWindowHandle) -> Result<RgbaImage> {
         let mut app = self.app.borrow_mut();
         app.update_window(window, |_, window, _| window.render_to_image())?
     }
 
-    /// Returns the text system.
     pub fn text_system(&self) -> &Arc<TextSystem> {
         &self.text_system
     }
 
-    /// Returns the background executor.
     pub fn background_executor(&self) -> &BackgroundExecutor {
         &self.background_executor
     }
 
-    /// Returns the foreground executor.
     pub fn foreground_executor(&self) -> &ForegroundExecutor {
         &self.foreground_executor
     }
@@ -188,8 +141,6 @@ impl HeadlessAppContext {
 
 impl Drop for HeadlessAppContext {
     fn drop(&mut self) {
-        // Shut down the app so windows are closed and entity handles are
-        // released before the LeakDetector runs.
         self.app.borrow_mut().shutdown();
     }
 }

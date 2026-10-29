@@ -2,18 +2,13 @@ use crate::collections::HashMap;
 use crate::{FontId, Pixels, SharedString, TextRun, TextSystem, px};
 use std::{borrow::Cow, iter, sync::Arc};
 
-/// Determines whether to truncate text from the start or end.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TruncateFrom {
-    /// Truncate text from the start.
     Start,
-    /// Truncate text from the end.
     End,
-    /// Truncate text from the middle, preserving the start and end.
     Middle,
 }
 
-/// The GPUI line wrapper, used to wrap lines of text to a given width.
 pub struct LineWrapper {
     text_system: Arc<TextSystem>,
     pub(crate) font_id: FontId,
@@ -23,7 +18,6 @@ pub struct LineWrapper {
 }
 
 impl LineWrapper {
-    /// The maximum indent that can be applied to a line.
     pub const MAX_INDENT: u32 = 256;
 
     pub(crate) fn new(font_id: FontId, font_size: Pixels, text_system: Arc<TextSystem>) -> Self {
@@ -36,7 +30,6 @@ impl LineWrapper {
         }
     }
 
-    /// Wrap a line of text to the given width with this wrapper's font and font size.
     pub fn wrap_line<'a>(
         &'a mut self,
         fragments: &'a [LineFragment],
@@ -71,7 +64,6 @@ impl LineWrapper {
                                 last_candidate_width = width;
                             }
                         } else {
-                            // CJK may not be space separated, e.g.: `Hello world你好世界`
                             if c != ' ' && first_non_whitespace_ix.is_some() {
                                 last_candidate_ix = ix;
                                 last_candidate_width = width;
@@ -135,9 +127,6 @@ impl LineWrapper {
         })
     }
 
-    /// Determines if a line should be truncated based on its width.
-    ///
-    /// Returns the truncation index in `line`.
     pub fn should_truncate_line(
         &mut self,
         line: &str,
@@ -244,7 +233,6 @@ impl LineWrapper {
         Some((front_end_ix, back_start_ix))
     }
 
-    /// Truncate a line of text to the given width with this wrapper's font and font size.
     pub fn truncate_line<'a>(
         &mut self,
         line: SharedString,
@@ -298,15 +286,6 @@ impl LineWrapper {
         }
     }
 
-    /// Truncate text to fit within a given number of wrapped lines.
-    ///
-    /// Unlike `truncate_line` which treats the text as a flat width budget
-    /// (`width * max_lines`), this method accounts for word-boundary wrapping:
-    /// it walks through characters once, tracking wrap boundaries and the
-    /// truncation point simultaneously. When text overflows on the last
-    /// allowed line, it truncates there and appends the affix.
-    ///
-    /// For `max_lines == 1`, this delegates to `truncate_line`.
     pub fn truncate_wrapped_line<'a>(
         &mut self,
         text: SharedString,
@@ -347,8 +326,6 @@ impl LineWrapper {
         for (ix, c) in text.char_indices() {
             if c == '\n' {
                 if line >= max_lines - 1 && !text[ix + 1..].trim().is_empty() {
-                    // Newline on the last allowed line with real content
-                    // below. Truncate here.
                     let truncated = text[..truncate_ix]
                         .trim_end_matches(|c: char| c.is_whitespace() || c.is_ascii_punctuation());
                     let result = SharedString::from(format!("{truncated}{truncation_affix}"));
@@ -362,7 +339,6 @@ impl LineWrapper {
                     return (result, Cow::Owned(runs));
                 }
 
-                // Newline before the last line: it consumes a line.
                 line += 1;
                 width = px(0.);
                 first_non_whitespace_ix = None;
@@ -394,7 +370,6 @@ impl LineWrapper {
             width += char_width;
 
             if line < max_lines - 1 {
-                // Before the last line: replicate wrap_line's boundary logic.
                 if width > wrap_width && ix > last_wrap_ix {
                     if let (None, Some(first_nw)) = (indent, first_non_whitespace_ix) {
                         indent = Some(Self::MAX_INDENT.min((first_nw - last_wrap_ix) as u32));
@@ -417,8 +392,6 @@ impl LineWrapper {
                     truncate_ix = last_wrap_ix;
                 }
             } else {
-                // On the last line: track the furthest point where the affix
-                // still fits, and stop as soon as the line overflows.
                 if width + affix_width <= wrap_width {
                     truncate_ix = ix + c.len_utf8();
                 }
@@ -441,52 +414,39 @@ impl LineWrapper {
             prev_c = c;
         }
 
-        // Text fits within max_lines without truncation.
         (text, Cow::Borrowed(runs))
     }
 
-    /// Any character in this list should be treated as a word character,
-    /// meaning it can be part of a word that should not be wrapped.
     pub(crate) fn is_word_char(c: char) -> bool {
-        // ASCII alphanumeric characters, for English, numbers: `Hello123`, etc.
-        c.is_ascii_alphanumeric() ||
-        // Latin script in Unicode for French, German, Spanish, etc.
-        // Latin-1 Supplement
-        // https://en.wikipedia.org/wiki/Latin-1_Supplement
-        matches!(c, '\u{00C0}'..='\u{00FF}') ||
-        // Latin Extended-A
-        // https://en.wikipedia.org/wiki/Latin_Extended-A
-        matches!(c, '\u{0100}'..='\u{017F}') ||
-        // Latin Extended-B
-        // https://en.wikipedia.org/wiki/Latin_Extended-B
-        matches!(c, '\u{0180}'..='\u{024F}') ||
-        // Cyrillic for Russian, Ukrainian, etc.
-        // https://en.wikipedia.org/wiki/Cyrillic_script_in_Unicode
-        matches!(c, '\u{0400}'..='\u{04FF}') ||
-
-        // Vietnamese (https://vietunicode.sourceforge.net/charset/)
-        matches!(c, '\u{1E00}'..='\u{1EFF}') || // Latin Extended Additional
-        matches!(c, '\u{0300}'..='\u{036F}') || // Combining Diacritical Marks
-
-        // Bengali (https://en.wikipedia.org/wiki/Bengali_(Unicode_block))
-        matches!(c, '\u{0980}'..='\u{09FF}') ||
-
-        // Some other known special characters that should be treated as word characters,
-        // e.g. `a-b`, `var_name`, `I'm`/`won’t`, '@mention`, `#hashtag`, `100%`, `3.1415`,
-        // `2^3`, `a~b`, `a=1`, `Self::new`, etc. Trailing punctuation like `,`, `.`, `:`, `;`
-        // is included so it stays attached to the preceding word when wrapping.
-        matches!(c, '-' | '_' | '.' | '\'' | '’' | '‘' | '$' | '%' | '@' | '#' | '^' | '~' | ',' | '=' | ':' | ';') ||
-        // Closing punctuation never starts a line (UAX #14 LB13: no break
-        // before `!`, `)`, `]`, `}`, closing quotes or an ellipsis) — `plz!`,
-        // `see)`, `quoted”` wrap as one word instead of orphaning the mark on
-        // the next line. `/` and `?` stay break opportunities so long paths
-        // and URLs (`a/b`, `foo?b=2`) can wrap.
-        matches!(c, '!' | ')' | ']' | '}' | '"' | '”' | '»' | '…') ||
-        // `⋯` character is special used in Zed, to keep this at the end of the line.
-        matches!(c, '⋯') ||
-
-        // Non-breaking glue characters
-        matches!(c, '\u{202F}' | '\u{00A0}' | '\u{2011}')
+        c.is_ascii_alphanumeric()
+            || matches!(c, '\u{00C0}'..='\u{00FF}')
+            || matches!(c, '\u{0100}'..='\u{017F}')
+            || matches!(c, '\u{0180}'..='\u{024F}')
+            || matches!(c, '\u{0400}'..='\u{04FF}')
+            || matches!(c, '\u{1E00}'..='\u{1EFF}')
+            || matches!(c, '\u{0300}'..='\u{036F}')
+            || matches!(c, '\u{0980}'..='\u{09FF}')
+            || matches!(
+                c,
+                '-' | '_'
+                    | '.'
+                    | '\''
+                    | '’'
+                    | '‘'
+                    | '$'
+                    | '%'
+                    | '@'
+                    | '#'
+                    | '^'
+                    | '~'
+                    | ','
+                    | '='
+                    | ':'
+                    | ';'
+            )
+            || matches!(c, '!' | ')' | ']' | '}' | '"' | '”' | '»' | '…')
+            || matches!(c, '⋯')
+            || matches!(c, '\u{202F}' | '\u{00A0}' | '\u{2011}')
     }
 
     #[inline(always)]
@@ -558,9 +518,6 @@ fn update_runs_after_middle_truncation(
     let original_runs = std::mem::take(runs);
     let mut result_runs: Vec<TextRun> = Vec::with_capacity(original_runs.len());
 
-    // Front segment [0, front_end_ix) + ellipsis: walk forward until the run
-    // that straddles or ends at front_end_ix, then extend that run's length
-    // to include the ellipsis.
     let mut front_remaining = front_end_ix;
     let mut front_done = false;
     for run in &original_runs {
@@ -578,8 +535,6 @@ fn update_runs_after_middle_truncation(
         }
     }
     if !front_done {
-        // front_end_ix landed exactly on a run boundary; append ellipsis to
-        // the last front run (or, if the front is empty, to the first back run).
         if let Some(last) = result_runs.last_mut() {
             last.len += ellipsis.len();
         } else if let Some(first) = original_runs.first() {
@@ -589,14 +544,11 @@ fn update_runs_after_middle_truncation(
         }
     }
 
-    // Back segment [back_start_ix, original.len()): skip runs entirely in the
-    // removed middle, keep the rest.
     let mut byte_pos = 0usize;
     for run in &original_runs {
         let run_end = byte_pos + run.len;
         if run_end > back_start_ix {
             if byte_pos < back_start_ix {
-                // Run straddles back_start_ix; keep only the tail.
                 let mut partial = run.clone();
                 partial.len = run_end - back_start_ix;
                 result_runs.push(partial);
@@ -610,29 +562,16 @@ fn update_runs_after_middle_truncation(
     *runs = result_runs;
 }
 
-/// A fragment of a line that can be wrapped.
 pub enum LineFragment<'a> {
-    /// A text fragment consisting of characters.
-    Text {
-        /// The text content of the fragment.
-        text: &'a str,
-    },
-    /// A non-text element with a fixed width.
-    Element {
-        /// The width of the element in pixels.
-        width: Pixels,
-        /// The UTF-8 encoded length of the element.
-        len_utf8: usize,
-    },
+    Text { text: &'a str },
+    Element { width: Pixels, len_utf8: usize },
 }
 
 impl<'a> LineFragment<'a> {
-    /// Creates a new text fragment from the given text.
     pub fn text(text: &'a str) -> Self {
         LineFragment::Text { text }
     }
 
-    /// Creates a new non-text element with the given width and UTF-8 encoded length.
     pub fn element(width: Pixels, len_utf8: usize) -> Self {
         LineFragment::Element { width, len_utf8 }
     }
@@ -669,12 +608,9 @@ impl WrapBoundaryCandidate {
     }
 }
 
-/// A boundary between two lines of text.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Boundary {
-    /// The index of the last character in a line
     pub ix: usize,
-    /// The indent of the next line.
     pub next_indent: u32,
 }
 
@@ -774,7 +710,6 @@ mod tests {
             ]
         );
 
-        // Test wrapping multiple text fragments
         assert_eq!(
             wrapper
                 .wrap_line(
@@ -792,7 +727,6 @@ mod tests {
             ],
         );
 
-        // Test wrapping with a mix of text and element fragments
         assert_eq!(
             wrapper
                 .wrap_line(
@@ -813,7 +747,6 @@ mod tests {
             ],
         );
 
-        // Test with element at the beginning and text afterward
         assert_eq!(
             wrapper
                 .wrap_line(
@@ -832,7 +765,6 @@ mod tests {
             ],
         );
 
-        // Test with a large element that forces wrapping by itself
         assert_eq!(
             wrapper
                 .wrap_line(
@@ -852,7 +784,6 @@ mod tests {
             ],
         );
 
-        // Test with non-breaking glue characters
         assert_eq!(
             wrapper
                 .wrap_line(
@@ -860,7 +791,7 @@ mod tests {
                     px(72.0)
                 )
                 .collect::<Vec<_>>(),
-            &[Boundary::new(12, 0),], // special chars above take up 3, 2 and 3 bytes, so boundary ends up at 12
+            &[Boundary::new(12, 0),],
         );
     }
 
@@ -983,20 +914,7 @@ mod tests {
                 assert_eq!(run.len, *result_len);
             }
         }
-        // Case 0: Normal
-        // Text: abcdefghijkl
-        // Runs: Run0 { len: 12, ... }
-        //
-        // Truncate res: abcd… (truncate_at = 4)
-        // Run res: Run0 { string: abcd…, len: 7, ... }
         perform_test(&mut wrapper, "abcdefghijkl", "abcd…", &[12], &[7], px(50.));
-        // Case 1: Drop some runs
-        // Text: abcdefghijkl
-        // Runs: Run0 { len: 4, ... }, Run1 { len: 4, ... }, Run2 { len: 4, ... }
-        //
-        // Truncate res: abcdef… (truncate_at = 6)
-        // Runs res: Run0 { string: abcd, len: 4, ... }, Run1 { string: ef…, len:
-        // 5, ... }
         perform_test(
             &mut wrapper,
             "abcdefghijkl",
@@ -1005,13 +923,6 @@ mod tests {
             &[4, 5],
             px(70.),
         );
-        // Case 2: Truncate at start of some run
-        // Text: abcdefghijkl
-        // Runs: Run0 { len: 4, ... }, Run1 { len: 4, ... }, Run2 { len: 4, ... }
-        //
-        // Truncate res: abcdefgh… (truncate_at = 8)
-        // Runs res: Run0 { string: abcd, len: 4, ... }, Run1 { string: efgh, len:
-        // 4, ... }, Run2 { string: …, len: 3, ... }
         perform_test(
             &mut wrapper,
             "abcdefghijkl",
@@ -1048,20 +959,7 @@ mod tests {
                 assert_eq!(run.len, *result_len);
             }
         }
-        // Case 0: Normal
-        // Text: abcdefghijkl
-        // Runs: Run0 { len: 12, ... }
-        //
-        // Truncate res: …ijkl (truncate_at = 9)
-        // Run res: Run0 { string: …ijkl, len: 7, ... }
         perform_test(&mut wrapper, "abcdefghijkl", "…ijkl", &[12], &[7], px(50.));
-        // Case 1: Drop some runs
-        // Text: abcdefghijkl
-        // Runs: Run0 { len: 4, ... }, Run1 { len: 4, ... }, Run2 { len: 4, ... }
-        //
-        // Truncate res: …ghijkl (truncate_at = 7)
-        // Runs res: Run0 { string: …gh, len: 5, ... }, Run1 { string: ijkl, len:
-        // 4, ... }
         perform_test(
             &mut wrapper,
             "abcdefghijkl",
@@ -1070,13 +968,6 @@ mod tests {
             &[5, 4],
             px(70.),
         );
-        // Case 2: Truncate at start of some run
-        // Text: abcdefghijkl
-        // Runs: Run0 { len: 4, ... }, Run1 { len: 4, ... }, Run2 { len: 4, ... }
-        //
-        // Truncate res: abcdefgh… (truncate_at = 3)
-        // Runs res: Run0 { string: …, len: 3, ... }, Run1 { string: efgh, len:
-        // 4, ... }, Run2 { string: ijkl, len: 4, ... }
         perform_test(
             &mut wrapper,
             "abcdefghijkl",
@@ -1096,28 +987,8 @@ mod tests {
                 assert_eq!(run.len, *result_len);
             }
         }
-        // Case 0: Normal
-        // Text: abcdefghijkl
-        // Runs: Run0 { len: 12, ... }
-        //
-        // Truncate res: abcd… (truncate_at = 4)
-        // Run res: Run0 { string: abcd…, len: 7, ... }
         perform_test("abcd…", &[12], &[7]);
-        // Case 1: Drop some runs
-        // Text: abcdefghijkl
-        // Runs: Run0 { len: 4, ... }, Run1 { len: 4, ... }, Run2 { len: 4, ... }
-        //
-        // Truncate res: abcdef… (truncate_at = 6)
-        // Runs res: Run0 { string: abcd, len: 4, ... }, Run1 { string: ef…, len:
-        // 5, ... }
         perform_test("abcdef…", &[4, 4, 4], &[4, 5]);
-        // Case 2: Truncate at start of some run
-        // Text: abcdefghijkl
-        // Runs: Run0 { len: 4, ... }, Run1 { len: 4, ... }, Run2 { len: 4, ... }
-        //
-        // Truncate res: abcdefgh… (truncate_at = 8)
-        // Runs res: Run0 { string: abcd, len: 4, ... }, Run1 { string: efgh, len:
-        // 4, ... }, Run2 { string: …, len: 3, ... }
         perform_test("abcdefgh…", &[4, 4, 4], &[4, 4, 3]);
     }
 
@@ -1163,50 +1034,37 @@ mod tests {
         assert_word("quoted”");
         assert_word("well…");
 
-        // Space
         assert_not_word("foo bar");
 
-        // URL case
         assert_word("github.com");
         assert_not_word("zed-industries/zed");
         assert_not_word("zed-industries\\zed");
         assert_not_word("a=1&b=2");
         assert_not_word("foo?b=2");
 
-        // Latin-1 Supplement
         assert_word("ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏ");
-        // Latin Extended-A
         assert_word("ĀāĂăĄąĆćĈĉĊċČčĎď");
-        // Latin Extended-B
         assert_word("ƀƁƂƃƄƅƆƇƈƉƊƋƌƍƎƏ");
-        // Cyrillic
         assert_word("АБВГДЕЖЗИЙКЛМНОП");
-        // Vietnamese (https://github.com/zed-industries/zed/issues/23245)
         assert_word("ThậmchíđếnkhithuachạychúngcònnhẫntâmgiếtnốtsốđôngtùchínhtrịởYênBáivàCaoBằng");
-        // Bengali
         assert_word("গিয়েছিলেন");
         assert_word("ছেলে");
         assert_word("হচ্ছিল");
 
-        // non-word characters
         assert_not_word("你好");
         assert_not_word("안녕하세요");
         assert_not_word("こんにちは");
         assert_not_word("😀😁😂");
         assert_not_word("()[]{}<>");
 
-        // Non-breaking ("Glue") characters, see https://www.unicode.org/reports/tr14/
-        // (https://github.com/zed-industries/zed/issues/59664)
-        assert_word("\u{202F}"); // NNBSP " "
-        assert_word("\u{00A0}"); // NBSP " "
-        assert_word("\u{2011}"); // NBH "‑"
+        assert_word("\u{202F}");
+        assert_word("\u{00A0}");
+        assert_word("\u{2011}");
     }
 
-    // For compatibility with the test macro
     #[cfg(target_os = "macos")]
     use crate as zz_gpui;
 
-    // These seem to vary wildly based on the text system.
     #[cfg(target_os = "macos")]
     #[crate::test]
     fn test_wrap_shaped_line(cx: &mut TestAppContext) {
@@ -1267,17 +1125,6 @@ mod tests {
     fn test_multiline_truncation_fits_within_wrapped_lines() {
         let mut wrapper = build_wrapper();
 
-        // With .ZedMono at 16px, each char is 9.6px wide.
-        // wrap_width = 72px fits ~7 chars per line.
-        //
-        // "aa bbbbbb cccccc dddddd eeee ffff" with wrap_width=72px wraps as:
-        //   Line 1: "aa "       (28.8px, wraps because "bbbbbb" won't fit)
-        //   Line 2: "bbbbbb "   (67.2px)
-        //   Line 3: "cccccc "   (67.2px)
-        //   ...
-        //
-        // truncate_wrapped_line should wrap first to find line 2 starts at
-        // "bbbbbb...", then truncate only that line to fit with ellipsis.
         let text: &str = "aa bbbbbb cccccc dddddd eeee ffff";
         let wrap_width = px(72.);
         let max_lines: usize = 2;
@@ -1292,7 +1139,6 @@ mod tests {
             TruncateFrom::End,
         );
 
-        // The truncated text, when wrapped, must fit within max_lines lines.
         let wrap_count = wrapper
             .wrap_line(&[LineFragment::text(&truncated)], wrap_width)
             .count();
@@ -1305,7 +1151,6 @@ mod tests {
             max_lines
         );
 
-        // The truncated text should end with the ellipsis.
         assert!(
             truncated.ends_with('\u{2026}'),
             "Truncated text '{}' should end with ellipsis",
@@ -1317,8 +1162,6 @@ mod tests {
     fn test_multiline_truncation_no_truncation_needed() {
         let mut wrapper = build_wrapper();
 
-        // Text that fits in 2 lines shouldn't be truncated.
-        // Line 1: "aa bbb " (67.2px), Line 2: "cccccc" (57.6px)
         let text: &str = "aa bbb cccccc";
         let wrap_width = px(72.);
         let max_lines: usize = 2;
@@ -1381,10 +1224,6 @@ mod tests {
     fn test_multiline_truncation_with_newlines() {
         let mut wrapper = build_wrapper();
 
-        // "hello\nworld foo bar baz" with line_clamp(2):
-        // shape_text splits on \n, giving physical lines "hello" and
-        // "world foo bar baz". The newline consumes line 1, so the
-        // second physical line should be truncated on line 2.
         let text: &str = "hello\nworld foo bar baz";
         let wrap_width = px(72.);
         let max_lines: usize = 2;
@@ -1399,7 +1238,6 @@ mod tests {
             TruncateFrom::End,
         );
 
-        // The newline should be preserved.
         let parts: Vec<&str> = truncated.splitn(2, '\n').collect();
         assert_eq!(
             parts.len(),
@@ -1409,7 +1247,6 @@ mod tests {
         );
         assert_eq!(parts[0], "hello");
 
-        // The second line should fit within wrap_width and end with ellipsis.
         let second_line_width: Pixels = parts[1].chars().map(|c| wrapper.width_for_char(c)).sum();
         assert!(
             second_line_width <= wrap_width,
@@ -1429,9 +1266,6 @@ mod tests {
     fn test_multiline_truncation_newline_on_last_line() {
         let mut wrapper = build_wrapper();
 
-        // "hello\nworld\nmore" with line_clamp(2):
-        // Line 1: "hello", Line 2: "world" — but there's a third line,
-        // so line 2 should be truncated with ellipsis.
         let text: &str = "hello\nworld\nmore";
         let wrap_width = px(72.);
         let max_lines: usize = 2;
@@ -1459,7 +1293,6 @@ mod tests {
     fn test_truncate_line_middle() {
         let mut wrapper = build_wrapper();
 
-        // No truncation when text fits within a very wide budget.
         let short_text = "hello world";
         let runs = generate_test_runs(&[short_text.len()]);
         let (result, result_runs) = wrapper.truncate_line(
@@ -1473,7 +1306,6 @@ mod tests {
         assert_eq!(result_runs.len(), 1);
         assert_eq!(result_runs[0].len, short_text.len());
 
-        // Basic middle truncation: long string with px(100.) budget.
         let long_text = "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz";
         let runs = generate_test_runs(&[long_text.len()]);
         let (result, _result_runs) =
@@ -1498,8 +1330,6 @@ mod tests {
             "Result should end with the same last character as original"
         );
 
-        // Degenerate case: budget so narrow that middle truncation cannot find a valid split.
-        // Still show the truncation affix instead of returning the original overflowing text.
         let text = "abcdef";
         let runs = generate_test_runs(&[text.len()]);
         let (result, result_runs) =
@@ -1508,8 +1338,6 @@ mod tests {
         assert_eq!(result_runs.len(), 1);
         assert_eq!(result_runs[0].len, "…".len());
 
-        // Run adjustment correctness: multiple runs across the string.
-        // Verify that the returned runs' lengths sum to result.len().
         let multi_run_text = "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz";
         let run_lens = [20, 20, multi_run_text.len() - 40];
         let runs = generate_test_runs(&run_lens);
@@ -1534,8 +1362,6 @@ mod tests {
     fn test_multiline_truncation_trailing_newline() {
         let mut wrapper = build_wrapper();
 
-        // "hello\nworld\n" with line_clamp(2):
-        // The trailing newline has no content after it, so no ellipsis.
         let text: &str = "hello\nworld\n";
         let wrap_width = px(72.);
         let max_lines: usize = 2;
@@ -1561,8 +1387,6 @@ mod tests {
     fn test_multiline_truncation_newline_fits_exactly() {
         let mut wrapper = build_wrapper();
 
-        // "hello\nworld" with line_clamp(2):
-        // Exactly 2 lines, no truncation needed.
         let text: &str = "hello\nworld";
         let wrap_width = px(72.);
         let max_lines: usize = 2;

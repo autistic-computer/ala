@@ -10,26 +10,16 @@ use crate::{
 pub use easing::*;
 use smallvec::SmallVec;
 
-/// An animation that can be applied to an element.
 #[derive(Clone)]
 pub struct Animation {
-    /// The amount of time for which this animation should run
     pub duration: Duration,
-    /// Whether to repeat this animation when it finishes
     pub oneshot: bool,
-    /// Whether to derive the phase from a shared clock. See [`Animation::repeat_synced`].
     pub synced: bool,
-    /// A function that maps normalized time to an animated value.
-    /// The result may exceed 0..1 for easing functions that overshoot.
     pub easing: Rc<dyn Fn(f32) -> f32>,
-    /// The maximum number of times per second this animation re-renders.
-    /// When `None`, the animation re-renders on every frame.
     pub max_fps: Option<f32>,
 }
 
 impl Animation {
-    /// Create a new animation with the given duration.
-    /// By default the animation will only run once and will use a linear easing function.
     pub fn new(duration: Duration) -> Self {
         Self {
             duration,
@@ -40,47 +30,29 @@ impl Animation {
         }
     }
 
-    /// Set the animation to loop when it finishes.
     pub fn repeat(mut self) -> Self {
         self.oneshot = false;
         self
     }
 
-    /// Set the animation to loop when it finishes, phase-locked to a clock shared by the whole [`App`].
     pub fn repeat_synced(mut self) -> Self {
         self.oneshot = false;
         self.synced = true;
         self
     }
 
-    /// Sets the easing function used to map normalized time to an animated value.
-    ///
-    /// The output is not clamped, allowing physical easing functions such as
-    /// springs to overshoot.
     pub fn with_easing(mut self, easing: impl Fn(f32) -> f32 + 'static) -> Self {
         self.easing = Rc::new(easing);
         self
     }
 
-    /// Limit how often this animation re-renders. Instead of re-rendering on
-    /// every frame, the animation schedules its next render `1 / max_fps`
-    /// seconds after the current one. Values that are not finite and positive
-    /// are ignored.
     pub fn with_max_fps(mut self, max_fps: f32) -> Self {
         self.max_fps = Some(max_fps);
         self
     }
 }
 
-/// An extension trait for adding the animation wrapper to both Elements and Components
-///
-/// Animations rendered through this trait automatically respect
-/// [`App::reduce_motion`](crate::App::reduce_motion): when it is set,
-/// the element is rendered in a static state (the end state for oneshot
-/// animations, the start state for repeating ones) and no animation frames are
-/// scheduled.
 pub trait AnimationExt {
-    /// Render this component or element with an animation
     fn with_animation(
         self,
         id: impl Into<ElementId>,
@@ -98,7 +70,6 @@ pub trait AnimationExt {
         }
     }
 
-    /// Render this component or element with a chain of animations
     fn with_animations(
         self,
         id: impl Into<ElementId>,
@@ -116,11 +87,6 @@ pub trait AnimationExt {
         }
     }
 
-    /// Renders this component or element at the value produced by a spring.
-    ///
-    /// The element ID preserves position and velocity across target changes.
-    /// A newly mounted spring starts at its target unless configured with
-    /// [`SpringAnimation::from`].
     fn with_spring<T>(
         self,
         id: impl Into<ElementId>,
@@ -157,7 +123,6 @@ pub trait AnimationExt {
 
 impl<E: IntoElement + 'static> AnimationExt for E {}
 
-/// A GPUI element that applies an animation to another element
 pub struct AnimationElement<E> {
     id: ElementId,
     element: Option<E>,
@@ -165,7 +130,6 @@ pub struct AnimationElement<E> {
     animator: Box<dyn Fn(E, usize, f32) -> E + 'static>,
 }
 
-/// A GPUI element driven by a stateful spring.
 pub struct SpringAnimationElement<E> {
     id: ElementId,
     element: Option<E>,
@@ -188,8 +152,6 @@ impl<E: ParentElement> ParentElement for SpringAnimationElement<E> {
 }
 
 impl<E> SpringAnimationElement<E> {
-    /// Returns a new [`SpringAnimationElement<E>`] after applying the given function
-    /// to the element being animated.
     pub fn map_element(mut self, f: impl FnOnce(E) -> E) -> SpringAnimationElement<E> {
         self.element = self.element.map(f);
         self
@@ -215,8 +177,6 @@ impl<E: ParentElement> ParentElement for AnimationElement<E> {
 }
 
 impl<E> AnimationElement<E> {
-    /// Returns a new [`AnimationElement<E>`] after applying the given function
-    /// to the element being animated.
     pub fn map_element(mut self, f: impl FnOnce(E) -> E) -> AnimationElement<E> {
         self.element = self.element.map(f);
         self
@@ -234,8 +194,6 @@ impl<E: IntoElement + 'static> IntoElement for AnimationElement<E> {
 struct AnimationState {
     start: Instant,
     animation_ix: usize,
-    /// Whether a throttled re-render (see [`Animation::with_max_fps`]) is
-    /// already scheduled, so overlapping renders don't stack extra timers.
     delayed_frame_pending: Rc<Cell<bool>>,
 }
 
@@ -420,7 +378,6 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
                     let elapsed = crate::animation_time(
                         cx.background_executor().now() - cx.synced_animation_epoch,
                     );
-                    // Reduce modulo the duration before f32 conversion, which loses sub-second precision at scale.
                     Duration::from_nanos((elapsed.as_nanos() % duration.as_nanos()) as u64)
                 } else {
                     crate::animation_time(state.start.elapsed())
@@ -504,17 +461,14 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
 mod easing {
     use std::f32::consts::PI;
 
-    /// The linear easing function, or delta itself
     pub fn linear(delta: f32) -> f32 {
         delta
     }
 
-    /// The quadratic easing function, delta * delta
     pub fn quadratic(delta: f32) -> f32 {
         delta * delta
     }
 
-    /// The quadratic ease-in-out function, which starts and ends slowly but speeds up in the middle
     pub fn ease_in_out(delta: f32) -> f32 {
         if delta < 0.5 {
             2.0 * delta * delta
@@ -524,12 +478,10 @@ mod easing {
         }
     }
 
-    /// The Quint ease-out function, which starts quickly and decelerates to a stop
     pub fn ease_out_quint() -> impl Fn(f32) -> f32 {
         move |delta| 1.0 - (1.0 - delta).powi(5)
     }
 
-    /// Apply the given easing function, first in the forward direction and then in the reverse direction
     pub fn bounce(easing: impl Fn(f32) -> f32) -> impl Fn(f32) -> f32 {
         move |delta| {
             if delta < 0.5 {
@@ -540,16 +492,13 @@ mod easing {
         }
     }
 
-    /// A custom easing function for pulsating alpha that slows down as it approaches 0.1
     pub fn pulsating_between(min: f32, max: f32) -> impl Fn(f32) -> f32 {
         let range = max - min;
 
         move |delta| {
-            // Use a combination of sine and cubic functions for a more natural breathing rhythm
             let t = (delta * 2.0 * PI).sin();
             let breath = (t * t * t + t) / 2.0;
 
-            // Map the breath to our desired alpha range
             let normalized_alpha = (breath + 1.0) / 2.0;
 
             min + (normalized_alpha * range)
@@ -631,8 +580,6 @@ mod tests {
     impl Render for AnimationTestView {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
             let rendered_deltas = self.rendered_deltas.clone();
-            // The throttled variant syncs to the shared clock so the deltas
-            // follow the test scheduler's clock rather than wall time.
             let mut animation = Animation::new(Duration::from_secs(1));
             if let Some(max_fps) = self.max_fps {
                 animation = animation.repeat_synced().with_max_fps(max_fps);
@@ -679,26 +626,16 @@ mod tests {
         cx.run_until_parked();
         callback_count
     }
-    // Before parent-animation-element, using .with_animation
-    // would not allow chaining .parent after. This is just a
-    // build check that we can call div().id().with_animation().child()
     #[test]
     fn test_animation_parent() {
         div()
             .id("id")
-            //
             .with_animation(
                 "animation",
                 Animation::new(Duration::from_secs(1)),
-                |el, _t| {
-                    //
-                    el
-                },
+                |el, _t| el,
             )
-            .child(
-                //
-                div(),
-            );
+            .child(div());
     }
 
     #[test]
@@ -936,8 +873,6 @@ mod tests {
     fn test_max_fps_schedules_timer_driven_frames(cx: &mut TestAppContext) {
         let (rendered_deltas, window) = open_test_window_with_max_fps(cx, Some(10.0));
 
-        // The test scheduler's clock jitters forward slightly on each poll,
-        // so compare against expectations loosely.
         let assert_deltas_approx_eq = |expected: &[f32]| {
             let actual = rendered_deltas.borrow();
             assert_eq!(actual.len(), expected.len(), "deltas: {actual:?}");
@@ -951,7 +886,6 @@ mod tests {
 
         assert_deltas_approx_eq(&[0.0]);
 
-        // No per-frame callback is scheduled; re-renders are timer-driven.
         assert_eq!(simulate_next_frame(&window, cx), 0);
         assert_deltas_approx_eq(&[0.0]);
 
@@ -985,8 +919,6 @@ mod tests {
         simulate_next_frame(&window, cx);
         assert_eq!(*first_deltas.borrow(), vec![0.0, 0.25]);
 
-        // The second element mounts a quarter through the cycle, yet renders
-        // the shared phase rather than starting at zero.
         window
             .update(cx, |view, _, cx| {
                 view.show_second = true;
@@ -1004,13 +936,10 @@ mod tests {
         );
         assert!(second_deltas.borrow().iter().all(|delta| *delta > 0.0));
 
-        // The phase wraps around each full cycle.
         cx.executor().advance_clock(Duration::from_millis(2250));
         simulate_next_frame(&window, cx);
         assert_eq!(*first_deltas.borrow().last().unwrap(), 0.75);
 
-        // Sub-second precision survives months of uptime: converting the raw
-        // elapsed time to f32 would round 0.25 away entirely.
         cx.executor()
             .advance_clock(Duration::from_secs(300 * 24 * 60 * 60) + Duration::from_millis(500));
         simulate_next_frame(&window, cx);

@@ -1,27 +1,3 @@
-//! `globalThis.zzGpui`: the page-level handle agents and tests use to find,
-//! drive and capture GPUI windows.
-//!
-//! ```js
-//! await zzGpui.enableAccessibility();   // or ({ interactive: true })
-//! zzGpui.windows();                        // [{ id, mount, title, width, height, active, accessibility }]
-//! zzGpui.tree(1);                          // the window's accessibility tree
-//! const [send] = zzGpui.find({ role: "button", name: "Send" });
-//! await zzGpui.click(send.ref);            // an AccessKit Click on that node
-//! const png = await zzGpui.capture(1);     // data URL of the window's pixels
-//! await zzGpui.idle();                     // resolves once no window has a frame pending
-//! ```
-//!
-//! Accessibility starts off, because building the tree costs every frame. A
-//! page opts in at boot with `<html data-zz-gpui-a11y>` or
-//! `globalThis.zzGpuiAccessibility = true`, or later with
-//! `zzGpui.enableAccessibility()`. Until then a visually hidden "Enable
-//! accessibility" button lets a screen reader turn it on.
-//!
-//! Interactive mode (`<html data-zz-gpui-a11y="interactive">` or
-//! `enableAccessibility({ interactive: true })`) lets clickable nodes take
-//! pointer input and forward it to the canvas, for tools that only act on
-//! hit-testable elements.
-
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 

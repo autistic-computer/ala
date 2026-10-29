@@ -44,8 +44,6 @@ use zz_gpui::{Pixels, Point, px};
 #[cfg(any(feature = "wayland", feature = "x11"))]
 pub(crate) const SCROLL_LINES: f32 = 3.0;
 
-// Values match the defaults on GTK.
-// Taken from https://github.com/GNOME/gtk/blob/main/gtk/gtksettings.c#L320
 #[cfg(any(feature = "wayland", feature = "x11"))]
 pub(crate) const DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(400);
 #[cfg(any(feature = "wayland", feature = "x11"))]
@@ -106,8 +104,6 @@ pub(crate) struct PlatformHandlers {
     pub(crate) system_wake: Option<Box<dyn FnMut()>>,
 }
 
-/// A logind `PrepareForSleep` signal, forwarded from the D-Bus listener to
-/// the client's event loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(
     not(all(target_os = "linux", any(feature = "wayland", feature = "x11"))),
@@ -353,9 +349,7 @@ impl<P: LinuxClient + 'static> Platform for LinuxPlatform<P> {
     fn restart(&self, binary_path: Option<PathBuf>, arguments: Vec<std::ffi::OsString>) {
         use std::os::unix::process::CommandExt as _;
 
-        // get the process id of the current process
         let app_pid = std::process::id().to_string();
-        // get the path to the executable
         let app_path = if let Some(path) = binary_path {
             path
         } else {
@@ -370,8 +364,6 @@ impl<P: LinuxClient + 'static> Platform for LinuxPlatform<P> {
 
         log::info!("Restarting process, using app path: {:?}", app_path);
 
-        // Script to wait for the current process to exit and then restart the app.
-        // Pass dynamic values as positional parameters to avoid shell interpolation issues.
         let script = r#"
             while kill -0 "$0" 2>/dev/null; do
                 sleep 0.1
@@ -575,7 +567,6 @@ impl<P: LinuxClient + 'static> Platform for LinuxPlatform<P> {
     }
 
     fn can_select_mixed_files_and_dirs(&self) -> bool {
-        // org.freedesktop.portal.FileChooser only supports "pick files" and "pick directories".
         false
     }
 
@@ -673,7 +664,6 @@ impl<P: LinuxClient + 'static> Platform for LinuxPlatform<P> {
     }
 
     fn app_path(&self) -> Result<PathBuf> {
-        // get the path of the executable of the current process
         let app_path = env::current_exe()?;
         Ok(app_path)
     }
@@ -688,9 +678,7 @@ impl<P: LinuxClient + 'static> Platform for LinuxPlatform<P> {
         self.inner.with_common(|common| Some(common.menus.clone()))
     }
 
-    fn set_dock_menu(&self, _menu: Vec<MenuItem>, _keymap: &Keymap) {
-        // todo(linux)
-    }
+    fn set_dock_menu(&self, _menu: Vec<MenuItem>, _keymap: &Keymap) {}
 
     fn path_for_auxiliary_executable(&self, _name: &str) -> Result<PathBuf> {
         Err(anyhow::Error::msg(
@@ -750,8 +738,6 @@ impl<P: LinuxClient + 'static> Platform for LinuxPlatform<P> {
                     item.unlock().await?;
                     let secret = item.secret().await?;
 
-                    // we lose the zeroizing capabilities at this boundary,
-                    // a current limitation GPUI's credentials api
                     return Ok(Some((username.to_string(), secret.to_vec())));
                 } else {
                     continue;
@@ -897,10 +883,6 @@ pub(super) fn is_within_click_distance(a: Point<Pixels>, b: Point<Pixels>) -> bo
     diff.x.abs() <= DOUBLE_CLICK_DISTANCE && diff.y.abs() <= DOUBLE_CLICK_DISTANCE
 }
 
-/// Creates an XKB context for keymaps supplied by Wayland or X11.
-///
-/// Server keymaps are already resolved and need no local keyboard definitions.
-/// Loading default include paths can fail on systems without those files.
 #[cfg(any(feature = "wayland", feature = "x11"))]
 pub(super) fn new_xkb_context() -> anyhow::Result<xkb::Context> {
     validate_xkb_context(xkb::Context::new(xkb::CONTEXT_NO_DEFAULT_INCLUDES))
@@ -982,8 +964,6 @@ pub(super) const DEFAULT_CURSOR_ICON_NAME: &str = "left_ptr";
 
 #[cfg(any(feature = "wayland", feature = "x11"))]
 pub(super) fn cursor_style_to_icon_names(style: CursorStyle) -> &'static [&'static str] {
-    // Based on cursor names from chromium:
-    // https://github.com/chromium/chromium/blob/d3069cf9c973dc3627fa75f64085c6a86c8f41bf/ui/base/cursor/cursor_factory.cc#L113
     match style {
         CursorStyle::Arrow => &[DEFAULT_CURSOR_ICON_NAME],
         CursorStyle::IBeam => &["text", "xterm"],
@@ -1162,9 +1142,6 @@ pub(super) fn keystroke_from_xkb(
             {
                 if key.is_ascii_graphic() {
                     key_utf8.to_lowercase()
-                // map ctrl-a to `a`
-                // ctrl-0..9 may emit control codes like ctrl-[, but
-                // we don't want to map them to `[`
                 } else if key_utf32 <= 0x1f
                     && !name.chars().next().is_some_and(|c| c.is_ascii_digit())
                 {
@@ -1183,15 +1160,11 @@ pub(super) fn keystroke_from_xkb(
     };
 
     if modifiers.shift {
-        // we only include the shift for upper-case letters by convention,
-        // so don't include for numbers and symbols, but do include for
-        // tab/enter, etc.
         if key.chars().count() == 1 && key.to_lowercase() == key.to_uppercase() {
             modifiers.shift = false;
         }
     }
 
-    // Ignore control characters (and DEL) for the purposes of key_char
     let key_char =
         (key_utf32 >= 32 && key_utf32 != 127 && !key_utf8.is_empty()).then_some(key_utf8);
 
@@ -1202,10 +1175,6 @@ pub(super) fn keystroke_from_xkb(
     }
 }
 
-/**
- * Returns which symbol the dead key represents
- * <https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values#dead_keycodes_for_linux>
- */
 #[cfg(any(feature = "wayland", feature = "x11"))]
 pub fn keystroke_underlying_dead_key(keysym: Keysym) -> Option<String> {
     match keysym {
@@ -1282,9 +1251,6 @@ pub(super) fn capslock_from_xkb(keymap_state: &State) -> zz_gpui::Capslock {
     zz_gpui::Capslock { on }
 }
 
-/// Resolve a Linux `dev_t` to PCI vendor/device IDs via sysfs, returning a
-/// [`CompositorGpuHint`] that the GPU adapter selection code can use to
-/// prioritize the compositor's rendering device.
 #[cfg(any(feature = "wayland", feature = "x11"))]
 pub(super) fn compositor_gpu_hint_from_dev_t(dev: u64) -> Option<crate::wgpu::CompositorGpuHint> {
     fn dev_major(dev: u64) -> u32 {
@@ -1380,10 +1346,7 @@ mod tests {
     #[cfg(any(feature = "wayland", feature = "x11"))]
     #[test]
     fn rejects_null_xkb_context() {
-        let context = unsafe {
-            // libxkbcommon permits unref on null, matching the value returned by Context::new on failure.
-            xkb::Context::from_raw_ptr(std::ptr::null_mut())
-        };
+        let context = unsafe { xkb::Context::from_raw_ptr(std::ptr::null_mut()) };
         let error = validate_xkb_context(context)
             .err()
             .expect("null XKB context should be rejected");
@@ -1576,8 +1539,6 @@ mod tests {
                     }
                 }
             });
-            // The total transfer (~480ms) exceeds the timeout; this only
-            // passes because the timeout is re-armed per chunk.
             let bytes = read_fd_with_timeout(pipe.read, timeout).unwrap();
             writer.join().unwrap();
             assert_eq!(bytes, vec![b'x'; 1000 * chunks]);
@@ -1586,7 +1547,6 @@ mod tests {
         #[test]
         fn reads_payload_larger_than_pipe_capacity() {
             let pipe = filedescriptor::Pipe::new().unwrap();
-            // Exceeds the 64 KiB pipe capacity, forcing the writer to block.
             let payload = vec![b'z'; 1024 * 1024];
 
             let writer = std::thread::spawn({

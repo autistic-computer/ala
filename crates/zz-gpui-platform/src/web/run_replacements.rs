@@ -39,7 +39,6 @@ pub(crate) fn collect_candidates(
             run_end += run.len;
         }
         let Some(run) = font_run else { break };
-        // Paint-only run boundaries must not split a fallback grapheme.
         while let Some(next_run) = font_runs.next_if(|next| next.font_id == run.font_id) {
             run_end += next_run.len;
         }
@@ -108,8 +107,6 @@ struct Segment {
     length: usize,
 }
 
-/// Ranges refer to the original flattened glyph stream and must be sorted,
-/// non-overlapping, nonempty, and in bounds.
 pub(crate) fn apply_replacements(layout: &mut LineLayout, replacements: Vec<Replacement>) {
     if replacements.is_empty() {
         return;
@@ -170,8 +167,6 @@ pub(crate) fn apply_replacements(layout: &mut LineLayout, replacements: Vec<Repl
         glyphs: Vec::new(),
     });
 
-    // Every destination is at or after its source. Expanding from the right
-    // therefore cannot overwrite an original run that still needs processing.
     let mut destination_end = final_run_count;
     for (source_index, segments) in (0..source_run_count).zip(segments_by_run).rev() {
         let destination_start = destination_end - segments.len();
@@ -557,8 +552,6 @@ mod tests {
 
     #[test]
     fn exhaustive_small_streams_match_reference() {
-        // Base-four choices at each original glyph: keep, start a native-font
-        // replacement, start a fallback replacement, or extend the previous one.
         for first in 0..=4 {
             for second in 0..=4 - first {
                 let lengths = [first, 0, second, 4 - first - second];

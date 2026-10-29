@@ -1,10 +1,3 @@
-//! Visual test platform that combines real rendering (macOs-only for now) with controllable TestDispatcher.
-//!
-//! This platform is used for visual tests that need:
-//! - Real rendering (e.g. Metal/compositor) for accurate screenshots
-//! - Deterministic task scheduling via TestDispatcher
-//! - Controllable time via `advance_clock`
-
 use crate::ScreenCaptureSource;
 use crate::{
     ActivityGuard, AnyWindowHandle, BackgroundExecutor, ClipboardItem, CursorStyle,
@@ -22,12 +15,6 @@ use std::{
     sync::Arc,
 };
 
-/// A platform that combines real Mac rendering with controllable TestDispatcher.
-///
-/// This allows visual tests to:
-/// - Render real UI via Metal for accurate screenshots
-/// - Control task scheduling deterministically via TestDispatcher
-/// - Advance simulated time for testing time-based behaviors (tooltips, animations, etc.)
 pub struct VisualTestPlatform {
     dispatcher: TestDispatcher,
     background_executor: BackgroundExecutor,
@@ -38,9 +25,6 @@ pub struct VisualTestPlatform {
 }
 
 impl VisualTestPlatform {
-    /// Creates a new VisualTestPlatform with the given random seed.
-    ///
-    /// The seed is used for deterministic random number generation in the TestDispatcher.
     pub fn new(platform: Rc<dyn Platform>, seed: u64) -> Self {
         let dispatcher = TestDispatcher::new(seed);
         let arc_dispatcher = Arc::new(dispatcher.clone());
@@ -58,7 +42,6 @@ impl VisualTestPlatform {
         }
     }
 
-    /// Returns a reference to the TestDispatcher for controlling task scheduling and time.
     pub fn dispatcher(&self) -> &TestDispatcher {
         &self.dispatcher
     }

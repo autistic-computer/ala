@@ -45,7 +45,6 @@ impl Quote {
     pub fn random() -> Self {
         use rand::Rng;
         let mut rng = rand::rng();
-        // simulate a base price in a realistic range
         let prev_close = rng.random_range(100.0..200.0);
         let change = rng.random_range(-5.0..5.0);
         let last_done = prev_close + change;
@@ -256,11 +255,9 @@ impl RenderOnce for TableRow {
 }
 
 struct DataTable {
-    /// Use `Rc` to share the same quote data across multiple items, avoid cloning.
     quotes: Vec<Rc<Quote>>,
     visible_range: Range<usize>,
     scroll_handle: UniformListScrollHandle,
-    /// The position in thumb bounds when dragging start mouse down.
     drag_position: Option<Point<Pixels>>,
 }
 

@@ -1,4 +1,3 @@
-// todo("windows"): remove
 #![cfg_attr(windows, allow(dead_code))]
 
 use schemars::JsonSchema;
@@ -19,16 +18,10 @@ use std::{
 };
 
 #[allow(non_camel_case_types, unused)]
-#[expect(missing_docs)]
 pub type PathVertex_ScaledPixels = PathVertex<ScaledPixels>;
 
-#[expect(missing_docs)]
 pub type DrawOrder = u32;
 
-/// A boolean stored as a `u32` so that GPU-facing structs contain no
-/// compiler-inserted padding bytes, which would be undefined behavior to
-/// reinterpret as `&[u8]` when writing instance buffers. Guaranteed to be
-/// `0` or `1` by construction; shaders read it as a `u32`/`uint`.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct PaddedBool32(u32);
@@ -39,24 +32,14 @@ impl From<bool> for PaddedBool32 {
     }
 }
 
-/// A rounded rectangle that every primitive in a scene except drop shadows is
-/// clipped to. Client-side-decorated windows use this to keep square-edged
-/// content (scrollbars, embedded surfaces) inside their rounded frame; shadows
-/// are exempt because the frame's own drop shadow lives outside the mask.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct WindowCornerMask {
-    /// The rectangle content is clipped to, in scaled pixels.
     pub bounds: Bounds<ScaledPixels>,
-    /// The corner radii of the clip rectangle, in scaled pixels.
     pub corner_radii: Corners<ScaledPixels>,
-    /// Superellipse exponent for the clip's corners, matching what the frame
-    /// it traces is drawn with. A mask left circular around a squircle frame
-    /// cuts the frame's own border off wherever the two curves part.
     pub corner_smoothing: f32,
 }
 
 #[derive(Default)]
-#[expect(missing_docs)]
 pub struct Scene {
     pub(crate) paint_operations: Vec<PaintOperation>,
     primitive_bounds: BoundsTree<ScaledPixels>,
@@ -229,7 +212,6 @@ struct OpenShaderLayer {
     scene: Scene,
 }
 
-#[expect(missing_docs)]
 impl Scene {
     pub fn clear(&mut self) {
         self.paint_operations.clear();
@@ -284,8 +266,6 @@ impl Scene {
         self.paint_operations.push(PaintOperation::EndLayer);
     }
 
-    /// Start capturing primitives into a nested scene that the renderer draws
-    /// to a texture and then composites through the descriptor's shader.
     pub(crate) fn push_shader_layer(&mut self, descriptor: ShaderLayerDescriptor) {
         self.paint_operations
             .push(PaintOperation::StartShaderLayer(descriptor.clone()));
@@ -360,8 +340,6 @@ impl Scene {
             return false;
         }
 
-        // Glass reads its whole backdrop, clipped or not, so it orders after
-        // everything painted under any of it.
         let ordered_bounds = match &*primitive {
             Primitive::Glass(glass) => glass.backdrop_bounds,
             _ => clipped_bounds,
@@ -528,7 +506,6 @@ pub(crate) enum PaintOperation {
 }
 
 #[derive(Clone)]
-#[expect(missing_docs)]
 pub enum Primitive {
     Shadow(Shadow),
     Quad(Quad),
@@ -544,7 +521,6 @@ pub enum Primitive {
 
 const _: () = assert!(std::mem::size_of::<Primitive>() <= std::mem::size_of::<Quad>() + 8);
 
-#[expect(missing_docs)]
 impl Primitive {
     pub fn bounds(&self) -> &Bounds<ScaledPixels> {
         match self {
@@ -557,8 +533,6 @@ impl Primitive {
             Primitive::PolychromeSprite(sprite) => &sprite.bounds,
             Primitive::Surface(surface) => &surface.bounds,
             Primitive::ShaderLayer(layer) => &layer.bounds,
-            // Glass reads what lies past its edge, so it orders after
-            // everything painted under its whole backdrop.
             Primitive::Glass(glass) => &glass.backdrop_bounds,
         }
     }
@@ -833,7 +807,6 @@ impl<'a> Iterator for BatchIterator<'a> {
     ),
     allow(dead_code)
 )]
-#[allow(missing_docs)]
 pub enum PrimitiveBatch {
     Shadows(Range<usize>),
     Quads(Range<usize>),
@@ -858,7 +831,6 @@ pub enum PrimitiveBatch {
 }
 
 impl PrimitiveBatch {
-    #[expect(missing_docs)]
     pub fn label(&self) -> String {
         match self {
             Self::Shadows(range) => format!("shadows ({})", range.len()),
@@ -895,7 +867,6 @@ impl PrimitiveBatch {
 
 #[derive(Default, Debug, Copy, Clone)]
 #[repr(C)]
-#[expect(missing_docs)]
 pub struct Quad {
     pub order: DrawOrder,
     pub border_style: BorderStyle,
@@ -905,21 +876,11 @@ pub struct Quad {
     pub border_color: Hsla,
     pub corner_radii: Corners<ScaledPixels>,
     pub border_widths: Edges<ScaledPixels>,
-    /// Superellipse exponent for the rounded corners: `2.0` is a circular
-    /// arc, `4.0` is a squircle (continuous corner).
     pub corner_smoothing: f32,
-    /// Padding for alignment for repr(C) layout.
     pub pad: [u32; 3],
 }
 
-// Shader-side `Bounds` is built from `vec2<f32>`, so every backend aligns
-// `Quad` to 8 and rounds its size up to match. Rust's `repr(C)` alignment is
-// only 4, so a field that leaves the size off an 8-byte boundary shrinks the
-// instance stride below what the shader reads and every draw fails with a
-// binding-size mismatch.
 const _: () = assert!(size_of::<Quad>().is_multiple_of(8));
-// The WebGL quad decoder fetches whole 16-byte instance texels at a fixed
-// per-instance texel stride, so a quad must also fill its last texel.
 const _: () = assert!(size_of::<Quad>().is_multiple_of(16));
 const _: () = assert!(size_of::<Shadow>().is_multiple_of(8));
 
@@ -931,10 +892,9 @@ impl From<Quad> for Primitive {
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
-#[expect(missing_docs)]
 pub struct Underline {
     pub order: DrawOrder,
-    pub pad: u32, // align to 8 bytes
+    pub pad: u32,
     pub bounds: Bounds<ScaledPixels>,
     pub content_mask: ContentMask<ScaledPixels>,
     pub color: Hsla,
@@ -950,7 +910,6 @@ impl From<Underline> for Primitive {
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
-#[expect(missing_docs)]
 pub struct Shadow {
     pub order: DrawOrder,
     pub blur_radius: ScaledPixels,
@@ -960,10 +919,7 @@ pub struct Shadow {
     pub color: Hsla,
     pub element_bounds: Bounds<ScaledPixels>,
     pub element_corner_radii: Corners<ScaledPixels>,
-    /// 0 = drop shadow (rendered outside the element), 1 = inset shadow (rendered inside).
     pub inset: u32,
-    /// Superellipse exponent for the corners, matching the element the shadow
-    /// traces.
     pub corner_smoothing: f32,
 }
 
@@ -973,32 +929,24 @@ impl From<Shadow> for Primitive {
     }
 }
 
-/// The style of a border.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[repr(C)]
 pub enum BorderStyle {
-    /// A solid border.
     #[default]
     Solid = 0,
-    /// A dashed border.
     Dashed = 1,
 }
 
-/// A data type representing a 2 dimensional transformation that can be applied to an element.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
 pub struct TransformationMatrix {
-    /// 2x2 matrix containing rotation and scale,
-    /// stored row-major
     pub rotation_scale: [[f32; 2]; 2],
-    /// translation vector
     pub translation: [f32; 2],
 }
 
 impl Eq for TransformationMatrix {}
 
 impl TransformationMatrix {
-    /// The unit matrix, has no effect.
     pub fn unit() -> Self {
         Self {
             rotation_scale: [[1.0, 0.0], [0.0, 1.0]],
@@ -1006,7 +954,6 @@ impl TransformationMatrix {
         }
     }
 
-    /// Move the origin by a given point
     pub fn translate(mut self, point: Point<ScaledPixels>) -> Self {
         self.compose(Self {
             rotation_scale: [[1.0, 0.0], [0.0, 1.0]],
@@ -1014,7 +961,6 @@ impl TransformationMatrix {
         })
     }
 
-    /// Clockwise rotation in radians around the origin
     pub fn rotate(self, angle: Radians) -> Self {
         self.compose(Self {
             rotation_scale: [
@@ -1025,7 +971,6 @@ impl TransformationMatrix {
         })
     }
 
-    /// Scale around the origin
     pub fn scale(self, size: Size<f32>) -> Self {
         self.compose(Self {
             rotation_scale: [[size.width, 0.0], [0.0, size.height]],
@@ -1033,15 +978,11 @@ impl TransformationMatrix {
         })
     }
 
-    /// Perform matrix multiplication with another transformation
-    /// to produce a new transformation that is the result of
-    /// applying both transformations: first, `other`, then `self`.
     #[inline]
     pub fn compose(self, other: TransformationMatrix) -> TransformationMatrix {
         if other == Self::unit() {
             return self;
         }
-        // Perform matrix multiplication
         TransformationMatrix {
             rotation_scale: [
                 [
@@ -1068,7 +1009,6 @@ impl TransformationMatrix {
         }
     }
 
-    /// Apply transformation to a point, mainly useful for debugging
     pub fn apply(&self, point: Point<Pixels>) -> Point<Pixels> {
         let input = [point.x.0, point.y.0];
         let mut output = self.translation;
@@ -1089,7 +1029,6 @@ impl Default for TransformationMatrix {
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
-#[expect(missing_docs)]
 pub struct MonochromeSprite {
     pub order: DrawOrder,
     pub pad: u32,
@@ -1108,10 +1047,9 @@ impl From<MonochromeSprite> for Primitive {
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
-#[expect(missing_docs)]
 pub struct SubpixelSprite {
     pub order: DrawOrder,
-    pub pad: u32, // align to 8 bytes
+    pub pad: u32,
     pub bounds: Bounds<ScaledPixels>,
     pub content_mask: ContentMask<ScaledPixels>,
     pub color: Hsla,
@@ -1127,7 +1065,6 @@ impl From<SubpixelSprite> for Primitive {
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
-#[expect(missing_docs)]
 pub struct PolychromeSprite {
     pub order: DrawOrder,
     pub pad: u32,
@@ -1136,17 +1073,11 @@ pub struct PolychromeSprite {
     pub bounds: Bounds<ScaledPixels>,
     pub content_mask: ContentMask<ScaledPixels>,
     pub corner_radii: Corners<ScaledPixels>,
-    /// Superellipse exponent for the rounded corners: `2.0` is a circular
-    /// arc, `4.0` is a squircle (continuous corner). An image inside a rounded
-    /// frame has to be cut with the same curve the frame is drawn with, or the
-    /// two edges part company along the diagonal.
     pub corner_smoothing: f32,
-    /// Padding for alignment for repr(C) layout.
     pub pad2: u32,
     pub tile: AtlasTile,
 }
 
-// Same 8-byte shader stride `Quad` is padded to, for the same reason.
 const _: () = assert!(size_of::<PolychromeSprite>().is_multiple_of(8));
 
 impl From<PolychromeSprite> for Primitive {
@@ -1156,27 +1087,14 @@ impl From<PolychromeSprite> for Primitive {
 }
 
 #[derive(Clone, Debug)]
-#[allow(missing_docs)]
 pub struct PaintSurface {
     pub order: DrawOrder,
     pub bounds: Bounds<ScaledPixels>,
     pub content_mask: ContentMask<ScaledPixels>,
     pub corner_radii: Corners<ScaledPixels>,
-    /// Superellipse exponent for the rounded corners, as on [`Quad`]. A surface
-    /// fills a pane whose frame is drawn with quads, so it is cut with their
-    /// curve rather than a plain arc.
     pub corner_smoothing: f32,
-    /// `None` punches a hole instead of drawing an image: everything painted
-    /// under the surface's shape is cleared to transparent, so a native layer
-    /// placed below the window's renderer shows through it.
     #[cfg(target_os = "macos")]
     pub image_buffer: Option<core_video::pixel_buffer::CVPixelBuffer>,
-    /// Set on a surface that stands in for a native layer below the window
-    /// ([`crate::Window::paint_underlay`]). Unless glass that blurs what is
-    /// under it is drawn over it later, [`Scene::finish`] drops the image and
-    /// punches the hole, so the layer shows through; under such glass the
-    /// image is drawn, so the glass has something to blur. Glass only beside
-    /// it does not count, though its blur reaches in.
     #[cfg(target_os = "macos")]
     pub underlay: bool,
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
@@ -1192,12 +1110,9 @@ impl From<PaintSurface> for Primitive {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[expect(missing_docs)]
 pub struct PathId(pub usize);
 
-/// A line made up of a series of vertices and control points.
 #[derive(Clone, Debug)]
-#[expect(missing_docs)]
 pub struct Path<P: Clone + Debug + Default + PartialEq> {
     pub id: PathId,
     pub order: DrawOrder,
@@ -1211,7 +1126,6 @@ pub struct Path<P: Clone + Debug + Default + PartialEq> {
 }
 
 impl Path<Pixels> {
-    /// Create a new path with the given starting point.
     pub fn new(start: Point<Pixels>) -> Self {
         Self {
             id: PathId(0),
@@ -1229,7 +1143,6 @@ impl Path<Pixels> {
         }
     }
 
-    /// Scale this path by the given factor.
     pub fn scale(&self, factor: f32) -> Path<ScaledPixels> {
         Path {
             id: self.id,
@@ -1248,14 +1161,12 @@ impl Path<Pixels> {
         }
     }
 
-    /// Move the start, current point to the given point.
     pub fn move_to(&mut self, to: Point<Pixels>) {
         self.contour_count += 1;
         self.start = to;
         self.current = to;
     }
 
-    /// Draw a straight line from the current point to the given point.
     pub fn line_to(&mut self, to: Point<Pixels>) {
         self.contour_count += 1;
         if self.contour_count > 1 {
@@ -1267,7 +1178,6 @@ impl Path<Pixels> {
         self.current = to;
     }
 
-    /// Draw a curve from the current point to the given point, using the given control point.
     pub fn curve_to(&mut self, to: Point<Pixels>, ctrl: Point<Pixels>) {
         self.contour_count += 1;
         if self.contour_count > 1 {
@@ -1284,7 +1194,6 @@ impl Path<Pixels> {
         self.current = to;
     }
 
-    /// Push a triangle to the Path.
     pub fn push_triangle(
         &mut self,
         xy: (Point<Pixels>, Point<Pixels>, Point<Pixels>),
@@ -1328,7 +1237,6 @@ where
     T: Clone + Debug + Default + PartialEq + PartialOrd + Add<T, Output = T> + Sub<Output = T>,
 {
     #[allow(unused)]
-    #[expect(missing_docs)]
     pub fn clipped_bounds(&self) -> Bounds<T> {
         self.bounds.intersect(&self.content_mask.bounds)
     }
@@ -1342,14 +1250,12 @@ impl From<Path<ScaledPixels>> for Primitive {
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-#[expect(missing_docs)]
 pub struct PathVertex<P: Clone + Debug + Default + PartialEq> {
     pub xy_position: Point<P>,
     pub st_position: Point<f32>,
     pub content_mask: ContentMask<P>,
 }
 
-#[expect(missing_docs)]
 impl PathVertex<Pixels> {
     pub fn scale(&self, factor: f32) -> PathVertex<ScaledPixels> {
         PathVertex {
@@ -1360,21 +1266,6 @@ impl PathVertex<Pixels> {
     }
 }
 
-/// A WGSL fragment shader that [`crate::Window::paint_shader_layer`] runs over
-/// what its closure paints.
-///
-/// The module holds one `@fragment` entry point. Its bindings, all in group 0:
-///
-/// - `@binding(0)`: a `texture_2d<f32>` with the layer's content, sized to the
-///   layer in device pixels, premultiplied.
-/// - `@binding(1)`: a `var<uniform>` filled with the layer's uniform bytes.
-/// - `@binding(2)`: a filtering `sampler` that clamps to the edge.
-///
-/// Its only input is `@location(0) vec2<f32>`, the fragment's position inside
-/// the layer in device pixels, with the origin at the top left and pixel
-/// centers on halves. It writes one premultiplied color to `@location(0)`,
-/// which is blended over the frame. A renderer that cannot compile the module
-/// paints the layer's content unchanged.
 #[derive(Clone)]
 pub struct CustomShader(Arc<CustomShaderSource>);
 
@@ -1384,8 +1275,6 @@ struct CustomShaderSource {
 }
 
 impl CustomShader {
-    /// Wrap WGSL source. Equal sources share one id, so renderers compile
-    /// each distinct module once.
     pub fn new(wgsl: impl Into<SharedString>) -> Self {
         let wgsl = wgsl.into();
         let mut hasher = std::hash::DefaultHasher::new();
@@ -1396,12 +1285,10 @@ impl CustomShader {
         }))
     }
 
-    /// A stable identifier derived from the source.
     pub fn id(&self) -> u64 {
         self.0.id
     }
 
-    /// The WGSL source.
     pub fn wgsl(&self) -> &str {
         &self.0.wgsl
     }
@@ -1423,10 +1310,7 @@ pub(crate) struct ShaderLayerDescriptor {
     pub(crate) uniforms: Arc<[u8]>,
 }
 
-/// Content painted into its own scene, drawn to a texture and composited
-/// through a [`CustomShader`].
 #[derive(Clone)]
-#[expect(missing_docs)]
 pub struct ShaderLayer {
     pub order: DrawOrder,
     pub bounds: Bounds<ScaledPixels>,

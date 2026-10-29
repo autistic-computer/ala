@@ -1,9 +1,3 @@
-//! Tests for the input composition. Require the `test-support` feature:
-//!
-//! ```sh
-//! cargo test -p zz-gpui --example view_example --features test-support
-//! ```
-
 #[cfg(test)]
 mod tests {
     use zz_gpui::{Context, Entity, KeyBinding, TestAppContext, Window, prelude::*};
@@ -12,9 +6,6 @@ mod tests {
     use crate::example_input::Input;
     use crate::{Backspace, Delete, End, Home, Left, Right};
 
-    /// Two inputs, each backed by an editor we own (so the test can focus and
-    /// read them). Proves data flows through the shared `String` and that
-    /// sibling inputs stay isolated.
     struct Harness {
         a: Entity<Editor>,
         b: Entity<Editor>,
@@ -64,7 +55,6 @@ mod tests {
         let a_value = cx.read_entity(&a, |e, _| e.value.clone());
         let b_value = cx.read_entity(&b, |e, _| e.value.clone());
 
-        // Focus the first input's editor.
         cx.update(|window, cx| {
             let focus_handle = a.read(cx).focus_handle.clone();
             window.focus(&focus_handle, cx);
@@ -102,9 +92,6 @@ mod tests {
         cx.simulate_input("hello");
         cx.read_entity(&editor, |editor, _| assert_eq!(editor.cursor, 5));
 
-        // Write the shared value from outside the editor. The old cursor (5)
-        // now points into the middle of a multi-byte character; the editor's
-        // observation must clamp it back onto a boundary.
         cx.update(|_, cx| {
             a_value.update(cx, |value, cx| {
                 *value = "日本".to_string();

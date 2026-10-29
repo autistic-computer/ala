@@ -39,10 +39,6 @@ where
         })))
     }
 
-    /// Inserts a new [`Subscription`] for the given `emitter_key`. By default, subscriptions
-    /// are inert, meaning that they won't be listed when calling `[SubscriberSet::remove]` or `[SubscriberSet::retain]`.
-    /// This method returns a tuple of a [`Subscription`] and an `impl FnOnce`, and you can use the latter
-    /// to activate the [`Subscription`].
     pub fn insert(
         &self,
         emitter_key: EmitterKey,
@@ -105,8 +101,6 @@ where
             })
     }
 
-    /// Call the given callback for each subscriber to the given emitter.
-    /// If the callback returns false, the subscriber is removed.
     pub fn retain<F>(&self, emitter: &EmitterKey, mut f: F)
     where
         F: FnMut(&mut Callback) -> bool,
@@ -133,7 +127,6 @@ where
         });
         let mut lock = self.0.borrow_mut();
 
-        // Add any new subscribers that were added while invoking the callback.
         if let Some(Some(new_subscribers)) = lock.subscribers.remove(emitter) {
             subscribers.extend(new_subscribers);
         }
@@ -144,31 +137,22 @@ where
     }
 }
 
-/// A handle to a subscription created by GPUI. When dropped, the subscription
-/// is cancelled and the callback will no longer be invoked.
 #[must_use]
 pub struct Subscription {
     unsubscribe: Option<Box<dyn FnOnce() + 'static>>,
 }
 
 impl Subscription {
-    /// Creates a new subscription with a callback that gets invoked when
-    /// this subscription is dropped.
     pub fn new(unsubscribe: impl 'static + FnOnce()) -> Self {
         Self {
             unsubscribe: Some(Box::new(unsubscribe)),
         }
     }
 
-    /// Detaches the subscription from this handle. The callback will
-    /// continue to be invoked until the entities it has been
-    /// subscribed to are dropped
     pub fn detach(mut self) {
         self.unsubscribe.take();
     }
 
-    /// Joins two subscriptions into a single subscription. Detach will
-    /// detach both interior subscriptions.
     pub fn join(mut subscription_a: Self, mut subscription_b: Self) -> Self {
         let a_unsubscribe = subscription_a.unsubscribe.take();
         let b_unsubscribe = subscription_b.unsubscribe.take();
@@ -218,8 +202,6 @@ mod tests {
         let sub_a: Rc<RefCell<Option<Subscription>>> = Default::default();
         let sub_b: Rc<RefCell<Option<Subscription>>> = Default::default();
 
-        // Observer A fires first (lower subscriber_id). It drops itself and
-        // inserts a new observer for the same global.
         *sub_a.borrow_mut() = Some(app.update({
             let count = observer_a_count.clone();
             let sub_a = sub_a.clone();
@@ -232,7 +214,6 @@ mod tests {
             }
         }));
 
-        // Observer B fires second. It just drops itself.
         *sub_b.borrow_mut() = Some(app.update({
             let count = observer_b_count.clone();
             let sub_b = sub_b.clone();
@@ -244,12 +225,10 @@ mod tests {
             }
         }));
 
-        // Both fire once.
         app.update(|cx| cx.set_global(TestGlobal));
         assert_eq!(observer_a_count.get(), 1);
         assert_eq!(observer_b_count.get(), 1);
 
-        // Neither should fire again — both dropped their subscriptions.
         app.update(|cx| cx.set_global(TestGlobal));
         assert_eq!(observer_a_count.get(), 1);
         assert_eq!(observer_b_count.get(), 1, "orphaned subscriber fired again");
@@ -266,7 +245,6 @@ mod tests {
         let observer_b_count = Rc::new(Cell::new(0usize));
         let sub_b: Rc<RefCell<Option<Subscription>>> = Default::default();
 
-        // Observer A fires first and drops B's subscription.
         app.update({
             let sub_b = sub_b.clone();
             move |cx| {
@@ -277,7 +255,6 @@ mod tests {
             }
         });
 
-        // Observer B fires second — but A already dropped it.
         *sub_b.borrow_mut() = Some(app.update({
             let count = observer_b_count.clone();
             move |cx| {

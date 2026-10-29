@@ -254,7 +254,6 @@ impl Render for WindowDemo {
             .child(button("Hide Application", |window, cx| {
                 cx.hide();
 
-                // Restore the application after 3 seconds
                 window
                     .spawn(cx, async move |cx| {
                         cx.background_executor()

@@ -1,52 +1,24 @@
-// Liquid glass. One module for every renderer: wgpu loads it as is and Metal
-// translates it through naga.
-//
-// A glass batch runs in three steps. The frame under each glass region is
-// copied into level 0 of a chain of textures that spans just those regions,
-// dual Kawase passes blur them down the chain and back up to level 1, and
-// one draw per glass refracts, tints, and lights what the chain holds. The
-// chain is addressed in device pixels from its origin, scaled down by its
-// level, so regions keep their places at every level.
-
 struct GlassShape {
-    // origin.xy, size.zw in device pixels
     rect: vec4<f32>,
-    // top_left, top_right, bottom_right, bottom_left
     radii: vec4<f32>,
 }
 
 struct Glass {
     shapes: array<GlassShape, 8>,
-    // The rectangle drawn: origin.xy, size.zw.
     quad: vec4<f32>,
-    // Level 0 texels holding this glass's backdrop: min.xy, max.zw.
     backdrop: vec4<f32>,
-    // Straight color mixed over the backdrop, alpha as its strength.
     tint: vec4<f32>,
-    // bezel width, refraction at the edge, dispersion, blurred level (0 = sharp)
     optics: vec4<f32>,
-    // light direction xy, glint strength, glint width
     light: vec4<f32>,
-    // saturation, brightness, contrast, grain
     tone: vec4<f32>,
-    // fresnel glow, edge shadow strength, edge shadow width, opacity
     rim: vec4<f32>,
-    // shape count, corner smoothing, merge radius, then how deep inside a
-    // shape the face is flat (0 computes the field everywhere)
     shape: vec4<f32>,
-    // touch glow center xy, radius, strength
     glow: vec4<f32>,
-    // viewport size, then where level 0 of the chain starts in the frame
     viewport: vec4<f32>,
-    // the window's rounded clip: rect, radii, then smoothing and whether set,
-    // then how directional the light is and how evenly the contour runs
     mask_rect: vec4<f32>,
     mask_radii: vec4<f32>,
     mask: vec4<f32>,
-    // color of the glint and the fresnel glow, premultiplied by its alpha in w
     light_color: vec4<f32>,
-    // color of the contour; its alpha is in the edge shadow strength, then 1
-    // when the glass draws only the light along its rim
     edge_color: vec4<f32>,
     shadow_bounds: vec4<f32>,
     shadow_radii: vec4<f32>,
@@ -55,9 +27,7 @@ struct Glass {
 }
 
 struct Blur {
-    // Source texels holding valid data: min.xy, max.zw.
     source: vec4<f32>,
-    // tap offset in source texels, pad
     params: vec4<f32>,
 }
 
@@ -69,8 +39,6 @@ struct Blur {
 @group(0) @binding(4) var<uniform> blur: Blur;
 @group(0) @binding(5) var blur_sampler: sampler;
 @group(0) @binding(6) var blur_source: texture_2d<f32>;
-
-// -- blur ------------------------------------------------------------------
 
 @vertex
 fn vs_glass_blur(@builtin(vertex_index) vertex_id: u32) -> @builtin(position) vec4<f32> {
@@ -84,8 +52,6 @@ fn blur_tap(position: vec2<f32>) -> vec4<f32> {
     return textureSampleLevel(blur_source, blur_sampler, clamped / size, 0.0);
 }
 
-// Halves the resolution: the center twice over and four diagonal taps, each
-// a bilinear average of four texels.
 @fragment
 fn fs_glass_down(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let center = position.xy * 2.0;
@@ -98,7 +64,6 @@ fn fs_glass_down(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f3
     return sum / 8.0;
 }
 
-// Doubles the resolution with a tent of eight taps around the source point.
 @fragment
 fn fs_glass_up(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let center = position.xy * 0.5;
@@ -118,8 +83,6 @@ fn fs_glass_up(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32>
 fn fs_glass_copy(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     return textureLoad(blur_source, vec2<i32>(position.xy) + vec2<i32>(blur.params.yz), 0);
 }
-
-// -- glass -----------------------------------------------------------------
 
 @vertex
 fn vs_glass(@builtin(vertex_index) vertex_id: u32) -> @builtin(position) vec4<f32> {
@@ -150,11 +113,6 @@ fn shadow_ring_vertex(vertex_id: u32) -> vec2<f32> {
     return mix(low, high, unit);
 }
 
-// Signed distance to a rounded rectangle (negative inside) and its outward
-// normal. Corners above smoothing 2 are superellipses, measured as a p-norm,
-// except on pills and circles. The normal comes from the same rectangle with
-// corners rounded at least as wide as the bezel, so it turns smoothly through
-// a tight corner instead of creasing along its diagonal.
 fn rounded_rect(point: vec2<f32>, shape: GlassShape, smoothing: f32, bezel: f32) -> vec3<f32> {
     let half_size = shape.rect.zw * 0.5;
     let center_to_point = point - (shape.rect.xy + half_size);
@@ -200,11 +158,6 @@ fn rounded_rect(point: vec2<f32>, shape: GlassShape, smoothing: f32, bezel: f32)
     return vec3<f32>(distance - radius, normalize(normal) * side);
 }
 
-// Smooth union of every shape, so shapes closer than the merge radius melt
-// into one body. The radius shrinks where the two edges face the same way,
-// which keeps neighbors in a row from bulging along their shared side. The
-// fourth component is half the shorter side of the shapes nearby, which
-// caps how deep the rim may lens.
 fn glass_field(point: vec2<f32>) -> vec4<f32> {
     let count = u32(glass.shape.x);
     let smoothing = glass.shape.y;
@@ -304,7 +257,6 @@ fn glass_shadow(position: vec2<f32>) -> vec4<f32> {
     return vec4<f32>(glass.shadow_color.rgb * alpha, alpha);
 }
 
-// What the frame already holds at this pixel, under the glass.
 fn under(frame_position: vec2<f32>) -> vec4<f32> {
     let position = frame_position - glass.viewport.zw;
     let clamped = clamp(position, glass.backdrop.xy + 0.5, glass.backdrop.zw - 0.5);
@@ -333,9 +285,6 @@ fn grain(position: vec2<f32>) -> f32 {
     return f32(state) / 4294967295.0 - 0.5;
 }
 
-// Whether a point lies at least `depth` inside a rounded rectangle, judged
-// without its curve: it is past `depth` from every side and past the largest
-// corner radius from one of them, where no corner reaches.
 fn deep_inside(point: vec2<f32>, shape: GlassShape, depth: f32) -> bool {
     let half_size = shape.rect.zw * 0.5;
     let inset = half_size - abs(point - (shape.rect.xy + half_size));
@@ -353,8 +302,6 @@ fn covered_by_body(point: vec2<f32>) -> bool {
     return false;
 }
 
-// Whether a point is on the flat face: deep inside one of the shapes, which
-// the melted body only deepens, and inside the window's clip.
 fn on_face(point: vec2<f32>) -> bool {
     let depth = glass.shape.w;
     if (depth <= 0.0) {
@@ -375,7 +322,6 @@ fn on_face(point: vec2<f32>) -> bool {
     return false;
 }
 
-// The backdrop's saturation, contrast and brightness, then the tint.
 fn toned(color: vec4<f32>) -> vec3<f32> {
     var rgb = color.rgb / max(color.a, 1e-4);
     let luminance = dot(rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
@@ -384,15 +330,8 @@ fn toned(color: vec4<f32>) -> vec3<f32> {
     return mix(rgb, glass.tint.rgb, glass.tint.a);
 }
 
-// Glass that reads its backdrop writes the pixel itself, with blending off:
-// its face replaces what it covers, which it already carries blurred, so
-// nothing under it shows through sharp, and past the face the frame's own
-// pixel goes back. Glass that reads nothing blends over the frame. Either
-// way the target stays premultiplied, whether or not the surface composites
-// that way.
 fn finish(position: vec2<f32>, color: vec4<f32>, lit: vec3<f32>, coverage: f32, contour: f32) -> vec4<f32> {
     var rgb = lit;
-    // Touch lights the glass from inside, brightest under the finger.
     if (glass.glow.w > 0.0) {
         let reach = 1.0 - saturate(length(position - glass.glow.xy) / max(glass.glow.z, 1.0));
         rgb = rgb + glass.glow.w * reach * reach;
@@ -423,8 +362,6 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         return glass_shadow(position);
     }
     let rim_only = glass.edge_color.w > 0.5;
-    // Past the rim nothing lenses, glints or casts the contour, so the face
-    // skips the field: most of a large surface draws like a fill.
     if (on_face(position)) {
         if (rim_only) {
             return vec4<f32>(0.0);
@@ -445,14 +382,10 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let away = max(-incidence, 0.0);
     let directionality = glass.mask.z;
 
-    // A thin contour just outside the edge, dark unless the material colors
-    // it and strongest along the light axis unless it spreads evenly,
-    // separates the glass from what it floats over.
     let contour_width = glass.rim.z;
     var contour = 0.0;
     if (contour_width > 0.0) {
         let lit = mix(mix(0.35, 1.0, facing), mix(0.2, 1.0, away), directionality);
-        // Only past the edge: inside, the body covers it.
         contour = glass.rim.y * (1.0 - saturate(distance / contour_width))
             * saturate(distance + 0.5)
             * mix(lit, 1.0, glass.mask.w);
@@ -465,15 +398,9 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     contour = contour * clip;
     let coverage = saturate(0.5 - distance) * clip;
     if (coverage <= 0.0) {
-        // Written rather than discarded: a discard slows the whole draw on
-        // tiled GPUs.
         return finish(position, vec4<f32>(0.0, 0.0, 0.0, 1.0), vec3<f32>(0.0), 0.0, contour);
     }
 
-    // The rim lenses the backdrop. Across the bezel the pull grows like a
-    // quarter circle, from nothing where the flat face starts to the full
-    // refraction at the edge, so the rim shows a squeezed, mirrored copy of
-    // what lies further in.
     let depth = max(-distance, 0.0);
     let bezel = clamp(glass.optics.x, 1e-3, max(field.w * 0.5, 1e-3));
     let edge = 1.0 - saturate(depth / bezel);
@@ -494,8 +421,6 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         }
     }
 
-    // The glint: a thin bright line along the edge where it faces the light
-    // axis, with a faint bleed inward, and a glow that fills the bezel.
     var glint = 0.0;
     var glow = 0.0;
     if (edge > 0.0) {
@@ -507,8 +432,6 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         glow = glass.rim.x * edge * edge * edge * mix(1.0, 0.25 + 0.75 * toward, directionality);
     }
 
-    // Rim-only glass lights what is already there: the glint adds to it and
-    // the glow lays the light color over it, premultiplied for blending.
     if (rim_only) {
         let veil = glow * glass.light_color.a;
         let light = glass.light_color.rgb * (glint * (1.0 - veil) + glow);

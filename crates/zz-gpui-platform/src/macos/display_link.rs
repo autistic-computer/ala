@@ -1,55 +1,3 @@
-//! Frame pacing for macOS windows, built on `CVDisplayLink`.
-//!
-//! CVDisplayLink has no safe teardown: `CVDisplayLinkStop` merely flags the
-//! link's io thread to exit "soon" and returns immediately, and there is no
-//! way to learn when (or whether) a final output callback has finished. Two
-//! crash classes came from ignoring this:
-//!
-//! * releasing the link after `stop` let the still-running io thread read the
-//!   freed link's internals (segfault in `CVHWTime::reset`, fixed by leaking
-//!   the link in #32116);
-//! * releasing the dispatch source that the output callback dereferenced via
-//!   its context pointer let a straggler callback read freed memory (segfault
-//!   in `dispatch_source_merge_data`, Sentry issue ZED-7XR).
-//!
-//! Instead of leaking one link and one source per teardown (and teardown
-//! happens on every resize tick, activation, and occlusion change), we keep a
-//! single immortal `CVDisplayLink` per display in a static registry and have
-//! windows subscribe to it:
-//!
-//! * Links are created lazily and never released, so the release race cannot
-//!   occur. The output callback's context is the display id (an integer, not
-//!   a pointer), and the only memory the callback dereferences is the static
-//!   registry, so a straggler callback after `stop` is a harmless no-op.
-//! * Each window owns one dispatch source for the life of the window. On
-//!   window close it is removed from the registry under the lock (making it
-//!   unreachable from the callback), cancelled, and genuinely released.
-//! * A display's link runs iff it has subscribers; windows never start or
-//!   stop links directly, so interleaved starts/stops of windows sharing a
-//!   display cannot conflict.
-//!
-//! One tradeoff of immortal entries: a link created for a given
-//! `CGDirectDisplayID` is reused forever, including after the display is
-//! unplugged and one reappears with the same id, or after mode/refresh-rate
-//! changes. `CVDisplayLink` looks up display timing dynamically, so a cached
-//! link keeps pacing correctly; if that ever proves untrue the fix is to
-//! also refresh entries from a display-reconfiguration callback, not to
-//! release links (which would reintroduce the teardown race).
-//!
-//! Lock ordering: the output callback runs on the link's io thread and takes
-//! the registry lock, possibly while holding CVDisplayLink-internal locks. To
-//! avoid a lock cycle through those (undocumented) internals, we never call a
-//! CoreVideo function while holding the registry lock. Registry mutations and
-//! link start/stop happen on the main thread only, which keeps the `running`
-//! flag and the link's actual state consistent without holding the lock
-//! across the calls.
-//!
-//! `std::sync::Mutex` rather than `parking_lot` is deliberate: on macOS it is
-//! currently backed by `os_unfair_lock`, whose priority donation resolves
-//! inversions between the high-priority io thread and the main thread. (That
-//! is a std implementation detail, not a guarantee; if it changes, the cost
-//! is added latency under contention, not incorrectness.)
-
 use anyhow::Result;
 use core_graphics::display::CGDirectDisplayID;
 use dispatch2::{
@@ -84,21 +32,12 @@ struct DisplayEntry {
     subscribers: Vec<(SubscriberId, DispatchRetained<DispatchSource>)>,
 }
 
-// SAFETY: Both fields wrapping raw pointers are refcounted handles to
-// thread-safe objects that are valid on any thread: `sys::DisplayLink` to a
-// CoreVideo object, and each subscriber's `DispatchRetained<DispatchSource>`
-// to a GCD object (which the display's io thread really does use, calling
-// `merge_data` from the output callback). All mutation of the entry itself
-// is serialized by the registry lock.
 unsafe impl Send for DisplayEntry {}
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 struct SubscriberId(u64);
 
 fn lock_registry() -> MutexGuard<'static, Registry> {
-    // Proceeding past poison is safe here (the map's invariants hold after
-    // any partial mutation), and panicking instead would abort the process
-    // when this is reached from the extern "C" output callback.
     REGISTRY.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
@@ -142,7 +81,6 @@ fn subscribe(
 
     let needs_link = !lock_registry().displays.contains_key(&display_id);
     let new_link = if needs_link {
-        // Created outside the registry lock; see the lock ordering note above.
         Some(unsafe {
             sys::DisplayLink::new(
                 display_id,
@@ -160,9 +98,6 @@ fn subscribe(
         let subscriber_id = SubscriberId(registry.next_subscriber_id);
         registry.next_subscriber_id += 1;
         let entry = match (registry.displays.entry(display_id), new_link) {
-            // If an entry appeared since the check above, dropping `new_link`
-            // is safe: a never-started link has no io thread, so releasing it
-            // doesn't race.
             (btree_map::Entry::Occupied(entry), _) => entry.into_mut(),
             (btree_map::Entry::Vacant(vacant), Some(link)) => vacant.insert(DisplayEntry {
                 link,
@@ -170,8 +105,6 @@ fn subscribe(
                 subscribers: Vec::new(),
             }),
             (btree_map::Entry::Vacant(_), None) => {
-                // Entries are never removed, so an entry observed above cannot
-                // have disappeared while subscriptions stay on the main thread.
                 anyhow::bail!("display link registry entry vanished for display {display_id}");
             }
         };
@@ -180,8 +113,6 @@ fn subscribe(
             None
         } else {
             entry.running = true;
-            // Clone the refcounted handle so the CVDisplayLinkStart call can
-            // happen after the lock is released.
             Some(entry.link.clone())
         };
         (subscriber_id, link_to_start)
@@ -219,15 +150,10 @@ fn unsubscribe(display_id: CGDirectDisplayID, subscriber_id: SubscriberId) {
     };
 
     if let Some(mut link) = link_to_stop {
-        // A final output callback can still fire after this returns; it finds
-        // no subscribers for this display and does nothing.
         unsafe { link.stop().log_err() };
     }
 }
 
-/// A per-window source of frame requests, paced by the display the window is
-/// on. The wrapped dispatch source coalesces vsync ticks from the display's
-/// io thread and invokes `callback(data)` on the main queue.
 pub struct WindowFrameSource {
     frame_requests: DispatchRetained<DispatchSource>,
     registration: Option<(CGDirectDisplayID, SubscriberId)>,
@@ -244,8 +170,6 @@ impl WindowFrameSource {
             );
             frame_requests.set_context(data);
             frame_requests.set_event_handler_f(callback);
-            // Resume before this source can ever be dropped: destroying a
-            // suspended dispatch source is undefined behavior (#50875).
             frame_requests.resume();
             frame_requests
         };
@@ -276,19 +200,11 @@ impl WindowFrameSource {
 impl Drop for WindowFrameSource {
     fn drop(&mut self) {
         self.stop();
-        // Unsubscribing makes this source unreachable from the output
-        // callback, so unlike before (ZED-7XR) it is safe to actually release
-        // it. Cancelling first guarantees the event handler never runs again;
-        // its context points at the window's native view, which may be
-        // deallocated after this.
         self.frame_requests.cancel();
     }
 }
 
 mod sys {
-    //! Derived from display-link crate under the following license:
-    //! <https://github.com/BrainiumLLC/display-link/blob/master/LICENSE-MIT>
-    //! Apple docs: [CVDisplayLink](https://developer.apple.com/documentation/corevideo/cvdisplaylinkoutputcallback?language=objc)
     #![allow(dead_code, non_upper_case_globals)]
 
     use anyhow::Result;
@@ -379,15 +295,10 @@ mod sys {
 
     pub type CVDisplayLinkOutputCallback = unsafe extern "C" fn(
         display_link_out: *mut CVDisplayLink,
-        // A pointer to the current timestamp. This represents the timestamp when the callback is called.
         current_time: *const CVTimeStamp,
-        // A pointer to the output timestamp. This represents the timestamp for when the frame will be displayed.
         output_time: *const CVTimeStamp,
-        // Unused
         flags_in: i64,
-        // Unused
         flags_out: *mut i64,
-        // A pointer to app-defined data.
         display_link_context: *mut c_void,
     ) -> i32;
 
@@ -414,7 +325,6 @@ mod sys {
     }
 
     impl DisplayLink {
-        /// Apple docs: [CVDisplayLinkCreateWithCGDisplay](https://developer.apple.com/documentation/corevideo/1456981-cvdisplaylinkcreatewithcgdisplay?language=objc)
         pub unsafe fn new(
             display_id: CGDirectDisplayID,
             callback: CVDisplayLinkOutputCallback,
@@ -444,7 +354,6 @@ mod sys {
     }
 
     impl DisplayLinkRef {
-        /// Apple docs: [CVDisplayLinkStart](https://developer.apple.com/documentation/corevideo/1457193-cvdisplaylinkstart?language=objc)
         pub unsafe fn start(&mut self) -> Result<()> {
             unsafe {
                 let code = CVDisplayLinkStart(self);
@@ -453,7 +362,6 @@ mod sys {
             }
         }
 
-        /// Apple docs: [CVDisplayLinkStop](https://developer.apple.com/documentation/corevideo/1457281-cvdisplaylinkstop?language=objc)
         pub unsafe fn stop(&mut self) -> Result<()> {
             unsafe {
                 let code = CVDisplayLinkStop(self);

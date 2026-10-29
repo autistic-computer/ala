@@ -1,7 +1,5 @@
 #![cfg_attr(target_family = "wasm", no_main)]
 
-//! Demonstrates posting, replacing, dismissing, and responding to system notifications.
-
 #[path = "example_support/fonts.rs"]
 mod example_support;
 

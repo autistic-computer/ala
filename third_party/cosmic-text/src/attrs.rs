@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 use core::hash::{Hash, Hasher};
@@ -11,61 +9,51 @@ use crate::{CacheKeyFlags, Metrics};
 
 pub use fontdb::{Family, Stretch, Style, Weight};
 
-/// Text color
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, Eq, Hash, PartialEq)]
 pub struct Color(pub u32);
 
 impl Color {
-    /// Create new color with red, green, and blue components
     #[inline]
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
         Self::rgba(r, g, b, 0xFF)
     }
 
-    /// Create new color with red, green, blue, and alpha components
     #[inline]
     pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self(((a as u32) << 24) | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32))
     }
 
-    /// Get a tuple over all of the attributes, in `(r, g, b, a)` order.
     #[inline]
     pub const fn as_rgba_tuple(self) -> (u8, u8, u8, u8) {
         (self.r(), self.g(), self.b(), self.a())
     }
 
-    /// Get an array over all of the components, in `[r, g, b, a]` order.
     #[inline]
     pub const fn as_rgba(self) -> [u8; 4] {
         [self.r(), self.g(), self.b(), self.a()]
     }
 
-    /// Get the red component
     #[inline]
     pub const fn r(&self) -> u8 {
         ((self.0 & 0x00_FF_00_00) >> 16) as u8
     }
 
-    /// Get the green component
     #[inline]
     pub const fn g(&self) -> u8 {
         ((self.0 & 0x00_00_FF_00) >> 8) as u8
     }
 
-    /// Get the blue component
     #[inline]
     pub const fn b(&self) -> u8 {
         (self.0 & 0x00_00_00_FF) as u8
     }
 
-    /// Get the alpha component
     #[inline]
     pub const fn a(&self) -> u8 {
         ((self.0 & 0xFF_00_00_00) >> 24) as u8
     }
 }
 
-/// An owned version of [`Family`]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum FamilyOwned {
     Name(SmolStr),
@@ -100,8 +88,6 @@ impl FamilyOwned {
     }
 }
 
-/// Metrics, but implementing Eq and Hash using u32 representation of f32
-//TODO: what are the edge cases of this?
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct CacheMetrics {
     font_size_bits: u32,
@@ -125,7 +111,6 @@ impl From<CacheMetrics> for Metrics {
         }
     }
 }
-/// A 4-byte `OpenType` feature tag identifier
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct FeatureTag([u8; 4]);
 
@@ -134,23 +119,14 @@ impl FeatureTag {
         Self(*tag)
     }
 
-    /// Kerning adjusts spacing between specific character pairs
     pub const KERNING: Self = Self::new(b"kern");
-    /// Standard ligatures (fi, fl, etc.)
     pub const STANDARD_LIGATURES: Self = Self::new(b"liga");
-    /// Contextual ligatures (context-dependent ligatures)
     pub const CONTEXTUAL_LIGATURES: Self = Self::new(b"clig");
-    /// Contextual alternates (glyph substitutions based on context)
     pub const CONTEXTUAL_ALTERNATES: Self = Self::new(b"calt");
-    /// Discretionary ligatures (optional stylistic ligatures)
     pub const DISCRETIONARY_LIGATURES: Self = Self::new(b"dlig");
-    /// Small caps (lowercase to small capitals)
     pub const SMALL_CAPS: Self = Self::new(b"smcp");
-    /// All small caps (uppercase and lowercase to small capitals)
     pub const ALL_SMALL_CAPS: Self = Self::new(b"c2sc");
-    /// Stylistic Set 1 (font-specific alternate glyphs)
     pub const STYLISTIC_SET_1: Self = Self::new(b"ss01");
-    /// Stylistic Set 2 (font-specific alternate glyphs)
     pub const STYLISTIC_SET_2: Self = Self::new(b"ss02");
 
     pub const fn as_bytes(&self) -> &[u8; 4] {
@@ -181,18 +157,15 @@ impl FontFeatures {
         self
     }
 
-    /// Enable a feature (set to 1)
     pub fn enable(&mut self, tag: FeatureTag) -> &mut Self {
         self.set(tag, 1)
     }
 
-    /// Disable a feature (set to 0)
     pub fn disable(&mut self, tag: FeatureTag) -> &mut Self {
         self.set(tag, 0)
     }
 }
 
-/// A wrapper for letter spacing to get around that f32 doesn't implement Eq and Hash
 #[derive(Clone, Copy, Debug)]
 pub struct LetterSpacing(pub f32);
 
@@ -215,7 +188,6 @@ impl Hash for LetterSpacing {
         let bits = if self.0.is_nan() {
             CANONICAL_NAN_BITS
         } else {
-            // Add +0.0 to canonicalize -0.0 to +0.0
             (self.0 + 0.0).to_bits()
         };
 
@@ -229,7 +201,6 @@ pub enum UnderlineStyle {
     None,
     Single,
     Double,
-    // TODO: Wavy
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -259,32 +230,22 @@ impl TextDecoration {
     }
 }
 
-/// Offset and thickness for a text decoration line, in EM units.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DecorationMetrics {
-    /// Offset from baseline in EM units
     pub offset: f32,
-    /// Thickness in EM units
     pub thickness: f32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct GlyphDecorationData {
-    /// The text decoration configuration from the user
     pub text_decoration: TextDecoration,
-    /// Underline offset and thickness from the font
     pub underline_metrics: DecorationMetrics,
-    /// Strikethrough offset and thickness from the font
     pub strikethrough_metrics: DecorationMetrics,
-    /// Font ascent in EM units (ascent / upem).
-    /// Used for overline positioning
     pub ascent: f32,
 }
 
-/// Text attributes
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Attrs<'a> {
-    //TODO: should this be an option?
     pub color_opt: Option<Color>,
     pub family: Family<'a>,
     pub stretch: Stretch,
@@ -293,16 +254,12 @@ pub struct Attrs<'a> {
     pub metadata: usize,
     pub cache_key_flags: CacheKeyFlags,
     pub metrics_opt: Option<CacheMetrics>,
-    /// Letter spacing (tracking) in EM
     pub letter_spacing_opt: Option<LetterSpacing>,
     pub font_features: FontFeatures,
     pub text_decoration: TextDecoration,
 }
 
 impl<'a> Attrs<'a> {
-    /// Create a new set of attributes with sane defaults
-    ///
-    /// This defaults to a regular Sans-Serif font.
     pub const fn new() -> Self {
         Self {
             color_opt: None,
@@ -319,61 +276,51 @@ impl<'a> Attrs<'a> {
         }
     }
 
-    /// Set [Color]
     pub const fn color(mut self, color: Color) -> Self {
         self.color_opt = Some(color);
         self
     }
 
-    /// Set [Family]
     pub const fn family(mut self, family: Family<'a>) -> Self {
         self.family = family;
         self
     }
 
-    /// Set [Stretch]
     pub const fn stretch(mut self, stretch: Stretch) -> Self {
         self.stretch = stretch;
         self
     }
 
-    /// Set [Style]
     pub const fn style(mut self, style: Style) -> Self {
         self.style = style;
         self
     }
 
-    /// Set [Weight]
     pub const fn weight(mut self, weight: Weight) -> Self {
         self.weight = weight;
         self
     }
 
-    /// Set metadata
     pub const fn metadata(mut self, metadata: usize) -> Self {
         self.metadata = metadata;
         self
     }
 
-    /// Set [`CacheKeyFlags`]
     pub const fn cache_key_flags(mut self, cache_key_flags: CacheKeyFlags) -> Self {
         self.cache_key_flags = cache_key_flags;
         self
     }
 
-    /// Set [`Metrics`], overriding values in buffer
     pub fn metrics(mut self, metrics: Metrics) -> Self {
         self.metrics_opt = Some(metrics.into());
         self
     }
 
-    /// Set letter spacing (tracking) in EM
     pub const fn letter_spacing(mut self, letter_spacing: f32) -> Self {
         self.letter_spacing_opt = Some(LetterSpacing(letter_spacing));
         self
     }
 
-    /// Set [`FontFeatures`]
     pub fn font_features(mut self, font_features: FontFeatures) -> Self {
         self.font_features = font_features;
         self
@@ -409,7 +356,6 @@ impl<'a> Attrs<'a> {
         self
     }
 
-    /// Check if this set of attributes can be shaped with another
     pub fn compatible(&self, other: &Self) -> bool {
         self.family == other.family
             && self.stretch == other.stretch
@@ -418,7 +364,6 @@ impl<'a> Attrs<'a> {
     }
 }
 
-/// Font-specific part of [`Attrs`] to be used for matching
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FontMatchAttrs {
     family: FamilyOwned,
@@ -438,10 +383,8 @@ impl<'a> From<&Attrs<'a>> for FontMatchAttrs {
     }
 }
 
-/// An owned version of [`Attrs`]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AttrsOwned {
-    //TODO: should this be an option?
     pub color_opt: Option<Color>,
     pub family_owned: FamilyOwned,
     pub stretch: Stretch,
@@ -450,7 +393,6 @@ pub struct AttrsOwned {
     pub metadata: usize,
     pub cache_key_flags: CacheKeyFlags,
     pub metrics_opt: Option<CacheMetrics>,
-    /// Letter spacing (tracking) in EM
     pub letter_spacing_opt: Option<LetterSpacing>,
     pub font_features: FontFeatures,
     pub text_decoration: TextDecoration,
@@ -490,8 +432,6 @@ impl AttrsOwned {
     }
 }
 
-/// List of text attributes to apply to a line
-//TODO: have this clean up the spans when changes are made
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct AttrsList {
     defaults: AttrsOwned,
@@ -499,7 +439,6 @@ pub struct AttrsList {
 }
 
 impl AttrsList {
-    /// Create a new attributes list with a set of default [Attrs]
     pub fn new(defaults: &Attrs) -> Self {
         Self {
             defaults: AttrsOwned::new(defaults),
@@ -507,29 +446,23 @@ impl AttrsList {
         }
     }
 
-    /// Get the default [Attrs]
     pub fn defaults(&self) -> Attrs<'_> {
         self.defaults.as_attrs()
     }
 
-    /// Get the current attribute spans
     pub fn spans(&self) -> Vec<(&Range<usize>, &AttrsOwned)> {
         self.spans_iter().collect()
     }
 
-    /// Get an iterator over the current attribute spans
     pub fn spans_iter(&self) -> impl Iterator<Item = (&Range<usize>, &AttrsOwned)> + '_ {
         self.spans.iter()
     }
 
-    /// Clear the current attribute spans
     pub fn clear_spans(&mut self) {
         self.spans.clear();
     }
 
-    /// Add an attribute span, removes any previous matching parts of spans
     pub fn add_span(&mut self, range: Range<usize>, attrs: &Attrs) {
-        //do not support 1..1 or 2..1 even if by accident.
         if range.is_empty() {
             return;
         }
@@ -537,9 +470,6 @@ impl AttrsList {
         self.spans.insert(range, AttrsOwned::new(attrs));
     }
 
-    /// Get the attribute span for an index
-    ///
-    /// This returns a span that contains the index
     pub fn get_span(&self, index: usize) -> Attrs<'_> {
         self.spans
             .get(&index)
@@ -547,13 +477,11 @@ impl AttrsList {
             .unwrap_or(self.defaults.as_attrs())
     }
 
-    /// Split attributes list at an offset
     #[allow(clippy::missing_panics_doc)]
     pub fn split_off(&mut self, index: usize) -> Self {
         let mut new = Self::new(&self.defaults.as_attrs());
         let mut removes = Vec::new();
 
-        //get the keys we need to remove or fix.
         for span in self.spans.iter() {
             if span.0.end <= index {
                 continue;
@@ -585,7 +513,6 @@ impl AttrsList {
         new
     }
 
-    /// Resets the attributes with new defaults.
     pub(crate) fn reset(mut self, default: &Attrs) -> Self {
         self.defaults = AttrsOwned::new(default);
         self.spans.clear();

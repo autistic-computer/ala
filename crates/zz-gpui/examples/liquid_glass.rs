@@ -1,9 +1,5 @@
 #![cfg_attr(target_family = "wasm", no_main)]
 
-//! Liquid glass playground: a draggable lens, a toolbar that lights up under
-//! the pointer, a tab bar whose pill slides like a drop, blobs that melt into
-//! each other, and a panel with every knob of the material they share.
-
 #[path = "example_support/fonts.rs"]
 mod example_support;
 
@@ -245,7 +241,6 @@ impl LiquidGlassDemo {
         )
     }
 
-    /// The area left of the knob panel.
     fn stage(&self) -> Bounds<Pixels> {
         Bounds::new(
             self.viewport.origin,
@@ -576,8 +571,6 @@ impl Render for LiquidGlassDemo {
         let time = self.started.elapsed().as_secs_f32();
         let material = self.material;
 
-        // Toolbar: one capsule, and a glass button per tool that swells and
-        // lights up from where it was pressed.
         let toolbar = self.toolbar();
         let mut layer = div().absolute().size_full();
         layer = layer.child(
@@ -631,8 +624,6 @@ impl Render for LiquidGlassDemo {
             );
         }
 
-        // A row of buttons painted as one body: they sit just apart, and a
-        // press swells one into its neighbors.
         let bar = self.tab_bar();
         layer = layer.child(
             glass_group("row", material.merge(px(18.)))
@@ -660,7 +651,6 @@ impl Render for LiquidGlassDemo {
                 )),
         );
 
-        // A card that lenses in and out with the "+" button.
         let stage = self.stage();
         layer = layer.child(
             liquid_glass(
@@ -697,9 +687,6 @@ impl Render for LiquidGlassDemo {
             ),
         );
 
-        // Tab bar: the bar and the pill riding in it. The pill morphs to the
-        // selected tab, stretching as it slides and lifting into a stronger
-        // lens until it settles.
         let bar = self.tab_bar();
         let pill = self.tab_slot(self.tab);
         layer = layer
@@ -765,7 +752,6 @@ impl Render for LiquidGlassDemo {
             );
         }
 
-        // Blobs that orbit close enough to melt into one body.
         let center = stage.center();
         let blobs = (0..3)
             .map(|index| {
@@ -788,8 +774,6 @@ impl Render for LiquidGlassDemo {
             .size_full(),
         );
 
-        // The lens, dragged by its element; the glass follows on a spring and
-        // stretches with its own speed.
         let lens = self.lens;
         layer = layer.child(
             liquid_glass("lens", material)
@@ -827,7 +811,6 @@ impl Render for LiquidGlassDemo {
     }
 }
 
-/// The material as the builder calls that make it, to paste into code.
 fn material_snippet(material: &GlassMaterial) -> String {
     let tint = material.tint;
     let mut lines = vec!["GlassMaterial::regular()".to_string()];

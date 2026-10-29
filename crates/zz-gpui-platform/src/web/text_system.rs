@@ -12,7 +12,6 @@ use zz_gpui::{
     SUBPIXEL_VARIANTS_Y, ShapedGlyph, Size, TextRenderingMode, point, px, size,
 };
 
-// Cosmic's font IDs index its loaded-font vector. Keep browser IDs in a disjoint namespace.
 const CANVAS_FONT_BIT: usize = 1 << (usize::BITS - 1);
 const MAX_MEASUREMENTS: usize = 4096;
 
@@ -125,7 +124,6 @@ impl WebTextSystem {
         if let Some(glyph_id) = self.state.read().glyphs.id_for(font_id, text, color) {
             return Ok(glyph_id);
         }
-        // Another thread may register the same glyph between the read and write locks.
         self.state
             .write()
             .glyphs
@@ -240,15 +238,12 @@ impl WebTextSystem {
             return;
         }
         replacements.sort_unstable_by_key(|replacement| replacement.glyph_range.start);
-        // Keep the primary font's baseline and line spacing stable. Browser ink
-        // extents affect raster bounds, not the surrounding editor's line metrics.
         apply_replacements(layout, replacements);
     }
 }
 
 impl PlatformTextSystem for WebTextSystem {
     fn set_missing_glyph_sink(&self, sink: Option<Arc<dyn MissingGlyphSink>>) {
-        // Cosmic must not report missing glyphs before Canvas has a chance to replace them.
         self.state.write().missing_glyph_sink = sink;
     }
 

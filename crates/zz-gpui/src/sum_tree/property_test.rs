@@ -19,9 +19,6 @@ where
     }
 }
 
-/// A strategy for producing a [`SumTree`] with a given size.
-///
-/// Equivalent to [`proptest::collection::vec`].
 pub fn sum_tree<S, T>(values: S, size: impl Into<SizeRange>) -> impl Strategy<Value = SumTree<T>>
 where
     T: Debug + Arbitrary + Item + 'static,

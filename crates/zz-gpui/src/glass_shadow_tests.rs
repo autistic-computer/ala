@@ -163,10 +163,6 @@ fn ensure_same_image(expected: &RgbaImage, actual: &RgbaImage, context: &str) ->
     Ok(())
 }
 
-/// What a renderer must draw for glass shadows: they darken only outside
-/// the body, leave its face as it was at any strength, ignore the
-/// material's opacity, and draw the same in a forced layer. `render` draws a
-/// scene at 64 by 64 device pixels.
 pub fn check_glass_shadow_rendering(
     mut render: impl FnMut(&Scene) -> Result<RgbaImage>,
 ) -> Result<()> {

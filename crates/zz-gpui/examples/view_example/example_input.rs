@@ -1,15 +1,3 @@
-//! `Input` — a single-line text input. The shaping layer over `Editor`.
-//!
-//! Construct it two ways, depending on how much state you want to own:
-//!   * `Input::new(value: Entity<String>)`  — you hold just the string; the input
-//!     allocates the `Editor` internally via `use_state`. Value readable, cursor hidden.
-//!   * `Input::editor(editor: Entity<Editor>)` — you hold the editor; cursor/selection
-//!     are now yours to read and drive too.
-//!
-//! Either way the chrome is identical. Because the string (or editor) is the
-//! input's *identity*, the internal `use_state(Editor)` is collision-safe across
-//! any number of inputs.
-
 use zz_gpui::{
     App, BoxShadow, CursorStyle, Entity, EntityId, Hsla, IntoElement, Pixels, StyleRefinement,
     Window, div, hsla, point, prelude::*, px, white,
@@ -30,7 +18,6 @@ pub struct Input {
 }
 
 impl Input {
-    /// Backed by a bare string; the editor is allocated internally.
     pub fn new(value: Entity<String>) -> Self {
         Self {
             source: Source::Value(value),
@@ -39,7 +26,6 @@ impl Input {
         }
     }
 
-    /// Backed by an editor you own (so you can read/drive its cursor).
     pub fn editor(editor: Entity<Editor>) -> Self {
         Self {
             source: Source::Editor(editor),
@@ -68,8 +54,6 @@ impl zz_gpui::View for Input {
     }
 
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        // Get the editor: use the one we were handed, or allocate it under our
-        // own (string-derived) identity so it persists and never collides.
         let editor = match self.source {
             Source::Value(value) => {
                 window.use_state(cx, move |window, cx| Editor::over(value, window, cx))

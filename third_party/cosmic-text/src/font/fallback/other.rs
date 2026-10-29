@@ -1,10 +1,7 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 use unicode_script::Script;
 
 use super::Fallback;
 
-/// An empty platform-specific font fallback list.
 #[derive(Debug)]
 pub struct PlatformFallback;
 
@@ -26,17 +23,14 @@ impl Fallback for PlatformFallback {
     }
 }
 
-// Fallbacks to use after any script specific fallbacks
 const fn common_fallback() -> &'static [&'static str] {
     &[]
 }
 
-// Fallbacks to never use
 const fn forbidden_fallback() -> &'static [&'static str] {
     &[]
 }
 
-// Fallbacks to use per script
 const fn script_fallback(_script: Script, _locale: &str) -> &'static [&'static str] {
     &[]
 }

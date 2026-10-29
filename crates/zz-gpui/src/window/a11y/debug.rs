@@ -1,10 +1,3 @@
-//! Developer tooling for inspecting the accessibility tree.
-//!
-//! [`A11yDebug`] retains the last [`TreeUpdate`] built by a completed frame so
-//! it can be serialized on demand (see
-//! [`crate::Window::debug_a11y_tree_json`]). In `cfg(debug_assertions)` builds,
-//! we capture extra info.
-
 use crate::collections::FxHashMap;
 use accesskit::{Action, NodeId, TreeUpdate};
 
@@ -30,18 +23,9 @@ struct CapturedFrame {
 #[cfg(debug_assertions)]
 #[derive(Clone, Default)]
 pub(crate) struct NodeDebugInfo {
-    /// Whether the node was synthesized via
-    /// [`crate::Element::a11y_synthetic_children`] rather than created from a
-    /// real element with a role and ID.
     pub synthetic: bool,
-    /// The type name of the `Render` view that was rendering when the node was
-    /// created.
     pub view: Option<&'static str>,
-    /// The [`ElementId`](crate::ElementId) of the creating element (the leaf of
-    /// its `GlobalElementId`, not the full path). For a synthetic node, this is
-    /// the real element whose `a11y_synthetic_children` produced it.
     pub element_id: Option<String>,
-    /// Source location where the creating element was constructed.
     pub source_location: Option<&'static core::panic::Location<'static>>,
 }
 
@@ -58,13 +42,8 @@ pub(crate) struct A11yDebug {
     last_tree_update: Option<TreeUpdate>,
     last_gpui_focus: Option<NodeId>,
     last_active_descendant: Option<NodeId>,
-    /// Monotonic counter incremented on each captured frame, so a re-dump makes
-    /// it obvious whether the tree actually refreshed.
     frame_number: u64,
-    /// Metadata about the most recently captured frame.
     last_frame: Option<CapturedFrame>,
-    /// Window-space bounds of every node in the last update, retained here
-    /// because the live map is cleared at the start of each frame.
     last_node_bounds: FxHashMap<NodeId, Bounds<Pixels>>,
     #[cfg(debug_assertions)]
     last_node_info: FxHashMap<NodeId, NodeDebugInfo>,
@@ -96,17 +75,14 @@ impl A11yDebug {
         });
     }
 
-    /// The last update built by a completed accessibility frame, if any.
     pub(crate) fn last_tree_update(&self) -> Option<&TreeUpdate> {
         self.last_tree_update.as_ref()
     }
 
-    /// Window-space bounds recorded for `id` in the last captured frame.
     pub(crate) fn node_bounds(&self, id: NodeId) -> Option<Bounds<Pixels>> {
         self.last_node_bounds.get(&id).copied()
     }
 
-    /// Monotonic count of captured frames; zero before the first.
     pub(crate) fn frame_number(&self) -> u64 {
         self.frame_number
     }
@@ -116,8 +92,6 @@ impl A11yDebug {
         self.last_node_info = node_info.clone();
     }
 
-    /// Serialize the last tree update to a readable JSON string. Node ids are
-    /// replaced with short ephemeral ids (`a`, `b`, ..., `z`, `aa`, ...).
     pub(crate) fn to_json(&self) -> Option<String> {
         let update = self.last_tree_update.as_ref()?;
 
@@ -140,8 +114,6 @@ impl A11yDebug {
                     element_id: info.element_id.as_deref(),
                     view: info.view,
                     source_location: info.source_location.map(|loc| loc.to_string()),
-                    // Only surface synthetic nodes; `false` is the default and
-                    // would just be noise on every real node.
                     synthetic: info.synthetic.then_some(true),
                 })
                 .unwrap_or_default();
@@ -234,7 +206,6 @@ fn node_to_json(
         map.insert("children".into(), json!(children));
     }
 
-    // Provenance (debug builds only), ordered before the accessibility section.
     if let Some(element_id) = provenance.element_id {
         map.insert("element_id".into(), json!(element_id));
     }
@@ -248,15 +219,9 @@ fn node_to_json(
         map.insert("synthetic".into(), json!(synthetic));
     }
 
-    // Accessibility semantics for this node, grouped together.
     let mut aria = serde_json::Map::new();
     aria.insert("role".into(), json!(format!("{:?}", node.role())));
 
-    // Which action types the node supports. AccessKit keeps these in a private
-    // bitset with no getter or iterator, so we probe each variant. `Action::n`
-    // (from AccessKit's `enumn` feature) maps a discriminant to its variant,
-    // returning `None` past the last one - so this can't drift out of sync with
-    // AccessKit's `Action` enum the way a hand-maintained list would.
     let mut next_action = 0u8;
     let on_action: Vec<String> = std::iter::from_fn(move || {
         let action = Action::n(next_action)?;
@@ -270,7 +235,6 @@ fn node_to_json(
         aria.insert("on_action".into(), json!(on_action));
     }
 
-    // String properties.
     if let Some(v) = node.label() {
         aria.insert("label".into(), json!(v));
     }
@@ -305,7 +269,6 @@ fn node_to_json(
         aria.insert("disabled".into(), json!(true));
     }
 
-    // Boolean / enum states.
     if node.is_hidden() {
         aria.insert("hidden".into(), json!(true));
     }
@@ -322,7 +285,6 @@ fn node_to_json(
         aria.insert("orientation".into(), json!(format!("{v:?}")));
     }
 
-    // Numeric properties.
     if let Some(v) = node.numeric_value() {
         aria.insert("numeric_value".into(), json!(v));
     }
@@ -336,7 +298,6 @@ fn node_to_json(
         aria.insert("numeric_value_step".into(), json!(v));
     }
 
-    // Set / table properties.
     if let Some(v) = node.level() {
         aria.insert("level".into(), json!(v));
     }
@@ -364,8 +325,6 @@ fn node_to_json(
     serde_json::Value::Object(map)
 }
 
-/// Maps a 0-based index to a short id in the sequence `a, b, ..., z, aa, ab,
-/// ...` (bijective base-26).
 fn ephemeral_id(mut index: usize) -> String {
     let mut bytes = Vec::new();
     loop {

@@ -9,62 +9,32 @@ use anyhow::anyhow;
 use image::RgbaImage;
 use std::{future::Future, rc::Rc, sync::Arc, time::Duration};
 
-/// A test context that uses real macOS rendering instead of mocked rendering.
-/// This is used for visual tests that need to capture actual screenshots.
-///
-/// Unlike `TestAppContext` which uses `TestPlatform` with mocked rendering,
-/// `VisualTestAppContext` uses the real `MacPlatform` to produce actual rendered output.
-///
-/// Windows created through this context are positioned off-screen (at coordinates like -10000, -10000)
-/// so they are invisible to the user but still fully rendered by the compositor.
 #[derive(Clone)]
 pub struct VisualTestAppContext {
-    /// The underlying app cell
     pub app: Rc<AppCell>,
-    /// The background executor for running async tasks
     pub background_executor: BackgroundExecutor,
-    /// The foreground executor for running tasks on the main thread
     pub foreground_executor: ForegroundExecutor,
-    /// The test dispatcher for deterministic task scheduling
     dispatcher: TestDispatcher,
     platform: Rc<dyn Platform>,
     text_system: Arc<TextSystem>,
 }
 
 impl VisualTestAppContext {
-    /// Creates a new `VisualTestAppContext` with real macOS platform rendering
-    /// but deterministic task scheduling via TestDispatcher.
-    ///
-    /// This provides:
-    /// - Real Metal/compositor rendering for accurate screenshots
-    /// - Deterministic task scheduling via TestDispatcher
-    /// - Controllable time via `advance_clock`
-    ///
-    /// Note: This uses a no-op asset source, so SVG icons won't render.
-    /// Use `with_asset_source` to provide real assets for icon rendering.
     pub fn new(platform: Rc<dyn Platform>) -> Self {
         Self::with_asset_source(platform, Arc::new(()))
     }
 
-    /// Creates a new `VisualTestAppContext` with a custom asset source.
-    ///
-    /// Use this when you need SVG icons to render properly in visual tests.
-    /// Pass the real `Assets` struct to enable icon rendering.
     pub fn with_asset_source(
         platform: Rc<dyn Platform>,
         asset_source: Arc<dyn AssetSource>,
     ) -> Self {
-        // Use a seeded RNG for deterministic behavior
         let seed = std::env::var("SEED")
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(0);
 
-        // Create a visual test platform that combines real Mac rendering
-        // with controllable TestDispatcher for deterministic task scheduling
         let platform = Rc::new(VisualTestPlatform::new(platform, seed));
 
-        // Get the dispatcher and executors from the platform
         let dispatcher = platform.dispatcher().clone();
         let background_executor = platform.background_executor();
         let foreground_executor = platform.foreground_executor();
@@ -86,14 +56,6 @@ impl VisualTestAppContext {
         }
     }
 
-    /// Opens a window positioned off-screen for invisible rendering.
-    ///
-    /// The window is positioned at (-10000, -10000) so it's not visible on any display,
-    /// but it's still fully rendered by the compositor and can be captured via ScreenCaptureKit.
-    ///
-    /// # Arguments
-    /// * `size` - The size of the window to create
-    /// * `build_root` - A closure that builds the root view for the window
     pub fn open_offscreen_window<V: Render + 'static>(
         &mut self,
         size: Size<Pixels>,
@@ -118,7 +80,6 @@ impl VisualTestAppContext {
         )
     }
 
-    /// Opens an off-screen window with default size (1280x800).
     pub fn open_offscreen_window_default<V: Render + 'static>(
         &mut self,
         build_root: impl FnOnce(&mut Window, &mut App) -> Entity<V>,
@@ -127,52 +88,40 @@ impl VisualTestAppContext {
         self.open_offscreen_window(size(px(1280.0), px(800.0)), build_root)
     }
 
-    /// Returns whether screen capture is supported on this platform.
     pub fn is_screen_capture_supported(&self) -> bool {
         self.platform.is_screen_capture_supported()
     }
 
-    /// Returns the text system used by this context.
     pub fn text_system(&self) -> &Arc<TextSystem> {
         &self.text_system
     }
 
-    /// Returns the background executor.
     pub fn executor(&self) -> BackgroundExecutor {
         self.background_executor.clone()
     }
 
-    /// Returns the foreground executor.
     pub fn foreground_executor(&self) -> ForegroundExecutor {
         self.foreground_executor.clone()
     }
 
-    /// Runs all pending foreground and background tasks until there's nothing left to do.
-    /// This is essential for processing async operations like tooltip timers.
     pub fn run_until_parked(&self) {
         self.dispatcher.run_until_parked();
     }
 
-    /// Advances the simulated clock by the given duration and processes any tasks
-    /// that become ready. This is essential for testing time-based behaviors like
-    /// tooltip delays.
     pub fn advance_clock(&self, duration: Duration) {
         self.dispatcher.advance_clock(duration);
     }
 
-    /// Updates the app state.
     pub fn update<R>(&mut self, f: impl FnOnce(&mut App) -> R) -> R {
         let mut app = self.app.borrow_mut();
         f(&mut app)
     }
 
-    /// Reads from the app state.
     pub fn read<R>(&self, f: impl FnOnce(&App) -> R) -> R {
         let app = self.app.borrow();
         f(&app)
     }
 
-    /// Updates a window.
     pub fn update_window<T, F>(&mut self, window: AnyWindowHandle, f: F) -> Result<T>
     where
         F: FnOnce(AnyView, &mut Window, &mut App) -> T,
@@ -181,7 +130,6 @@ impl VisualTestAppContext {
         lock.update_window(window, f)
     }
 
-    /// Spawns a task on the foreground executor.
     pub fn spawn<F, R>(&self, f: F) -> Task<R>
     where
         F: Future<Output = R> + 'static,
@@ -190,25 +138,21 @@ impl VisualTestAppContext {
         self.foreground_executor.spawn(f)
     }
 
-    /// Checks if a global of type G exists.
     pub fn has_global<G: Global>(&self) -> bool {
         let app = self.app.borrow();
         app.has_global::<G>()
     }
 
-    /// Reads a global value.
     pub fn read_global<G: Global, R>(&self, f: impl FnOnce(&G, &App) -> R) -> R {
         let app = self.app.borrow();
         f(app.global::<G>(), &app)
     }
 
-    /// Sets a global value.
     pub fn set_global<G: Global>(&mut self, global: G) {
         let mut app = self.app.borrow_mut();
         app.set_global(global);
     }
 
-    /// Updates a global value.
     pub fn update_global<G: Global, R>(&mut self, f: impl FnOnce(&mut G, &mut App) -> R) -> R {
         let mut lock = self.app.borrow_mut();
         lock.update(|cx| {
@@ -219,9 +163,6 @@ impl VisualTestAppContext {
         })
     }
 
-    /// Simulates a sequence of keystrokes on the given window.
-    ///
-    /// Keystrokes are specified as a space-separated string, e.g., "cmd-p escape".
     pub fn simulate_keystrokes(&mut self, window: AnyWindowHandle, keystrokes: &str) {
         for keystroke_text in keystrokes.split_whitespace() {
             let keystroke = Keystroke::parse(keystroke_text)
@@ -231,7 +172,6 @@ impl VisualTestAppContext {
         self.run_until_parked();
     }
 
-    /// Dispatches a single keystroke to a window.
     pub fn dispatch_keystroke(&mut self, window: AnyWindowHandle, keystroke: Keystroke) {
         self.update_window(window, |_, window, cx| {
             window.dispatch_keystroke(keystroke, cx);
@@ -239,7 +179,6 @@ impl VisualTestAppContext {
         .ok();
     }
 
-    /// Simulates typing text input on the given window.
     pub fn simulate_input(&mut self, window: AnyWindowHandle, input: &str) {
         for char in input.chars() {
             let key = char.to_string();
@@ -253,7 +192,6 @@ impl VisualTestAppContext {
         self.run_until_parked();
     }
 
-    /// Simulates a mouse move event.
     pub fn simulate_mouse_move(
         &mut self,
         window: AnyWindowHandle,
@@ -271,7 +209,6 @@ impl VisualTestAppContext {
         );
     }
 
-    /// Simulates a mouse down event.
     pub fn simulate_mouse_down(
         &mut self,
         window: AnyWindowHandle,
@@ -291,7 +228,6 @@ impl VisualTestAppContext {
         );
     }
 
-    /// Simulates a mouse up event.
     pub fn simulate_mouse_up(
         &mut self,
         window: AnyWindowHandle,
@@ -310,7 +246,6 @@ impl VisualTestAppContext {
         );
     }
 
-    /// Simulates a click (mouse down followed by mouse up).
     pub fn simulate_click(
         &mut self,
         window: AnyWindowHandle,
@@ -321,7 +256,6 @@ impl VisualTestAppContext {
         self.simulate_mouse_up(window, position, MouseButton::Left, modifiers);
     }
 
-    /// Simulates an input event on the given window.
     pub fn simulate_event<E: InputEvent>(&mut self, window: AnyWindowHandle, event: E) {
         self.update_window(window, |_, window, cx| {
             window.dispatch_event(event.to_platform_input(), cx);
@@ -330,7 +264,6 @@ impl VisualTestAppContext {
         self.run_until_parked();
     }
 
-    /// Dispatches an action to the given window.
     pub fn dispatch_action(&mut self, window: AnyWindowHandle, action: impl Action) {
         self.update_window(window, |_, window, cx| {
             window.dispatch_action(action.boxed_clone(), cx);
@@ -339,17 +272,14 @@ impl VisualTestAppContext {
         self.run_until_parked();
     }
 
-    /// Writes to the clipboard.
     pub fn write_to_clipboard(&self, item: ClipboardItem) {
         self.platform.write_to_clipboard(item);
     }
 
-    /// Reads from the clipboard.
     pub fn read_from_clipboard(&self) -> Option<ClipboardItem> {
         self.platform.read_from_clipboard()
     }
 
-    /// Waits for a condition to become true, with a timeout.
     pub async fn wait_for<T: 'static>(
         &mut self,
         entity: &Entity<T>,
@@ -376,16 +306,11 @@ impl VisualTestAppContext {
         }
     }
 
-    /// Captures a screenshot of the specified window using direct texture capture.
-    ///
-    /// This renders the scene to a Metal texture and reads the pixels directly,
-    /// which does not require the window to be visible on screen.
     #[cfg(any(test, feature = "test-support"))]
     pub fn capture_screenshot(&mut self, window: AnyWindowHandle) -> Result<RgbaImage> {
         self.update_window(window, |_, window, _cx| window.render_to_image())?
     }
 
-    /// Waits for animations to complete by waiting a couple of frames.
     pub async fn wait_for_animations(&self) {
         self.background_executor
             .timer(Duration::from_millis(32))

@@ -1,28 +1,12 @@
-//! Eligibility only for independent, horizontal Canvas fallback of a complete
-//! extended grapheme. Callers must still check whether bundled shaping supplies
-//! the requested glyph and presentation; eligibility alone does not override it.
-//!
-//! This is intentionally not a Unicode sequence validator or an RGI emoji database.
-//! Han variation selectors are checked structurally, not against the IVD registry.
-//! Emoji selectors are checked against the Emoji property, not the registered
-//! variation-sequence list. Eligibility does not guarantee browser coverage.
-//! Flags accept two regional indicators, not only assigned country codes. ZWJ
-//! support is limited to person/profession pairs and a small explicit allowlist;
-//! tags are limited to the three subdivision flags. Other sequences stay on Cosmic.
-
 use unicode_properties::{EmojiStatus, GeneralCategory, UnicodeEmoji, UnicodeGeneralCategory};
 use unicode_script::{Script, UnicodeScript};
 use unicode_segmentation::UnicodeSegmentation;
 
-/// Controls browser-font fallback when loaded fonts lack a glyph or its emoji presentation.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum CanvasFontFallback {
-    /// Use only fonts loaded into GPUI.
     Disabled,
-    /// Use Canvas for eligible emoji, including missing text-presentation symbols.
     #[default]
     Emoji,
-    /// Also allow approximate independent rendering of eligible horizontal CJK text.
     EmojiAndCjk,
 }
 
@@ -37,17 +21,12 @@ impl CanvasFontFallback {
     }
 }
 
-/// A supported grapheme assumed to be independently renderable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CanvasFallback {
-    /// Whether this is an emoji-capable grapheme, independent of its presentation.
     pub is_emoji: bool,
-    /// Whether to request emoji presentation instead of ordinary text presentation.
     pub emoji_presentation: bool,
 }
 
-/// Returns a presentation only when `grapheme` is exactly one supported extended
-/// grapheme cluster. No normalization, splitting, or font-coverage decision occurs.
 pub fn classify_canvas_fallback(grapheme: &str) -> Option<CanvasFallback> {
     if grapheme.is_ascii() {
         return None;
@@ -77,8 +56,6 @@ fn is_cjk(grapheme: &str) -> bool {
     };
     let suffix = characters.as_str();
 
-    // The script/category checks exclude unassigned holes; the ranges exclude
-    // Han radicals, iteration marks, and other non-ideographic Han characters.
     if base.script() == Script::Han
         && base.general_category() == GeneralCategory::OtherLetter
         && matches!(base, '\u{3400}'..='\u{9fff}' | '\u{f900}'..='\u{faff}'

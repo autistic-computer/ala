@@ -25,10 +25,6 @@ use zz_gpui::{
     WindowKind, WindowParams, popup::PopupNotSupportedError,
 };
 
-/// Provides the GPUI platform implementation for web browsers.
-///
-/// The platform starts with an empty font database. Applications must add fonts
-/// through [`zz_gpui::App::text_system`] before opening a window.
 pub struct WebPlatform {
     browser_window: web_sys::Window,
     dispatcher: Arc<WebDispatcher>,
@@ -49,8 +45,6 @@ pub struct WebPlatform {
     _cursor_restore_listeners: Vec<EventListenerHandle>,
 }
 
-/// Gesture feel for the browser, chosen so touch scrolling matches the host
-/// OS's native applications.
 struct WebGestures {
     tuning: GestureTuning,
 }
@@ -60,10 +54,6 @@ impl WebGestures {
         let scroll_physics = if user_agent.contains("Android") {
             ScrollPhysics::android()
         } else {
-            // iOS, and also desktops: the default exponential decay. Desktop
-            // browsers rarely reach the portable fling at all (trackpads
-            // deliver their own momentum events), so the distinction only
-            // matters for touch screens.
             ScrollPhysics::ios()
         };
         Self {
@@ -95,17 +85,10 @@ enum WebGraphics {
 
 #[derive(Debug)]
 pub enum WebWindowError {
-    /// WebGL2 binds its device to one canvas, so only WebGPU can draw more
-    /// than one window, or a window opened after the first one closed.
     MultipleWindowsNeedWebGpu,
-    /// No element matched the window's [`zz_gpui::WindowOptions::mount`] selector.
     MountNotFound(String),
     UnsupportedWindowKind(&'static str),
-    /// Graphics initialization has not completed yet; retrying after it
-    /// finishes (e.g. from the `Platform::run` callback) can succeed.
     GraphicsInitializationPending,
-    /// Graphics initialization or an earlier window creation failed;
-    /// retrying cannot succeed.
     GraphicsUnavailable,
 }
 
@@ -162,10 +145,6 @@ impl WebPlatform {
         )
     }
 
-    /// Configures browser fallback before any fonts or layouts are cached.
-    ///
-    /// Loaded fonts remain preferred, except when they cannot supply requested
-    /// emoji presentation. The policy cannot be changed after construction.
     pub fn new_with_backend_and_font_fallback(
         allow_multi_threading: bool,
         backend_preference: WebBackendPreference,
@@ -216,12 +195,10 @@ impl WebPlatform {
         }
     }
 
-    /// Returns an HTTP client that runs browser Fetch operations on this platform's main thread.
     pub fn fetch_http_client(&self) -> FetchHttpClient {
         FetchHttpClient::new(self.dispatcher.clone())
     }
 
-    /// Returns a browser Fetch HTTP client with the given reported user agent.
     pub fn fetch_http_client_with_user_agent(
         &self,
         user_agent: &str,
@@ -539,8 +516,6 @@ impl Platform for WebPlatform {
         self.callbacks.borrow_mut().reopen = Some(callback);
     }
 
-    // Browsers expose no system sleep or wake signal; the nearest thing is the
-    // Page Visibility API, which drives `WindowVisibility` instead.
     fn on_system_sleep(&self, _callback: Box<dyn FnMut()>) {}
 
     fn on_system_wake(&self, _callback: Box<dyn FnMut()>) {}
@@ -641,17 +616,11 @@ impl Platform for WebPlatform {
 
     fn read_from_clipboard_async(&self) -> Task<Result<Option<ClipboardItem>, ClipboardReadError>> {
         let navigator = self.browser_window.navigator();
-        // `navigator.clipboard` is undefined outside secure contexts; probing
-        // first avoids a wasm-bindgen abort from invoking a method on
-        // `undefined`.
         let clipboard_available = js_sys::Reflect::get(navigator.as_ref(), &"clipboard".into())
             .is_ok_and(|clipboard| !clipboard.is_undefined() && !clipboard.is_null());
         if !clipboard_available {
             return Task::ready(Err(ClipboardReadError::Unavailable));
         }
-        // `read()` must be called synchronously so it is still covered by the
-        // user activation (e.g. the click on a context-menu item) that
-        // triggered this read.
         let read = navigator.clipboard().read();
         self.foreground_executor.spawn(async move {
             let items = wasm_bindgen_futures::JsFuture::from(read)
@@ -665,10 +634,6 @@ impl Platform for WebPlatform {
                     let Some(mime_type) = mime_type.as_string() else {
                         continue;
                     };
-                    // Only fetch blobs for types we can convert; copies from
-                    // other web apps routinely carry `text/html` and
-                    // `web application/...` custom formats whose `getType`
-                    // fetches would be wasted or rejected.
                     if mime_type == "text/plain" {
                         match read_clipboard_item_text(&item, &mime_type).await {
                             Ok(text) if !text.is_empty() => {
@@ -704,8 +669,6 @@ impl Platform for WebPlatform {
         if let Some(text) = item.text()
             && let Some(window) = web_sys::window()
         {
-            // Fire-and-forget; called synchronously inside the user's input
-            // event, which satisfies the browser's user-activation requirement.
             drop(window.navigator().clipboard().write_text(&text));
         }
     }
@@ -739,12 +702,6 @@ impl Platform for WebPlatform {
     }
 }
 
-/// Maps a `navigator.clipboard.read()` rejection to a [`ClipboardReadError`].
-///
-/// Only `NotAllowedError` and `SecurityError` mean the user or browser
-/// refused access; other rejections (e.g. `DataError`) indicate content the
-/// clipboard could not represent, where "allow clipboard access" guidance
-/// would mislead.
 fn clipboard_read_rejection_error(error: JsValue) -> ClipboardReadError {
     match js_error_name(&error).as_deref() {
         Some("NotAllowedError") | Some("SecurityError") => {

@@ -33,6 +33,5 @@ pub(crate) fn wayland_gravity(gravity: PopupGravity) -> xdg_positioner::Gravity 
 pub(crate) fn wayland_constraint_adjustment(
     adjustment: PopupConstraintAdjustment,
 ) -> xdg_positioner::ConstraintAdjustment {
-    // The flag values match the protocol bitfield, so the bits map across directly.
     xdg_positioner::ConstraintAdjustment::from_bits_truncate(adjustment.bits())
 }

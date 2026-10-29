@@ -4,45 +4,22 @@ use std::{
     ops::{Add, Sub},
 };
 
-/// The side of a grid cell, in the units of the bounds. A frame's bounds are
-/// mostly a few dozen scaled pixels across, so each takes a cell or a few.
 const CELL_SIZE: f64 = 64.;
 
-/// The most cells the grid spans along either axis. Bounds reaching past the
-/// last cell are kept in it.
 const MAX_CELLS_PER_AXIS: usize = 256;
 
-/// No entry: the end of a cell's list.
 const NONE: u32 = u32::MAX;
 
-/// Hands out orderings for bounds inserted one after another, each one
-/// greater than that of every bounds inserted before it that it intersects,
-/// and no greater than it has to be, so that primitives that don't overlap
-/// share an ordering and are drawn in one batch.
-///
-/// The bounds are kept in a uniform grid over the plane. Each cell lists the
-/// bounds that reach into it, newest first, except those that cover it
-/// whole: every search that reaches into the cell meets those, so the cell
-/// keeps only the greatest of their orderings. Upstream kept an R-tree,
-/// while the grid indexes each frame's bounds by the cells they touch.
 #[derive(Debug)]
 pub(crate) struct BoundsTree<U>
 where
     U: Clone + Debug + Default + PartialEq,
 {
     grid: Grid<U>,
-    /// The bounds with the greatest ordering so far, and that ordering: a
-    /// search that meets it has its answer at once.
     max: Option<(Bounds<U>, u32)>,
-    /// The bounds inserted since the tree was last cleared, in order, each
-    /// with the ordering it was given.
     recorded: Vec<(Bounds<U>, u32)>,
 }
 
-/// The grid a [`BoundsTree`] keeps its bounds in. Cell `(column, row)`
-/// spans `column * CELL_SIZE` to `(column + 1) * CELL_SIZE` across, and
-/// likewise down, except that the first and last column and row reach on
-/// without end, so every point of the plane is in exactly one cell.
 #[derive(Debug)]
 struct Grid<U>
 where
@@ -50,22 +27,15 @@ where
 {
     columns: usize,
     rows: usize,
-    /// Row by row.
     cells: Vec<Cell>,
-    /// Every cell's list, linked through `next`.
     entries: Vec<Entry<U>>,
-    /// Bounds without a positive width and height. Such bounds may still
-    /// meet others, `intersects` being what it is, but have no cells.
     degenerate: Vec<(Bounds<U>, u32)>,
 }
 
 #[derive(Clone, Copy, Debug)]
 struct Cell {
-    /// The newest entry of the cell's list.
     head: u32,
-    /// The greatest ordering among the bounds that cover the cell whole.
     cover: u32,
-    /// The greatest ordering among all the cell's bounds, covering or not.
     max: u32,
 }
 
@@ -84,13 +54,10 @@ where
 {
     bounds: Bounds<U>,
     order: u32,
-    /// The greatest ordering of this entry and every one after it in its
-    /// list, so a search stops as soon as the rest can't raise its result.
     rest_max: u32,
     next: u32,
 }
 
-/// A bounds' extent along one axis, as the grid sees it.
 #[derive(Clone, Copy)]
 struct Span {
     start: f64,
@@ -109,21 +76,16 @@ impl Span {
         }
     }
 
-    /// Whether this span reaches into the interior of `cell`, of `cells`,
-    /// rather than stopping at one of its edges.
     fn enters(&self, cell: usize, cells: usize) -> bool {
         self.start < cell_end(cell, cells) && self.end > cell_start(cell)
     }
 
-    /// Whether this span covers all of `cell`, of `cells`.
     fn covers(&self, cell: usize, cells: usize) -> bool {
         self.start <= cell_start(cell) && self.end >= cell_end(cell, cells)
     }
 }
 
 fn cell_at(coordinate: f64, cells: usize) -> usize {
-    // `as` truncates toward zero, which is flooring for all that isn't
-    // clamped to the first cell anyway; it saturates, and turns NaN into 0.
     ((coordinate * (1. / CELL_SIZE)) as isize).clamp(0, cells as isize - 1) as usize
 }
 
@@ -161,9 +123,6 @@ where
         self.degenerate.clear();
     }
 
-    /// Whether `bounds` has a positive width and height, and an origin that
-    /// is a number, which is what it takes to be kept in cells or searched
-    /// for through them.
     #[allow(clippy::eq_op)]
     fn has_area(bounds: &Bounds<U>) -> bool {
         bounds.size.width > U::default()
@@ -172,7 +131,6 @@ where
             && bounds.origin.y == bounds.origin.y
     }
 
-    /// Where `bounds` lies along each axis.
     fn spans(&self, bounds: &Bounds<U>) -> (Span, Span) {
         let right = bounds.origin.x.clone() + bounds.size.width.clone();
         let bottom = bounds.origin.y.clone() + bounds.size.height.clone();
@@ -182,8 +140,6 @@ where
         )
     }
 
-    /// How many columns and rows a grid needs to hold `bounds` without
-    /// keeping it in its last column or row, if more than it has.
     fn needs(&self, bounds: &Bounds<U>) -> Option<(usize, usize)> {
         let right: f64 = (bounds.origin.x.clone() + bounds.size.width.clone()).into();
         let bottom: f64 = (bounds.origin.y.clone() + bounds.size.height.clone()).into();
@@ -200,7 +156,6 @@ where
         (columns > self.columns || rows > self.rows).then_some((columns, rows))
     }
 
-    /// Makes the grid `columns` by `rows` and empties it.
     fn resize(&mut self, columns: usize, rows: usize) {
         self.columns = columns;
         self.rows = rows;
@@ -241,14 +196,6 @@ where
         }
     }
 
-    /// The greatest ordering among the bounds that intersect `query`, which
-    /// has a positive width and height, or 0.
-    ///
-    /// Two such bounds that intersect share a point inside both, and the
-    /// cell holding that point lists one of them if it doesn't cover it, and
-    /// the query reaches into its interior. A bounds that covers a cell whole
-    /// meets every query that reaches into its interior, so the cell's cover
-    /// counts there without looking at the bounds.
     fn max_intersecting(&self, query: &Bounds<U>) -> u32 {
         let mut max = self
             .degenerate
@@ -296,17 +243,12 @@ where
         + Default
         + Into<f64>,
 {
-    /// Clears the scene bounds, keeping the allocated grid storage.
     pub fn clear(&mut self) {
         self.grid.clear();
         self.max = None;
         self.recorded.clear();
     }
 
-    /// Inserts bounds into the tree and returns its assigned ordering.
-    ///
-    /// The ordering is one greater than the maximum ordering of any
-    /// existing bounds that intersect with the new bounds.
     pub fn insert(&mut self, new_bounds: Bounds<U>) -> u32 {
         let ordering = self.find_max_ordering(&new_bounds) + 1;
         self.add(&new_bounds, ordering);
@@ -314,8 +256,6 @@ where
         ordering
     }
 
-    /// Adds `bounds` with `ordering` to the grid, growing it first if the
-    /// bounds reach past it.
     fn add(&mut self, bounds: &Bounds<U>, ordering: u32) {
         if Grid::has_area(bounds)
             && let Some((columns, rows)) = self.grid.needs(bounds)
@@ -331,7 +271,6 @@ where
         }
     }
 
-    /// Finds the maximum ordering among all bounds that intersect with the query.
     fn find_max_ordering(&self, query: &Bounds<U>) -> u32 {
         if let Some((max_bounds, max)) = &self.max
             && query.intersects(max_bounds)
@@ -341,8 +280,6 @@ where
         if Grid::has_area(query) {
             self.grid.max_intersecting(query)
         } else {
-            // Without an area of its own the query may miss the interior of
-            // every cell it touches, so the covers can't answer for it.
             self.recorded
                 .iter()
                 .filter(|(bounds, _)| bounds.intersects(query))
@@ -403,12 +340,10 @@ mod tests {
             },
         };
 
-        // Insert the bounds into the tree and verify the order is correct
         assert_eq!(tree.insert(bounds1), 1);
         assert_eq!(tree.insert(bounds2), 2);
         assert_eq!(tree.insert(bounds3), 3);
 
-        // Insert non-overlapping bounds and verify they can reuse orders
         let bounds4 = Bounds {
             origin: Point { x: 20.0, y: 20.0 },
             size: Size {
@@ -430,21 +365,19 @@ mod tests {
                 height: 10.0,
             },
         };
-        assert_eq!(tree.insert(bounds4), 1); // bounds4 does not overlap with bounds1, bounds2, or bounds3
-        assert_eq!(tree.insert(bounds5), 1); // bounds5 does not overlap with any other bounds
-        assert_eq!(tree.insert(bounds6), 2); // bounds6 overlaps with bounds4, so it should have a different order
+        assert_eq!(tree.insert(bounds4), 1);
+        assert_eq!(tree.insert(bounds5), 1);
+        assert_eq!(tree.insert(bounds6), 2);
     }
 
     #[test]
     fn test_random_iterations() {
         let max_bounds = 100;
         for seed in 1..=1000 {
-            // let seed = 44;
             let mut tree = BoundsTree::default();
             let mut rng = rand::rngs::StdRng::seed_from_u64(seed as u64);
             let mut expected_quads: Vec<(Bounds<f32>, u32)> = Vec::new();
 
-            // Insert a random number of random AABBs into the tree.
             let num_bounds = rng.random_range(1..=max_bounds);
             for _ in 0..num_bounds {
                 let min_x: f32 = rng.random_range(-100.0..100.0);
@@ -464,14 +397,12 @@ mod tests {
                     + 1;
                 expected_quads.push((bounds, expected_ordering));
 
-                // Insert the AABB into the tree and collect intersections.
                 let actual_ordering = tree.insert(bounds);
                 assert_eq!(actual_ordering, expected_ordering);
             }
         }
     }
 
-    /// Large random frames check each ordering against all earlier bounds.
     #[test]
     fn test_large_random_iterations() {
         for seed in 1..=10 {
@@ -501,10 +432,6 @@ mod tests {
         }
     }
 
-    /// Bounds the grid can't simply file under the cells they reach into:
-    /// ones on cells' edges, covering cells whole or reaching past the grid,
-    /// without a width or height, negative, infinite or not a number. Each
-    /// still gets the ordering comparing it with every bounds before it gives.
     #[test]
     fn awkward_bounds_are_ordered_as_comparing_them_with_all_would() {
         let edge = CELL_SIZE as f32;

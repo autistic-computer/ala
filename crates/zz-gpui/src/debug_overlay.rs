@@ -1,14 +1,9 @@
-//! A developer overlay that paints frame-time statistics directly into the
-//! scene, bypassing layout, text, and view invalidation entirely (to avoid
-//! infinitely triggering new frames).
-
 use crate::{
     BorderStyle, Bounds, ContentMask, Corners, Edges, Hsla, Pixels, Quad, ScaledPixels, Scene,
     Size, point, rgba, size, transparent_black,
 };
 use std::{collections::VecDeque, time::Duration};
 
-#[allow(missing_docs)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum DebugFrameOverlayMode {
     #[default]
@@ -18,7 +13,6 @@ pub enum DebugFrameOverlayMode {
 }
 
 impl DebugFrameOverlayMode {
-    /// Returns the next mode in the Hidden → FrameTime → Detailed cycle.
     pub fn next(self) -> Self {
         match self {
             Self::Hidden => Self::Minimal,
@@ -28,19 +22,14 @@ impl DebugFrameOverlayMode {
     }
 }
 
-/// The number of most recent draw durations retained for percentile statistics.
 const MAX_SAMPLES: usize = 1000;
 
 const GLYPH_WIDTH: usize = 5;
 const GLYPH_HEIGHT: usize = 7;
-/// Glyph advance and line advance, in font cells.
 const CHAR_ADVANCE: f32 = (GLYPH_WIDTH + 1) as f32;
 const LINE_ADVANCE: f32 = (GLYPH_HEIGHT + 2) as f32;
-/// Padding between the panel edge and the text, in font cells.
 const PANEL_PADDING: f32 = 2.0;
-/// Margin between the panel and the window corner, in font cells.
 const PANEL_MARGIN: f32 = 4.0;
-/// Side of one square font cell, in logical pixels.
 const CELL_SIZE: f32 = 2.0;
 
 fn text_color() -> Hsla {
@@ -74,8 +63,6 @@ impl DebugFrameOverlay {
         self.mode = mode;
     }
 
-    /// Clears the draw-duration samples, restarting the percentile window.
-    /// The total frame count is left untouched.
     pub(crate) fn reset_stats(&mut self) {
         self.draw_durations.clear();
     }
@@ -99,8 +86,6 @@ impl DebugFrameOverlay {
 
         let lines = self.lines();
         let max_line_chars = lines.iter().map(|line| line.len()).max().unwrap_or(0);
-        // Ensure at least one physical pixel per cell so the text stays legible
-        // at fractional downscale factors.
         let cell = (CELL_SIZE * scale_factor).max(1.0);
 
         let panel_width = cell * (max_line_chars as f32 * CHAR_ADVANCE + 2.0 * PANEL_PADDING);
@@ -133,7 +118,6 @@ impl DebugFrameOverlay {
                     panel_left + cell * (PANEL_PADDING + char_index as f32 * CHAR_ADVANCE);
                 for (row_index, row) in rows.iter().enumerate() {
                     let row_top = line_top + cell * row_index as f32;
-                    // Merge horizontal runs of lit cells into single quads.
                     let mut column = 0;
                     while column < GLYPH_WIDTH {
                         if row & (1 << (GLYPH_WIDTH - 1 - column)) == 0 {
@@ -171,15 +155,11 @@ impl DebugFrameOverlay {
                 let percentile = |numerator: usize| {
                     (!sorted.is_empty()).then(|| sorted[(sorted.len() - 1) * numerator / 100])
                 };
-                // Past five digits the count would break the column
-                // alignment, so it saturates instead.
                 let frame_count = if self.total_frame_count > 99_999 {
                     "LOTS".to_string()
                 } else {
                     self.total_frame_count.to_string()
                 };
-                // Labels are padded to a uniform width so the fixed-width
-                // durations start in the same column on every line.
                 vec![
                     format!("CUR {}", format_ms(current)),
                     format!("1%  {}", format_ms(percentile(99))),
@@ -192,8 +172,6 @@ impl DebugFrameOverlay {
     }
 }
 
-/// Formats as `abc.d MS`, right-aligned in room for three integer digits and
-/// one decimal (padded with spaces, not zeroes), so stacked readouts align.
 fn format_ms(duration: Option<Duration>) -> String {
     match duration {
         Some(duration) => {
@@ -230,9 +208,6 @@ fn solid_quad(
     }
 }
 
-/// Returns the 5x7 bitmap for the given character, one `u8` of column bits per
-/// row with the most significant of the 5 bits leftmost. Only the characters
-/// used by the overlay's readouts are defined.
 fn glyph(character: char) -> Option<[u8; GLYPH_HEIGHT]> {
     Some(match character {
         '0' => [
@@ -321,8 +296,6 @@ fn glyph(character: char) -> Option<[u8; GLYPH_HEIGHT]> {
 mod tests {
     use super::*;
 
-    /// Every character the readouts can produce must have a glyph, or it
-    /// would silently render as blank space.
     #[test]
     fn all_rendered_characters_have_glyphs() {
         let mut overlay = DebugFrameOverlay::new();
@@ -339,11 +312,9 @@ mod tests {
             overlay.record_frame(duration);
             lines.extend(overlay.lines());
         }
-        // Counts beyond five digits render as "LOTS".
         overlay.total_frame_count = 100_000;
         lines.extend(overlay.lines());
 
-        // An enabled overlay with no samples yet renders placeholders.
         let mut empty = DebugFrameOverlay::new();
         empty.set_mode(DebugFrameOverlayMode::Full);
         lines.extend(empty.lines());

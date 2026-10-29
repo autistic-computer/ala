@@ -32,13 +32,9 @@ fn run_example() {
         }
         cx.set_global(AppState::new());
 
-        // Bring the menu bar to the foreground (so you can see the menu bar)
         cx.activate(true);
-        // Register the `quit` function so it can be referenced
-        // by the `MenuItem::action` in the menu bar
         cx.on_action(quit);
         cx.on_action(toggle_check);
-        // Add menu items
         set_app_menus(cx);
         cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| SetMenus {}))
             .unwrap();
@@ -118,10 +114,8 @@ fn set_app_menus(cx: &mut App) {
     ])]);
 }
 
-// Associate actions using the `actions!` macro (or `Action` derive macro)
 actions!(set_menus, [Quit, ToggleCheck]);
 
-// Define the quit function that is registered with the App
 fn quit(_: &Quit, cx: &mut App) {
     println!("Gracefully quitting the application...");
     cx.quit();

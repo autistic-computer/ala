@@ -4,7 +4,6 @@ use crate::sum_tree::{
     Bias, ContextLessSummary, Dimension, Edit, Item, KeyedItem, SeekTarget, SumTree,
 };
 
-/// A cheaply-cloneable ordered map based on a [SumTree](crate::sum_tree::SumTree).
 #[derive(Clone, PartialEq, Eq)]
 pub struct TreeMap<K, V>(SumTree<MapEntry<K, V>>)
 where
@@ -122,7 +121,6 @@ impl<K: Clone + Ord, V: Clone> TreeMap<K, V> {
         self.0 = new_tree;
     }
 
-    /// Returns the key-value pair with the greatest key less than or equal to the given key.
     pub fn closest(&self, key: &K) -> Option<(&K, &V)> {
         let mut cursor = self.0.cursor::<MapKeyRef<'_, K>>(());
         let key = MapKeyRef(Some(key));

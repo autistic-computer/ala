@@ -92,9 +92,9 @@ impl PlatformKeyboardMapper for WindowsKeyboardMapper {
 
 impl WindowsKeyboardLayout {
     pub(crate) fn new() -> Result<Self> {
-        let mut buffer = [0u16; KL_NAMELENGTH as usize]; // KL_NAMELENGTH includes the null terminator
+        let mut buffer = [0u16; KL_NAMELENGTH as usize];
         unsafe { GetKeyboardLayoutNameW(&mut buffer)? };
-        let id = String::from_utf16_lossy(&buffer[..buffer.len() - 1]); // Remove the null terminator
+        let id = String::from_utf16_lossy(&buffer[..buffer.len() - 1]);
         let entry = windows_registry::LOCAL_MACHINE.open(format!(
             "System\\CurrentControlSet\\Control\\Keyboard Layouts\\{id}"
         ))?;
@@ -165,7 +165,6 @@ fn get_key_from_vkey(vkey: VIRTUAL_KEY) -> Option<String> {
         return None;
     }
 
-    // The high word contains dead key flag, the low word contains the character
     let key = char::from_u32(key_data & 0xFFFF)?;
 
     Some(key.to_ascii_lowercase().to_string())
@@ -240,7 +239,6 @@ pub(crate) fn generate_key_char(
 
 fn get_vkey_from_key_with_us_layout(key: &str) -> Option<(u16, bool)> {
     match key {
-        // ` => VK_OEM_3
         "`" => Some((VK_OEM_3.0, false)),
         "~" => Some((VK_OEM_3.0, true)),
         "1" => Some((VK_1.0, false)),
@@ -323,7 +321,6 @@ mod tests {
     fn test_keyboard_mapper() {
         let mapper = WindowsKeyboardMapper::new();
 
-        // Normal case
         let keystroke = Keystroke {
             modifiers: Modifiers::control(),
             key: "a".to_string(),
@@ -334,7 +331,6 @@ mod tests {
         assert_eq!(mapped.key(), "a");
         assert_eq!(*mapped.modifiers(), Modifiers::control());
 
-        // Shifted case, ctrl-$
         let keystroke = Keystroke {
             modifiers: Modifiers::control(),
             key: "$".to_string(),
@@ -345,7 +341,6 @@ mod tests {
         assert_eq!(mapped.key(), "4");
         assert_eq!(*mapped.modifiers(), Modifiers::control_shift());
 
-        // Shifted case, but shift is true
         let keystroke = Keystroke {
             modifiers: Modifiers::control_shift(),
             key: "$".to_string(),
@@ -356,7 +351,6 @@ mod tests {
         assert_eq!(mapped.key(), "4");
         assert_eq!(*mapped.modifiers(), Modifiers::control_shift());
 
-        // Windows style
         let keystroke = Keystroke {
             modifiers: Modifiers::control_shift(),
             key: "4".to_string(),

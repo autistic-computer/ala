@@ -10,13 +10,11 @@ use fontdb::{FaceInfo, Query, Style};
 use skrifa::raw::{ReadError, TableProvider as _};
 use skrifa::MetadataProvider;
 
-// re-export fontdb and harfrust
 pub use fontdb;
 pub use harfrust;
 
 use super::fallback::{Fallback, Fallbacks, MonospaceFallbackInfo, PlatformFallback};
 
-// The fields are used in the derived Ord implementation for sorting fallback candidates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FontMatchKey {
     pub(crate) not_emoji: bool,
@@ -31,7 +29,6 @@ pub struct FontMatchKey {
 
 impl FontMatchKey {
     fn new(attrs: &Attrs, face: &FaceInfo, db: &fontdb::Database) -> FontMatchKey {
-        // TODO: smarter way of detecting emoji
         let not_emoji = !face.post_script_name.contains("Emoji");
         let font_weight_diff = attrs.weight.0.abs_diff(face.weight.0);
 
@@ -95,13 +92,11 @@ impl FontCachedCodepointSupportInfo {
     ) -> bool {
         let ret = font_codepoints.contains(&codepoint);
         if ret {
-            // don't bother inserting if we are going to truncate the entry away
             if supported_insert_pos != Self::SUPPORTED_MAX_SZ {
                 self.supported.insert(supported_insert_pos, codepoint);
                 self.supported.truncate(Self::SUPPORTED_MAX_SZ);
             }
         } else {
-            // don't bother inserting if we are going to truncate the entry away
             if not_supported_insert_pos != Self::NOT_SUPPORTED_MAX_SZ {
                 self.not_supported
                     .insert(not_supported_insert_pos, codepoint);
@@ -128,45 +123,30 @@ impl FontCachedCodepointSupportInfo {
     }
 }
 
-/// Access to the system fonts.
 pub struct FontSystem {
-    /// The locale of the system.
     locale: String,
 
-    /// The underlying font database.
     db: fontdb::Database,
 
-    /// Cache for loaded fonts from the database.
     font_cache: HashMap<(fontdb::ID, fontdb::Weight), Option<Arc<Font>>>,
 
-    /// Sorted unique ID's of all Monospace fonts in DB
     monospace_font_ids: Vec<fontdb::ID>,
 
-    /// Sorted unique ID's of all Monospace fonts in DB per script.
-    /// A font may support multiple scripts of course, so the same ID
-    /// may appear in multiple map value vecs.
     per_script_monospace_font_ids: HashMap<[u8; 4], Vec<fontdb::ID>>,
 
-    /// Cache for font codepoint support info
     font_codepoint_support_info_cache: HashMap<fontdb::ID, FontCachedCodepointSupportInfo>,
 
-    /// Cache for font matches.
     font_matches_cache: HashMap<FontMatchAttrs, Arc<Vec<FontMatchKey>>>,
 
-    /// Scratch buffer for shaping and laying out.
     pub(crate) shape_buffer: ShapeBuffer,
 
-    /// Buffer for use in `FontFallbackIter`.
     pub(crate) monospace_fallbacks_buffer: BTreeSet<MonospaceFallbackInfo>,
 
-    /// Cache for shaped runs
     #[cfg(feature = "shape-run-cache")]
     pub shape_run_cache: crate::ShapeRunCache,
 
-    /// List of fallbacks
     pub(crate) dyn_fallback: Box<dyn Fallback>,
 
-    /// List of fallbacks
     pub(crate) fallbacks: Fallbacks,
 }
 
@@ -181,18 +161,10 @@ impl fmt::Debug for FontSystem {
 
 impl FontSystem {
     const FONT_MATCHES_CACHE_SIZE_LIMIT: usize = 256;
-    /// Create a new [`FontSystem`], that allows access to any installed system fonts
-    ///
-    /// # Timing
-    ///
-    /// This function takes some time to run. On the release build, it can take up to a second,
-    /// while debug builds can take up to ten times longer. For this reason, it should only be
-    /// called once, and the resulting [`FontSystem`] should be shared.
     pub fn new() -> Self {
         Self::new_with_fonts(core::iter::empty())
     }
 
-    /// Create a new [`FontSystem`] with a pre-specified set of fonts.
     pub fn new_with_fonts(fonts: impl IntoIterator<Item = fontdb::Source>) -> Self {
         let locale = Self::get_locale();
         log::debug!("Locale: {locale}");
@@ -201,7 +173,6 @@ impl FontSystem {
 
         Self::load_fonts(&mut db, fonts.into_iter());
 
-        //TODO: configurable default fonts
         db.set_monospace_family("Noto Sans Mono");
         db.set_sans_serif_family("Open Sans");
         db.set_serif_family("DejaVu Serif");
@@ -209,7 +180,6 @@ impl FontSystem {
         Self::new_with_locale_and_db_and_fallback(locale, db, PlatformFallback)
     }
 
-    /// Create a new [`FontSystem`] with a pre-specified locale, font database and font fallback list.
     pub fn new_with_locale_and_db_and_fallback(
         locale: String,
         db: fontdb::Database,
@@ -272,34 +242,28 @@ impl FontSystem {
         }
     }
 
-    /// Create a new [`FontSystem`] with a pre-specified locale and font database.
     pub fn new_with_locale_and_db(locale: String, db: fontdb::Database) -> Self {
         Self::new_with_locale_and_db_and_fallback(locale, db, PlatformFallback)
     }
 
-    /// Get the locale.
     pub fn locale(&self) -> &str {
         &self.locale
     }
 
-    /// Get the database.
     pub const fn db(&self) -> &fontdb::Database {
         &self.db
     }
 
-    /// Get a mutable reference to the database.
     pub fn db_mut(&mut self) -> &mut fontdb::Database {
         self.font_matches_cache.clear();
         self.shape_buffer.clear_shape_plans();
         &mut self.db
     }
 
-    /// Consume this [`FontSystem`] and return the locale and database.
     pub fn into_locale_and_db(self) -> (String, fontdb::Database) {
         (self.locale, self.db)
     }
 
-    /// Get a font by its ID and weight.
     pub fn get_font(&mut self, id: fontdb::ID, weight: fontdb::Weight) -> Option<Arc<Font>> {
         self.font_cache
             .entry((id, weight))
@@ -358,14 +322,12 @@ impl FontSystem {
     }
 
     pub fn get_font_matches(&mut self, attrs: &Attrs<'_>) -> Arc<Vec<FontMatchKey>> {
-        // Clear the cache first if it reached the size limit
         if self.font_matches_cache.len() >= Self::FONT_MATCHES_CACHE_SIZE_LIMIT {
             log::trace!("clear font mache cache");
             self.font_matches_cache.clear();
         }
 
         self.font_matches_cache
-            //TODO: do not create AttrsOwned unless entry does not already exist
             .entry(attrs.into())
             .or_insert_with(|| {
                 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
@@ -377,10 +339,8 @@ impl FontSystem {
                     .map(|face| FontMatchKey::new(attrs, face, &self.db))
                     .collect::<Vec<_>>();
 
-                // Sort so we get the keys with weight_offset=0 first
                 font_match_keys.sort();
 
-                // db.query is better than above, but returns just one font
                 let query = Query {
                     families: &[attrs.family],
                     weight: attrs.weight,
@@ -395,11 +355,9 @@ impl FontSystem {
                         .find(|(_i, key)| key.id == id)
                         .map(|(i, _)| i)
                     {
-                        // if exists move to front
                         let match_key = font_match_keys.remove(i);
                         font_match_keys.insert(0, match_key);
                     } else if let Some(face) = self.db.face(id) {
-                        // else insert in front
                         let match_key = FontMatchKey::new(attrs, face, &self.db);
                         font_match_keys.insert(0, match_key);
                     } else {
@@ -458,7 +416,6 @@ impl FontSystem {
     }
 }
 
-/// A value borrowed together with an [`FontSystem`]
 #[derive(Debug)]
 pub struct BorrowedWithFontSystem<'a, T> {
     pub(crate) inner: &'a mut T,

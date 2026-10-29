@@ -1,10 +1,7 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 use unicode_script::Script;
 
 use super::Fallback;
 
-/// A platform-specific font fallback list, for Windows.
 #[derive(Debug)]
 pub struct PlatformFallback;
 
@@ -26,42 +23,30 @@ impl Fallback for PlatformFallback {
     }
 }
 
-// Fallbacks to use after any script specific fallbacks
 fn common_fallback() -> &'static [&'static str] {
-    //TODO: abstract style (sans/serif/monospaced)
     &[
         "Segoe UI",
         "Segoe UI Emoji",
         "Segoe UI Symbol",
         "Segoe UI Historic",
-        //TODO: Add CJK script here for doublewides?
     ]
 }
 
-// Fallbacks to never use
 fn forbidden_fallback() -> &'static [&'static str] {
     &[]
 }
 
 fn han_unification(locale: &str) -> &'static [&'static str] {
-    //TODO!
     match locale {
-        // Japan
         "ja" => &["Yu Gothic"],
-        // Korea
         "ko" => &["Malgun Gothic"],
-        // Hong Kong"
         "zh-HK" => &["MingLiU_HKSCS"],
-        // Taiwan
         "zh-TW" => &["Microsoft JhengHei UI"],
-        // Simplified Chinese is the default (also catches "zh-CN" for China)
         _ => &["Microsoft YaHei UI"],
     }
 }
 
-// Fallbacks to use per script
 fn script_fallback(script: Script, locale: &str) -> &'static [&'static str] {
-    //TODO: better match https://github.com/chromium/chromium/blob/master/third_party/blink/renderer/platform/fonts/win/font_fallback_win.cc#L99
     match script {
         Script::Adlam => &["Ebrima"],
         Script::Bengali => &["Nirmala UI"],

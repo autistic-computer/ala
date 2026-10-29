@@ -59,9 +59,6 @@ impl WindowsDispatcher {
             ..Default::default()
         };
 
-        // If the thread pool never runs our callback, the matching `from_raw` is never called, which leaks the runnable.
-        // Dropping the scheduled runnable would cancel its task and make the next poll of any awaiter panic. Since we expect
-        // the scenario to usually happen during shutdown, this leak is acceptable.
         let context = runnable.into_raw().as_ptr() as *mut c_void;
 
         unsafe {
@@ -76,7 +73,6 @@ impl WindowsDispatcher {
         unsafe {
             if let Ok(timer) = CreateThreadpoolTimer(Some(run_timer_callback), Some(context), None)
             {
-                // Negative FILETIME expresses a relative delay in 100ns ticks
                 let ticks = (duration.as_nanos() / 100).min(i64::MAX as u128) as i64;
                 let due = (-ticks) as u64;
                 let due_time = FILETIME {
@@ -131,14 +127,6 @@ impl PlatformDispatcher for WindowsDispatcher {
                 }
             }
             Err(runnable) => {
-                // NOTE: Runnable may wrap a Future that is !Send.
-                //
-                // This is usually safe because we only poll it on the main thread.
-                // However if the send fails, we know that:
-                // 1. main_receiver has been dropped (which implies the app is shutting down)
-                // 2. we are on a background thread.
-                // It is not safe to drop something !Send on the wrong thread, and
-                // the app will exit soon anyway, so we must forget the runnable.
                 std::mem::forget(runnable);
             }
         }
@@ -150,10 +138,8 @@ impl PlatformDispatcher for WindowsDispatcher {
 
     fn spawn_realtime(&self, f: Box<dyn FnOnce() + Send>) {
         std::thread::spawn(move || {
-            // SAFETY: always safe to call
             let thread_handle = unsafe { GetCurrentThread() };
 
-            // SAFETY: thread_handle is a valid handle to the current thread
             unsafe { SetThreadPriority(thread_handle, THREAD_PRIORITY_TIME_CRITICAL) }
                 .context("thread priority")
                 .log_err();

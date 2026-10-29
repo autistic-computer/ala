@@ -155,7 +155,6 @@ fn set_clipboard_bytes<T>(data: &[T], format: u32) -> Result<()> {
         std::ptr::copy_nonoverlapping(data.as_ptr(), ptr as _, data.len());
         GlobalUnlock(*global).ok();
         SetClipboardData(format, Some(HANDLE(global.0)))?;
-        // SetClipboardData succeeded — the system now owns the memory.
         std::mem::forget(global);
     }
     Ok(())
@@ -203,8 +202,6 @@ fn write_image(item: &Image) -> Result<()> {
         set_clipboard_bytes(item.bytes(), format)?;
     }
 
-    // Also provide a PNG copy for broad compatibility.
-    // SVG can't be rasterized by the image crate, so skip it.
     if item.format != ImageFormat::Svg && native_format != Some(*CLIPBOARD_PNG_FORMAT) {
         if let Some(png_bytes) = convert_to_png(item.bytes(), item.format) {
             set_clipboard_bytes(&png_bytes, *CLIPBOARD_PNG_FORMAT)?;
@@ -268,7 +265,6 @@ fn read_files() -> Option<ClipboardEntry> {
     )))
 }
 
-/// DIB is BMP without the 14-byte BITMAPFILEHEADER. Prepend one.
 fn convert_dib_to_bmp(dib: &[u8]) -> Option<Vec<u8>> {
     if dib.len() < 40 {
         return None;
@@ -286,7 +282,7 @@ fn convert_dib_to_bmp(dib: &[u8]) -> Option<Vec<u8>> {
             colors_used
         }) * 4
     } else if compression == 3 {
-        12 // BI_BITFIELDS
+        12
     } else {
         0
     };
@@ -297,7 +293,7 @@ fn convert_dib_to_bmp(dib: &[u8]) -> Option<Vec<u8>> {
     let mut bmp = Vec::with_capacity(file_size as usize);
     bmp.extend_from_slice(b"BM");
     bmp.extend_from_slice(&file_size.to_le_bytes());
-    bmp.extend_from_slice(&[0u8; 4]); // reserved
+    bmp.extend_from_slice(&[0u8; 4]);
     bmp.extend_from_slice(&pixel_offset.to_le_bytes());
     bmp.extend_from_slice(dib);
     Some(bmp)

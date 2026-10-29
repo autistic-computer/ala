@@ -18,12 +18,6 @@ pub struct WgpuContext {
     errors: Arc<DeviceErrorState>,
 }
 
-/// Errors reported by wgpu's device-wide callbacks.
-///
-/// A device has exactly one lost callback and one uncaptured-error callback, so this
-/// state is installed once per device and shared by every renderer using it. Renderers
-/// keep their own handle so they can keep observing a loss after the context that
-/// produced it has been dropped for recovery.
 #[derive(Default)]
 pub struct DeviceErrorState {
     lost: AtomicBool,
@@ -49,7 +43,6 @@ impl DeviceErrorState {
         errors
     }
 
-    /// Returns true if the GPU device was lost (e.g., due to driver crash, suspend/resume).
     pub fn device_lost(&self) -> bool {
         self.lost.load(Ordering::Relaxed)
     }
@@ -60,10 +53,6 @@ impl DeviceErrorState {
         last_error.1 = Some(error);
     }
 
-    /// Returns the latest error once per observer, without consuming shared state.
-    /// Start each observer at zero, including after switching devices, so errors
-    /// raised during construction are observed. Multiple errors between observations
-    /// coalesce into the latest error; this is not an error queue.
     pub fn observe_error(&self, generation: &mut u64) -> Option<String> {
         let last_error = self.last_error.lock();
         if *generation == last_error.0 {
@@ -96,10 +85,6 @@ pub struct PreparedWebGraphics {
     pub surface: wgpu::Surface<'static>,
 }
 
-/// wgpu-core refuses to create a surface when neither the instance nor the surface
-/// target carries a display handle, and `SurfaceTarget::Canvas` always passes `None`.
-/// The WebGL2 backend never reads the handle (WebGPU bypasses wgpu-core entirely), so
-/// a unit web display handle on the instance satisfies the check.
 #[cfg(target_family = "wasm")]
 #[derive(Debug)]
 struct WebDisplaySource;
@@ -147,8 +132,6 @@ impl WgpuContext {
     ) -> anyhow::Result<Self> {
         let device_id_filter = Self::device_id_filter();
 
-        // Select an adapter by actually testing surface configuration with the real device.
-        // This is the only reliable way to determine compatibility on hybrid GPU systems.
         let (adapter, device, queue, dual_source_blending, color_texture_format) =
             zz_gpui::block_on(Self::select_adapter_and_device(
                 &instance,
@@ -241,9 +224,6 @@ impl WgpuContext {
         not(target_family = "wasm"),
         any(test, feature = "bench-support", feature = "test-support")
     ))]
-    /// Both candidates are 8-bit RGBA-ordered or BGRA-ordered formats: headless readback
-    /// copies rows as 4 bytes per pixel and only swizzles, so no other formats may be added
-    /// here without updating it.
     fn headless_target_format(adapter: &wgpu::Adapter) -> Option<wgpu::TextureFormat> {
         let required_usages =
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC;
@@ -462,14 +442,6 @@ impl WgpuContext {
         })
     }
 
-    /// Under WSL the host GPU is reachable only through Mesa's dzn driver, which
-    /// translates Vulkan to D3D12 and reports no conformance version. wgpu hides
-    /// such adapters, leaving llvmpipe as the only candidate and every frame on
-    /// the CPU. Opt in there so the real GPU stays visible.
-    ///
-    /// `/dev/dxg` is the WSL GPU device node, so this cannot fire on a native
-    /// Linux system, and a conformant driver is unaffected either way: the flag
-    /// only gates adapters whose reported conformance version is zero.
     #[cfg(not(target_family = "wasm"))]
     fn instance_flags() -> wgpu::InstanceFlags {
         let mut flags = wgpu::InstanceFlags::default();
@@ -494,11 +466,6 @@ impl WgpuContext {
         Ok(())
     }
 
-    /// Select an adapter and create a device, testing that the surface can actually be configured.
-    /// This is the only reliable way to determine compatibility on hybrid GPU systems, where
-    /// adapters may report surface compatibility via get_capabilities() but fail when actually
-    /// configuring (e.g., NVIDIA reporting Vulkan Wayland support but failing because the
-    /// Wayland compositor runs on the Intel GPU).
     #[cfg(not(target_family = "wasm"))]
     async fn select_adapter_and_device(
         instance: &wgpu::Instance,
@@ -525,7 +492,6 @@ impl WgpuContext {
 
         Self::sort_adapters(&mut adapters, device_id_filter, compositor_gpu);
 
-        // Log all available adapters (in sorted order)
         log::info!("Found {} GPU adapter(s):", adapters.len());
         for adapter in &adapters {
             let info = adapter.get_info();
@@ -539,7 +505,6 @@ impl WgpuContext {
             );
         }
 
-        // Test each adapter by creating a device and configuring the surface
         for adapter in adapters {
             let info = adapter.get_info();
 
@@ -583,13 +548,6 @@ impl WgpuContext {
         anyhow::bail!("No GPU adapter found that can configure the display surface")
     }
 
-    /// Sort adapters into a single priority order. Tiers (from highest to lowest):
-    ///
-    /// 1. ZED_DEVICE_ID match — explicit user override
-    /// 2. Compositor GPU match — the GPU the display server is rendering on
-    /// 3. Device type (Discrete > Integrated > Other > Virtual > Cpu).
-    ///    "Other" ranks above "Virtual" because OpenGL seems to count as "Other".
-    /// 4. Backend — prefer Vulkan/Metal/Dx12 over GL/etc.
     #[cfg(not(target_family = "wasm"))]
     fn sort_adapters(
         adapters: &mut [wgpu::Adapter],
@@ -598,8 +556,6 @@ impl WgpuContext {
     ) {
         adapters.sort_by_key(|adapter| {
             let info = adapter.get_info();
-            // Backends like OpenGL report device=0 for all adapters, so
-            // device-based matching is only meaningful when non-zero.
             let device_known = info.device != 0;
             let user_override: u8 = match device_id_filter {
                 Some(id) if device_known && info.device == id => 0,
@@ -636,8 +592,6 @@ impl WgpuContext {
         });
     }
 
-    /// Try to use an adapter with a surface by creating a device and testing configuration.
-    /// Returns the device and queue if successful, allowing them to be reused.
     #[cfg(not(target_family = "wasm"))]
     async fn try_adapter_with_surface(
         adapter: &wgpu::Adapter,
@@ -736,13 +690,10 @@ impl WgpuContext {
         self.color_texture_format
     }
 
-    /// Returns true if the GPU device was lost (e.g., due to driver crash, suspend/resume).
-    /// When this returns true, the context should be recreated.
     pub fn device_lost(&self) -> bool {
         self.errors.device_lost()
     }
 
-    /// The device-wide error state, shared with renderers on this device.
     pub fn errors(&self) -> &Arc<DeviceErrorState> {
         &self.errors
     }

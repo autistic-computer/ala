@@ -70,9 +70,6 @@ struct RawWindow {
     display: *mut c_void,
 }
 
-// Safety: The raw pointers in RawWindow point to Wayland surface/display
-// which are valid for the window's lifetime. These are used only for
-// passing to wgpu which needs Send+Sync for surface creation.
 unsafe impl Send for RawWindow {}
 unsafe impl Sync for RawWindow {}
 
@@ -104,8 +101,6 @@ struct InProgressConfigure {
 pub struct WaylandWindowState {
     surface_state: WaylandSurfaceState,
     parent: Option<WaylandWindowStatePtr>,
-    /// Child surfaces mapped to whether they block this window's input (dialogs
-    /// block, popups don't). Children are closed before this window closes.
     children: FxHashMap<ObjectId, bool>,
     pub surface: wl_surface::WlSurface,
     app_id: Option<String>,
@@ -125,7 +120,6 @@ pub struct WaylandWindowState {
     background_appearance: WindowBackgroundAppearance,
     fullscreen: bool,
     maximized: bool,
-    /// `Hidden` while the `xdg_toplevel` `suspended` state (xdg-shell v6) is set.
     visibility: WindowVisibility,
     tiling: Tiling,
     window_bounds: Bounds<Pixels>,
@@ -159,7 +153,6 @@ impl WaylandSurfaceState {
         popup_grab: Option<(u32, wl_seat::WlSeat)>,
         target_output: Option<wl_output::WlOutput>,
     ) -> anyhow::Result<Self> {
-        // For layer_shell windows, create a layer surface instead of an xdg surface
         if let WindowKind::LayerShell(options) = &params.kind {
             let Some(layer_shell) = globals.layer_shell.as_ref() else {
                 return Err(LayerShellNotSupportedError.into());
@@ -222,8 +215,6 @@ impl WaylandSurfaceState {
                 .wm_base
                 .get_xdg_surface(&surface, &globals.qh, surface.id());
 
-            // A layer-shell parent takes a null xdg parent and is attached via the layer
-            // surface. Every other surface kind has an xdg_surface to parent to directly.
             let xdg_popup = if let Some(parent_layer_surface) = parent.layer_surface() {
                 let xdg_popup = xdg_surface.get_popup(None, &positioner, &globals.qh, surface.id());
                 parent_layer_surface.get_popup(&xdg_popup);
@@ -242,8 +233,6 @@ impl WaylandSurfaceState {
                 xdg_popup.grab(&seat, serial);
             }
 
-            // Non-blocking: the parent keeps its input so it can dismiss the popup on
-            // clicks in its own window.
             parent.add_child(surface.id(), false);
 
             return Ok(WaylandSurfaceState::Popup(WaylandPopupSurfaceState {
@@ -254,7 +243,6 @@ impl WaylandSurfaceState {
             }));
         }
 
-        // All other WindowKinds result in a regular xdg surface
         let xdg_surface = globals
             .wm_base
             .get_xdg_surface(&surface, &globals.qh, surface.id());
@@ -286,7 +274,6 @@ impl WaylandSurfaceState {
             toplevel.set_min_size(f32::from(size.width) as i32, f32::from(size.height) as i32);
         }
 
-        // Attempt to set up window decorations based on the requested configuration
         let decoration = globals
             .decoration_manager
             .as_ref()
@@ -318,7 +305,6 @@ pub struct WaylandLayerSurfaceState {
 pub struct WaylandPopupSurfaceState {
     xdg_surface: xdg_surface::XdgSurface,
     xdg_popup: xdg_popup::XdgPopup,
-    // Kept so the popup can be re-anchored via `xdg_popup.reposition` when resized.
     options: PopupOptions,
     next_reposition_token: Cell<u32>,
 }
@@ -330,16 +316,11 @@ fn build_popup_positioner(
     parent_geometry: Bounds<Pixels>,
 ) -> xdg_positioner::XdgPositioner {
     let positioner = globals.wm_base.create_positioner(&globals.qh, ());
-    // A zero or negative size is a protocol error.
     positioner.set_size(
         f32::from(size.width).max(1.0) as i32,
         f32::from(size.height).max(1.0) as i32,
     );
 
-    // The protocol wants the anchor rect relative to the parent's window geometry, while
-    // `options.anchor_rect` is in zz-gpui window coordinates (surface-local). A rect extending
-    // outside the geometry or with a zero size is a protocol error, so translate, then clamp
-    // to at least one pixel inside the geometry, pulling the origin inward at the edges.
     let anchor_rect = Bounds {
         origin: options.anchor_rect.origin - parent_geometry.origin,
         size: options.anchor_rect.size,
@@ -433,7 +414,6 @@ impl WaylandSurfaceState {
                 xdg_surface.set_window_geometry(x, y, width, height);
             }
             WaylandSurfaceState::LayerShell(WaylandLayerSurfaceState { layer_surface, .. }) => {
-                // cannot set window position of a layer surface
                 layer_surface.set_size(width as u32, height as u32);
             }
             WaylandSurfaceState::Popup(WaylandPopupSurfaceState { xdg_surface, .. }) => {
@@ -442,8 +422,6 @@ impl WaylandSurfaceState {
         }
     }
 
-    // Re-anchors a mapped popup at a new size via `xdg_popup.reposition`. Repositioning an
-    // unmapped popup (before the first configure) is a protocol error.
     fn reposition_popup(
         &self,
         globals: &Globals,
@@ -478,9 +456,6 @@ impl WaylandSurfaceState {
         }
     }
 
-    /// An exclusive edge must be a single edge that the surface is anchored to,
-    /// otherwise the compositor raises a fatal `invalid_exclusive_edge` protocol
-    /// error. An invalid edge is logged and ignored. Returns whether it applied.
     fn apply_exclusive_edge(
         layer_surface: &zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
         anchor: Anchor,
@@ -518,13 +493,10 @@ impl WaylandSurfaceState {
                 decoration: _decoration,
                 dialog,
             }) => {
-                // drop the dialog before toplevel so compositor can explicitly unapply it's effects
                 if let Some(dialog) = dialog {
                     dialog.destroy();
                 }
 
-                // The role object (toplevel) must always be destroyed before the xdg_surface.
-                // See https://wayland.app/protocols/xdg-shell#xdg_surface:request:destroy
                 toplevel.destroy();
                 xdg_surface.destroy();
             }
@@ -536,7 +508,6 @@ impl WaylandSurfaceState {
                 xdg_popup,
                 ..
             }) => {
-                // Role object before its xdg_surface, as with the toplevel above.
                 xdg_popup.destroy();
                 xdg_surface.destroy();
             }
@@ -582,7 +553,6 @@ impl WaylandWindowState {
                     height: DevicePixels(f32::from(options.bounds.size.height) as i32),
                 },
                 transparent: true,
-                // Prefer Mailbox to avoid blocking. Falls back to FIFO if Mailbox is unsupported.
                 preferred_present_mode: Some(wgpu::PresentMode::Mailbox),
             };
             WgpuRenderer::new(gpu_context, &raw_window, config, compositor_gpu)?
@@ -597,8 +567,6 @@ impl WaylandWindowState {
                 xdg_state.toplevel.set_app_id(app_id.clone());
             }
 
-            // Set max window size based on the GPU's maximum texture dimension.
-            // This prevents the window from being resized larger than what the GPU can render.
             let max_texture_size = renderer.max_texture_size() as i32;
             xdg_state
                 .toplevel
@@ -779,7 +747,6 @@ impl Drop for WaylandWindow {
 
         state.renderer.destroy();
 
-        // Destroy background effects first, as they depend on the wl_surface.
         if let Some(background_effect) = &state.background_effect {
             background_effect.destroy();
         }
@@ -787,23 +754,16 @@ impl Drop for WaylandWindow {
             blur.release();
         }
 
-        // Decorations must be destroyed before the xdg state.
-        // See https://wayland.app/protocols/xdg-decoration-unstable-v1#zxdg_toplevel_decoration_v1
         if let Some(decoration) = &state.surface_state.decoration() {
             decoration.destroy();
         }
 
-        // Surface state might contain xdg_toplevel/xdg_surface which can be destroyed now that
-        // decorations are gone. layer_surface has no dependencies.
         state.surface_state.destroy();
 
-        // Viewport must be destroyed before the wl_surface.
-        // See https://wayland.app/protocols/viewporter#wp_viewport
         if let Some(viewport) = &state.viewport {
             viewport.destroy();
         }
 
-        // The wl_surface itself should always be destroyed last.
         state.surface.destroy();
 
         let state_ptr = self.0.clone();
@@ -879,7 +839,6 @@ impl WaylandWindow {
             frame_ping,
         });
 
-        // Kick things off
         surface.commit();
 
         Ok((this, surface.id()))
@@ -903,18 +862,14 @@ impl WaylandWindowStatePtr {
         self.state.borrow().surface_state.toplevel().cloned()
     }
 
-    /// The `xdg_surface` backing this window, if it has one. Used to anchor child popups.
     pub fn xdg_surface(&self) -> Option<xdg_surface::XdgSurface> {
         self.state.borrow().surface_state.xdg_surface().cloned()
     }
 
-    /// The layer-shell surface backing this window, if it is one. Used to anchor child popups.
     pub fn layer_surface(&self) -> Option<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1> {
         self.state.borrow().surface_state.layer_surface().cloned()
     }
 
-    /// This window's xdg window geometry in surface-local coordinates. Child popup anchor
-    /// rectangles are relative to it, while zz-gpui coordinates are surface-local.
     pub fn window_geometry(&self) -> Bounds<Pixels> {
         let state = self.state.borrow();
         inset_by_tiling(
@@ -942,8 +897,6 @@ impl WaylandWindowStatePtr {
         self.frame_loop.set(FrameLoop::Ticking);
         let mut state = self.state.borrow_mut();
         state.resize_throttle = false;
-        // GPUI may throttle this tick without calling draw, so leave the request
-        // latched until a draw actually reaches the renderer.
         let force_render = state.redraw_requested;
         let require_presentation = state.presentation.requires_presentation();
         drop(state);
@@ -972,9 +925,6 @@ impl WaylandWindowStatePtr {
         }
 
         if state.presentation.requires_presentation() {
-            // Before the first present, or when throttling skipped draw, a
-            // callback may never arrive. Otherwise let the compositor pace
-            // retries so an occluded window does not keep polling.
             if frame_loop == FrameLoop::PresentationFailed
                 && state.presentation == PresentationState::RetryAfterPresent
             {
@@ -1013,8 +963,6 @@ impl WaylandWindowStatePtr {
     }
 
     pub fn frame_callback_fired(&self) {
-        // Another wl_surface commit may have carried this callback while a retry
-        // timer owned the render-loop wakeup.
         self.state.borrow_mut().pending_frame_callback = None;
         if self.frame_loop.get() == FrameLoop::AwaitingCallback {
             self.frame();
@@ -1046,8 +994,6 @@ impl WaylandWindowStatePtr {
             FrameLoop::Ticking => {
                 self.frame_loop.set(FrameLoop::RescheduleRequested);
             }
-            // A wake is already armed: a ping or retry timer is in flight, or a
-            // presented buffer guarantees a compositor frame callback.
             _ => {}
         }
     }
@@ -1115,7 +1061,6 @@ impl WaylandWindowStatePtr {
                     state.tiling = configure.tiling;
                     let visibility_changed = state.visibility != configure.visibility;
                     state.visibility = configure.visibility;
-                    // Limit interactive resizes to once per vblank
                     let throttled = configure.resizing && state.resize_throttle;
                     if throttled {
                         state.surface_state.ack_configure(serial);
@@ -1190,7 +1135,6 @@ impl WaylandWindowStatePtr {
                 }
                 WEnum::Value(zxdg_toplevel_decoration_v1::Mode::ClientSide) => {
                     self.state.borrow_mut().decorations = WindowDecorations::Client;
-                    // Update background to be transparent
                     let callback = self.callbacks.borrow_mut().appearance_changed.take();
                     if let Some(mut fun) = callback {
                         fun();
@@ -1261,9 +1205,7 @@ impl WaylandWindowStatePtr {
                         xdg_toplevel::State::TiledBottom => {
                             tiling.bottom = true;
                         }
-                        _ => {
-                            // noop
-                        }
+                        _ => {}
                     }
                 }
 
@@ -1357,24 +1299,17 @@ impl WaylandWindowStatePtr {
                 });
                 drop(state);
 
-                // just do the same thing we'd do as an xdg_surface
                 self.handle_xdg_surface_event(xdg_surface::Event::Configure { serial });
 
                 false
             }
-            zwlr_layer_surface_v1::Event::Closed => {
-                // unlike xdg, we don't have a choice here: the surface is closing.
-                true
-            }
+            zwlr_layer_surface_v1::Event::Closed => true,
             _ => false,
         }
     }
 
-    // Returns `true` if the popup should be closed.
     pub fn handle_popup_event(&self, event: xdg_popup::Event) -> bool {
         match event {
-            // Only the size is needed, the position is the compositor's. The following
-            // xdg_surface.configure applies the change.
             xdg_popup::Event::Configure { width, height, .. } => {
                 let size = if width <= 0 || height <= 0 {
                     None
@@ -1394,7 +1329,6 @@ impl WaylandWindowStatePtr {
                 false
             }
             xdg_popup::Event::PopupDone => true,
-            // Precedes the reposition's Configure, which does the work. The token is not needed.
             xdg_popup::Event::Repositioned { .. } => false,
             _ => false,
         }
@@ -1452,7 +1386,6 @@ impl WaylandWindowStatePtr {
                 self.request_redraw();
             }
             wl_surface::Event::PreferredBufferScale { factor } => {
-                // We use `WpFractionalScale` instead to set the scale if it's available
                 if state.globals.fractional_scale_manager.is_none() {
                     state.surface.set_buffer_scale(factor);
                     drop(state);
@@ -1721,9 +1654,6 @@ impl PlatformWindow for WaylandWindow {
         let state = self.borrow();
         let state_ptr = self.0.clone();
 
-        // A popup's placement is the compositor's, so a resize re-runs the positioner and the
-        // configure reply drives the buffer resize. Before the first configure the popup is
-        // unmapped and cannot reposition, but the initial positioner already carries the size.
         if matches!(state.surface_state, WaylandSurfaceState::Popup(_)) {
             if self.0.is_configured() {
                 let parent_geometry = state
@@ -1738,9 +1668,6 @@ impl PlatformWindow for WaylandWindow {
             return;
         }
 
-        // Keep window geometry consistent with configure handling. On Wayland, window geometry is
-        // surface-local: resizing should not attempt to translate the window; the compositor
-        // controls placement. We also account for client-side decoration insets and tiling.
         let window_geometry = inset_by_tiling(
             Bounds {
                 origin: Point::default(),
@@ -1822,14 +1749,11 @@ impl PlatformWindow for WaylandWindow {
     }
 
     fn activate(&self) {
-        // Try to request an activation token. Even though the activation is likely going to be rejected,
-        // KWin and Mutter can use the app_id to visually indicate we're requesting attention.
         let state = self.borrow();
         if let (Some(activation), Some(app_id)) = (&state.globals.activation, state.app_id.clone())
         {
             state.client.set_pending_activation(state.surface.id());
             let token = activation.get_activation_token(&state.globals.qh, ());
-            // The serial isn't exactly important here, since the activation is probably going to be rejected anyway.
             let serial = state.client.get_serial(SerialKind::MousePress);
             token.set_app_id(app_id);
             token.set_serial(serial.as_raw(), &state.globals.seat);
@@ -1901,10 +1825,6 @@ impl PlatformWindow for WaylandWindow {
     }
 
     fn set_visible(&self, visible: bool) {
-        // An xdg toplevel cannot unmap and come back without repeating its
-        // initial configure, so hiding degrades to minimizing here. Showing is
-        // then nothing: the default `is_visible` keeps reporting true, and
-        // `activate` is what asks the compositor to bring the window back.
         if !visible {
             self.minimize();
         }
@@ -2008,11 +1928,6 @@ impl PlatformWindow for WaylandWindow {
             return;
         }
 
-        // ext-background-effect defines its region in wl_surface coordinates.
-        // KWin 6.7 instead anchors it at the xdg window geometry (the client
-        // content rect), shifting a CSD region down and right by its exposed
-        // top/left inset. Submit the inverse translation on KWin so the effect
-        // and the rendered mask meet at the same pixels.
         let compositor_offset = if kwin_uses_content_local_background_effect_coordinates() {
             let inset = state.inset();
             point(
@@ -2035,15 +1950,10 @@ impl PlatformWindow for WaylandWindow {
             state.background_effect_region = Some(background_effect_region);
         }
 
-        // A compositor effect applies independently of buffer alpha. Extending
-        // it into a translucent client-side shadow therefore reveals either a
-        // raw rail or a blurred corner wedge. Keep the exact rounded effect and
-        // make the unused CSD margin fully transparent while ext blur is active.
         let clip_window_shadows =
             state.background_effect.is_some() && scene.window_corner_mask.is_some();
         state.renderer.set_clip_window_shadows(clip_window_shadows);
 
-        // Surface state changed during this GPUI tick is included in this presentation.
         state.redraw_requested = false;
         if state.pending_frame_callback.is_none() {
             let callback = state.surface.frame(&state.globals.qh, state.surface.id());
@@ -2126,8 +2036,6 @@ impl PlatformWindow for WaylandWindow {
             .surface_state
             .set_exclusive_zone(f32::from(zone) as i32)
         {
-            // Commit to apply it immediately, otherwise it only takes effect
-            // on the next frame.
             state.surface.commit();
         }
     }
@@ -2135,8 +2043,6 @@ impl PlatformWindow for WaylandWindow {
     fn set_exclusive_edge(&self, edge: Anchor) {
         let state = self.borrow();
         if state.surface_state.set_exclusive_edge(edge) {
-            // Commit to apply it immediately, otherwise it only takes effect
-            // on the next frame.
             state.surface.commit();
         }
     }
@@ -2144,10 +2050,7 @@ impl PlatformWindow for WaylandWindow {
     fn set_input_region(&self, region: Option<&[Bounds<Pixels>]>) {
         let state = self.borrow();
         match region {
-            // No region means the whole surface receives input.
             None => state.surface.set_input_region(None),
-            // A region restricts input to its rectangles. An empty region
-            // receives no input at all.
             Some(rects) => {
                 let wl_region = state
                     .globals
@@ -2167,9 +2070,6 @@ impl PlatformWindow for WaylandWindow {
             }
         }
 
-        // Commit so the new input region applies immediately. Otherwise it
-        // waits for the next frame, which could be the very click we want to
-        // allow passing through.
         state.surface.commit();
     }
 
@@ -2212,10 +2112,6 @@ impl PlatformWindow for WaylandWindow {
         let mut state = self.borrow_mut();
         if Some(inset) != state.client_inset {
             state.client_inset = Some(inset);
-            // xdg window geometry is double-buffered surface state. Updating
-            // only the cached inset leaves the compositor using the old CSD
-            // origin until an unrelated resize/configure arrives, which makes
-            // zoomed rendering and compositor effects disagree in the meantime.
             let window_geometry = inset_by_tiling(
                 state.bounds.map_origin(|_| px(0.0)),
                 state.inset(),
@@ -2284,9 +2180,7 @@ impl PlatformWindow for WaylandWindow {
         }
     }
 
-    fn a11y_update_window_bounds(&self) {
-        // Wayland doesn't expose window position, so this is a no-op
-    }
+    fn a11y_update_window_bounds(&self) {}
 }
 
 struct TrivialActivationHandler {
@@ -2350,21 +2244,9 @@ impl BackgroundEffectRegion {
             return Self::full_surface(surface_size);
         };
 
-        // The scene mask uses device pixels, while ext-background-effect uses
-        // integer surface-local coordinates. Fractional output scales round the
-        // drawable dimensions, so dividing by the advertised scale can drift at
-        // the far edge. Map each axis through the drawable that was configured.
         let x_scale = f32::from(surface_size.width) / i32::from(buffer_size.width).max(1) as f32;
         let y_scale = f32::from(surface_size.height) / i32::from(buffer_size.height).max(1) as f32;
-        // Drawable rounding can make the two ratios differ slightly. The
-        // protocol has only scalar corner radii, so choose the smaller ratio:
-        // its isotropic curve stays inside the renderer's slightly elliptical
-        // projection instead of leaking a compositor-effect pixel outside it.
         let radius_scale = x_scale.min(y_scale);
-        // The effect changes pixels independently of the surface buffer's
-        // alpha. Keep it on the rendered window mask: extending it through a
-        // soft CSD shadow exposes the protocol's hard integer-region edge as a
-        // bright halo or corner wedge.
         Self {
             bounds: Bounds {
                 origin: point(
@@ -2599,14 +2481,9 @@ fn update_window(mut state: RefMut<WaylandWindowState>) {
         surface_area.size.height,
     );
 
-    // Note that rounded corners make this rectangle API hard to work with.
-    // As this is common when using CSD, let's just disable this API.
     if state.background_appearance == WindowBackgroundAppearance::Opaque
         && state.decorations == WindowDecorations::Server
     {
-        // Promise the compositor that this region of the window surface
-        // contains no transparent pixels. This allows the compositor to skip
-        // updating whatever is behind the surface for better performance.
         state.surface.set_opaque_region(Some(&region));
     } else {
         state.surface.set_opaque_region(None);
@@ -2674,7 +2551,6 @@ fn update_window(mut state: RefMut<WaylandWindowState>) {
             }
 
             if let Some(blur_manager) = &blur_manager {
-                // It probably doesn't hurt to clear the blur for opaque windows.
                 blur_manager.unset(&state.surface);
             }
             if let Some(blur) = state.blur.take() {
@@ -2685,7 +2561,6 @@ fn update_window(mut state: RefMut<WaylandWindowState>) {
 
     region.destroy();
     if commit_surface {
-        // ext-background-effect state is double-buffered with the wl_surface.
         state.surface.commit();
     }
 }
@@ -2722,9 +2597,6 @@ impl ResizeEdgeWaylandExt for ResizeEdge {
     }
 }
 
-/// The configuration event is in terms of the window geometry, which we are constantly
-/// updating to account for the client decorations. But that's not the area we want to render
-/// to, due to our intrusize CSD. So, here we calculate the 'actual' size, by adding back in the insets
 fn compute_outer_size(
     inset: Pixels,
     new_size: Option<Size<Pixels>>,

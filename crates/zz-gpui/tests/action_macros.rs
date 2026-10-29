@@ -5,14 +5,7 @@ use zz_gpui_macros::register_action;
 
 #[test]
 fn test_action_macros() {
-    actions!(
-        test_only,
-        [
-            SomeAction,
-            /// Documented action
-            SomeActionWithDocs,
-        ]
-    );
+    actions!(test_only, [SomeAction, SomeActionWithDocs,]);
 
     #[derive(PartialEq, Clone, Deserialize, JsonSchema, Action)]
     #[action(namespace = test_only)]

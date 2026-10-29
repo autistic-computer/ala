@@ -27,7 +27,6 @@ pub struct FollowRedirects(pub bool);
 pub struct RequestTimeout(pub Duration);
 
 pub trait HttpRequestExt {
-    /// Conditionally modify self with the given closure.
     fn when(self, condition: bool, then: impl FnOnce(Self) -> Self) -> Self
     where
         Self: Sized,
@@ -35,7 +34,6 @@ pub trait HttpRequestExt {
         if condition { then(self) } else { self }
     }
 
-    /// Conditionally unwrap and modify self with the given closure, if the given option is Some.
     fn when_some<T>(self, option: Option<T>, then: impl FnOnce(Self, T) -> Self) -> Self
     where
         Self: Sized,
@@ -46,10 +44,8 @@ pub trait HttpRequestExt {
         }
     }
 
-    /// Whether or not to follow redirects
     fn follow_redirects(self, follow: RedirectPolicy) -> Self;
 
-    /// Sets a deadline for the complete HTTP request, including its response body.
     fn timeout(self, timeout: Duration) -> Self;
 }
 
@@ -64,11 +60,6 @@ impl HttpRequestExt for http::request::Builder {
     }
 }
 
-/// A set of pre-validated user-supplied HTTP headers.
-///
-/// Construction (and the per-name validation that goes with it) happens once
-/// at settings load time. Cloning is `Arc`-cheap, so providers can hand a copy
-/// to each outgoing request without re-parsing or re-allocating.
 #[derive(Default, Clone, Debug)]
 pub struct CustomHeaders(Arc<[(HeaderName, HeaderValue)]>);
 
@@ -98,7 +89,6 @@ impl PartialEq for CustomHeaders {
 }
 
 pub trait RequestBuilderExt {
-    /// Append every header in `headers` to the request being built.
     fn extra_headers(self, headers: &CustomHeaders) -> Self;
 }
 
@@ -170,7 +160,6 @@ pub trait HttpClient: 'static + Send + Sync {
     }
 }
 
-/// An [`HttpClient`] that may have a proxy.
 #[derive(Deref)]
 pub struct HttpClientWithProxy {
     #[deref]
@@ -179,7 +168,6 @@ pub struct HttpClientWithProxy {
 }
 
 impl HttpClientWithProxy {
-    /// Returns a new [`HttpClientWithProxy`] with the given proxy URL.
     pub fn new(client: Arc<dyn HttpClient>, proxy_url: Option<String>) -> Self {
         let proxy_url = proxy_url
             .and_then(|proxy| proxy.parse().ok())
@@ -217,7 +205,6 @@ impl HttpClient for HttpClientWithProxy {
     }
 }
 
-/// An [`HttpClient`] that has a base URL.
 #[derive(Deref)]
 pub struct HttpClientWithUrl {
     base_url: Mutex<String>,
@@ -226,7 +213,6 @@ pub struct HttpClientWithUrl {
 }
 
 impl HttpClientWithUrl {
-    /// Returns a new [`HttpClientWithUrl`] with the given base URL.
     pub fn new(
         client: Arc<dyn HttpClient>,
         base_url: impl Into<String>,
@@ -253,23 +239,19 @@ impl HttpClientWithUrl {
         }
     }
 
-    /// Returns the base URL.
     pub fn base_url(&self) -> String {
         self.base_url.lock().clone()
     }
 
-    /// Sets the base URL.
     pub fn set_base_url(&self, base_url: impl Into<String>) {
         let base_url = base_url.into();
         *self.base_url.lock() = base_url;
     }
 
-    /// Builds a URL using the given path.
     pub fn build_url(&self, path: &str) -> String {
         format!("{}{}", self.base_url(), path)
     }
 
-    /// Builds a Zed API URL using the given path.
     pub fn build_zed_api_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
@@ -285,7 +267,6 @@ impl HttpClientWithUrl {
         )?)
     }
 
-    /// Builds a Zed Cloud URL using the given path.
     pub fn build_zed_cloud_url(&self, path: &str) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
@@ -298,7 +279,6 @@ impl HttpClientWithUrl {
         Ok(Url::parse(&format!("{}{}", base_api_url, path))?)
     }
 
-    /// Builds a Zed Cloud URL using the given path and query params.
     pub fn build_zed_cloud_url_with_query(&self, path: &str, query: impl Serialize) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
@@ -311,7 +291,6 @@ impl HttpClientWithUrl {
         Ok(Url::parse(&format!("{}{}?{}", base_api_url, path, query))?)
     }
 
-    /// Builds a Zed LLM URL using the given path.
     pub fn build_zed_llm_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {

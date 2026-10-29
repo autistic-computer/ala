@@ -29,7 +29,6 @@ pub(crate) struct WindowsDisplay {
     uuid: Uuid,
 }
 
-// The `HMONITOR` is thread-safe.
 unsafe impl Send for WindowsDisplay {}
 unsafe impl Sync for WindowsDisplay {}
 
@@ -79,7 +78,6 @@ impl WindowsDisplay {
     }
 
     pub fn primary_monitor() -> Option<Self> {
-        // https://devblogs.microsoft.com/oldnewthing/20070809-00/?p=25643
         const POINT_ZERO: POINT = POINT { x: 0, y: 0 };
         let monitor = unsafe { MonitorFromPoint(POINT_ZERO, MONITOR_DEFAULTTOPRIMARY) };
         if monitor.is_invalid() {
@@ -92,13 +90,10 @@ impl WindowsDisplay {
         WindowsDisplay::new(Self::display_id_for_monitor(monitor))
     }
 
-    /// The DPI scale factor of this monitor, independent of whatever monitor
-    /// a not-yet-positioned window currently happens to be on.
     pub(crate) fn scale_factor(&self) -> f32 {
         self.scale_factor
     }
 
-    /// Check if the center point of given bounds is inside this monitor
     pub fn check_given_bounds(&self, bounds: Bounds<Pixels>) -> bool {
         let center = bounds.center();
         let center = POINT {

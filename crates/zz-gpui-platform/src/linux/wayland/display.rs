@@ -11,11 +11,9 @@ use zz_gpui::{Bounds, DisplayId, Pixels, PlatformDisplay};
 
 #[derive(Debug, Clone)]
 pub(crate) struct WaylandDisplay {
-    /// The ID of the wl_output object
     pub id: ObjectId,
     pub name: Option<String>,
     pub bounds: Bounds<Pixels>,
-    /// Refresh rate of the output's current mode, from `wl_output::mode`.
     pub refresh_millihertz: Option<i32>,
 }
 

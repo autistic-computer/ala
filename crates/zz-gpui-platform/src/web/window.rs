@@ -75,22 +75,8 @@ pub(crate) struct WebWindowInner {
     pub(crate) last_physical_size: Cell<(u32, u32)>,
     pub(crate) notify_scale: Cell<bool>,
     pub(crate) is_composing: Cell<bool>,
-    /// Set while `show_virtual_keyboard` blur/focus-cycles the hidden input.
-    /// The cycle is a keyboard-visibility hint, not a real activity change;
-    /// letting the focus/blur listeners report it would re-enter GPUI
-    /// synchronously from inside an input dispatch, and a `RefCell`
-    /// double-borrow panic on wasm never unwinds, wedging the app.
     pub(crate) suppress_focus_status_events: Cell<bool>,
-    /// The visual viewport height when the current pointer gesture began.
-    /// A mid-gesture change means the software keyboard opened or closed and
-    /// reflowed the layout, so the release position no longer refers to what
-    /// the user aimed at.
     pub(crate) gesture_start_visual_viewport_height: Cell<f64>,
-    /// A touch that may still resolve into a tap: its pointer id and starting
-    /// position, cleared once it travels beyond touch slop. Virtual keyboard
-    /// and IME focus may only change when a touch release completes a tap;
-    /// pans must leave them untouched, or scrolling over editable content
-    /// flickers the keyboard and drags the caret around.
     pub(crate) touch_tap_candidate: Cell<Option<(i32, Point<Pixels>)>>,
     mql_handle: RefCell<Option<MqlHandle>>,
     pending_physical_size: Cell<Option<(u32, u32)>>,
@@ -379,14 +365,12 @@ impl WebWindow {
                 .set((physical_width, physical_height));
             inner.a11y.place_layer(&inner.canvas, dpr);
 
-            // Skip rendering to a zero-size canvas (e.g. display:none).
             if physical_width == 0 || physical_height == 0 {
                 {
                     let mut s = inner.state.borrow_mut();
                     s.bounds.size = Size::default();
                     s.scale_factor = dpr_f32;
                 }
-                // Still fire the callback so GPUI knows the window is gone.
                 inner.with_callback(
                     |callbacks| &mut callbacks.resize,
                     |callback| callback(Size::default(), dpr_f32),
@@ -398,10 +382,6 @@ impl WebWindow {
             let clamped_width = physical_width.min(max_texture_dimension);
             let clamped_height = physical_height.min(max_texture_dimension);
 
-            // Recompute the logical size from the clamped physical size so
-            // that scale_factor still maps GPUI's logical bounds exactly onto
-            // the surface; otherwise clamping would silently distort the
-            // effective scale.
             let (logical_width, logical_height) =
                 if (clamped_width, clamped_height) != (physical_width, physical_height) {
                     (
@@ -435,10 +415,6 @@ impl WebWindow {
                 |callback| callback(new_size, dpr_f32),
             );
 
-            // ResizeObserver runs after layout but before the browser paints.
-            // Render synchronously here so the newly resized CSS canvas is
-            // never presented with its previous backing image stretched into
-            // the new viewport dimensions.
             inner.with_callback(
                 |callbacks| &mut callbacks.request_frame,
                 |callback| {
@@ -474,13 +450,6 @@ impl WebWindowInner {
         );
     }
 
-    /// Invokes a registered callback with take/call/restore semantics.
-    ///
-    /// The callback is removed from the slot for the duration of the call, so
-    /// the `RefCell` is not borrowed while user code runs: a callback that
-    /// re-enters the platform window (dispatching input, registering
-    /// handlers) would otherwise panic with a `BorrowMutError`. A re-entrant
-    /// invocation of the same callback finds the slot empty and is a no-op.
     pub(crate) fn with_callback<C, R>(
         &self,
         select: impl Fn(&mut WebWindowCallbacks) -> &mut Option<C>,
@@ -495,10 +464,6 @@ impl WebWindowInner {
     fn create_raf_closure(self: &Rc<Self>) -> Closure<dyn FnMut()> {
         let this = Rc::clone(self);
         let closure = Closure::new(move || {
-            // The request that fired is no longer pending; clear it before
-            // running the frame so wakeups issued while the frame executes
-            // (e.g. views invalidated during draw) schedule the next request
-            // instead of being swallowed.
             this.raf_id.set(None);
             this.with_callback(
                 |callbacks| &mut callbacks.request_frame,
@@ -666,9 +631,6 @@ impl WebWindowInner {
         ))
     }
 
-    /// Tracks `fullscreenchange` instead of toggling a local flag: the user
-    /// can exit fullscreen with Esc, and `requestFullscreen` can be rejected,
-    /// so the document is the only reliable source of truth.
     pub(crate) fn register_fullscreen_change(self: &Rc<Self>) -> Option<EventListenerHandle> {
         let document = self.browser_window.document()?;
         let this = Rc::clone(self);
@@ -718,18 +680,12 @@ impl WebWindowInner {
 
 impl Drop for WebWindow {
     fn drop(&mut self) {
-        // Cancel the pending requestAnimationFrame callback before
-        // `_raf_closure` is freed, and disconnect the resize observer before
-        // `_resize_observer_closure` is freed; a late invocation of either
-        // would throw "closure invoked after being dropped".
         if let Some(raf_id) = self.inner.raf_id.take() {
             self.inner
                 .browser_window
                 .cancel_animation_frame(raf_id)
                 .ok();
         }
-        // A frame waker that outlives this window must not re-schedule the
-        // freed closure; without a stored function, `wake_frame_loop` no-ops.
         self.inner.raf_function.borrow_mut().take();
         if let Some(ref observer) = self._resize_observer {
             observer.disconnect();
@@ -741,9 +697,6 @@ impl Drop for WebWindow {
             observer.disconnect();
         }
 
-        // The DPR media-query closure captures an `Rc<WebWindowInner>` and is
-        // stored inside the inner itself, forming a reference cycle; take it
-        // out so the inner can actually be freed.
         self.inner.mql_handle.borrow_mut().take();
 
         let canvas: &web_sys::Element = self.inner.canvas.as_ref();
@@ -774,8 +727,6 @@ fn current_appearance(browser_window: &web_sys::Window) -> WindowAppearance {
     }
 }
 
-/// The Page Visibility API: `hidden` when the tab is in the background or the
-/// browser window is minimized. A missing document reads as visible.
 fn scroll_root(
     browser_window: &web_sys::Window,
     mount: &web_sys::HtmlElement,
@@ -827,7 +778,6 @@ impl Drop for MqlHandle {
     }
 }
 
-// Safari does not support `devicePixelContentBoxSize`, so detect whether it's available.
 fn check_device_pixel_support() -> bool {
     let global: JsValue = js_sys::global().into();
     let Ok(constructor) = js_sys::Reflect::get(&global, &"ResizeObserverEntry".into()) else {
@@ -941,14 +891,9 @@ impl PlatformWindow for WebWindow {
             return;
         }
         self.inner.ime_mirror.set_virtual_keyboard_enabled(false);
-        // Restart the browser input session without a software keyboard, but
-        // keep receiving hardware keys that can move the caret back into an
-        // editable region. GPUI focus, not this DOM element, owns their target.
         self.inner.suppress_focus_status_events.set(true);
         self.inner.ime_mirror.blur();
         self.inner.suppress_focus_status_events.set(false);
-        // Chrome can coalesce a same-task blur/focus and leave the keyboard
-        // visible. Restore the hardware-key receiver after this task instead.
         let callback = Closure::once_into_js({
             let inner = Rc::downgrade(&self.inner);
             move || {
@@ -988,11 +933,6 @@ impl PlatformWindow for WebWindow {
     }
 
     fn text_input_state_changed(&self, change: TextInputStateChange) {
-        // React to editability transitions, not each frame: manually dismissing
-        // the keyboard must remain effective until another editing gesture.
-        // On desktop, the DOM input remains the keyboard event receiver even
-        // when GPUI focuses a read-only surface. Blurring it would also disable
-        // hardware shortcuts, unlike a native window.
         if self.inner.touch_input {
             match change {
                 TextInputStateChange::FocusGained => self.inner.show_virtual_keyboard(),
@@ -1069,8 +1009,6 @@ impl PlatformWindow for WebWindow {
             return;
         };
 
-        // `is_fullscreen` is updated by the `fullscreenchange` listener once
-        // the transition actually happens (or not, if the request fails).
         if document.fullscreen_element().is_some() {
             document.exit_fullscreen();
         } else {
@@ -1084,10 +1022,6 @@ impl PlatformWindow for WebWindow {
     }
 
     fn frame_waker(&self) -> Option<Rc<dyn Fn()>> {
-        // Hold the inner window weakly: the waker is stored in the window's
-        // invalidator, and `callbacks.request_frame` captures a clone of that
-        // invalidator, so a strong reference here would form a cycle and leak
-        // the window on close.
         let inner = Rc::downgrade(&self.inner);
         Some(Rc::new(move || {
             if let Some(inner) = inner.upgrade() {

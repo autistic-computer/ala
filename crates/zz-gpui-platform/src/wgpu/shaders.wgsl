@@ -1,38 +1,4 @@
-/* Functions useful for debugging:
-
-// A heat map color for debugging (blue -> cyan -> green -> yellow -> red).
-fn heat_map_color(value: f32, minValue: f32, maxValue: f32, position: vec2<f32>) -> vec4<f32> {
-    // Normalize value to 0-1 range
-    let t = clamp((value - minValue) / (maxValue - minValue), 0.0, 1.0);
-
-    // Heat map color calculation
-    let r = t * t;
-    let g = 4.0 * t * (1.0 - t);
-    let b = (1.0 - t) * (1.0 - t);
-    let heat_color = vec3<f32>(r, g, b);
-
-    // Create a checkerboard pattern (black and white)
-    let sum = floor(position.x / 3) + floor(position.y / 3);
-    let is_odd = fract(sum * 0.5); // 0.0 for even, 0.5 for odd
-    let checker_value = is_odd * 2.0; // 0.0 for even, 1.0 for odd
-    let checker_color = vec3<f32>(checker_value);
-
-    // Determine if value is in range (1.0 if in range, 0.0 if out of range)
-    let in_range = step(minValue, value) * step(value, maxValue);
-
-    // Mix checkerboard and heat map based on whether value is in range
-    let final_color = mix(checker_color, heat_color, in_range);
-
-    return vec4<f32>(final_color, 1.0);
-}
-
-*/
-
-// Contrast and gamma correction adapted from https://github.com/microsoft/terminal/blob/1283c0f5b99a2961673249fa77c6b986efb5086c/src/renderer/atlas/dwrite.hlsl
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
 fn color_brightness(color: vec3<f32>) -> f32 {
-    // REC. 601 luminance coefficients for perceived brightness
     return dot(color, vec3<f32>(0.30, 0.59, 0.11));
 }
 
@@ -80,8 +46,6 @@ fn apply_contrast_and_gamma_correction3(sample: vec3<f32>, color: vec3<f32>, enh
 struct GlobalParams {
     viewport_size: vec2<f32>,
     premultiplied_alpha: u32,
-    // Scene-wide rounded clip (Scene::window_corner_mask); zero size disables
-    // it. The smoothing rides in what was alignment padding.
     window_mask_smoothing: f32,
     window_mask_origin: vec2<f32>,
     window_mask_size: vec2<f32>,
@@ -139,13 +103,7 @@ struct LinearColorStop {
 }
 
 struct Background {
-    // 0u is Solid
-    // 1u is LinearGradient
-    // 2u is PatternSlash
-    // 3u is Checkerboard
     tag: u32,
-    // 0u is sRGB linear color
-    // 1u is Oklab color
     color_space: u32,
     solid: Hsla,
     gradient_angle_or_pattern_height: f32,
@@ -187,7 +145,6 @@ fn to_device_position(unit_vertex: vec2<f32>, bounds: Bounds) -> vec4<f32> {
 
 fn to_device_position_transformed(unit_vertex: vec2<f32>, bounds: Bounds, transform: TransformationMatrix) -> vec4<f32> {
     let position = unit_vertex * vec2<f32>(bounds.size) + bounds.origin;
-    //Note: Rust side stores it as row-major, so transposing here
     let transformed = transpose(transform.rotation_scale) * position + transform.translation;
     return to_device_position_impl(transformed);
 }
@@ -227,7 +184,6 @@ fn clip_sprite_to_mask(unit_vertex: vec2<f32>, bounds: Bounds, clip_bounds: Boun
     return unit_within(clip_to_mask(unit_vertex, translated, clip_bounds), translated);
 }
 
-// https://gamedev.stackexchange.com/questions/92015/optimized-linear-to-srgb-glsl
 fn srgb_to_linear(srgb: vec3<f32>) -> vec3<f32> {
     let cutoff = srgb < vec3<f32>(0.04045);
     let higher = pow((srgb + vec3<f32>(0.055)) / vec3<f32>(1.055), vec3<f32>(2.4));
@@ -249,19 +205,16 @@ fn linear_to_srgb(linear: vec3<f32>) -> vec3<f32> {
     return select(higher, lower, cutoff);
 }
 
-/// Convert a linear color to sRGBA space.
 fn linear_to_srgba(color: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(linear_to_srgb(color.rgb), color.a);
 }
 
-/// Convert a sRGBA color to linear space.
 fn srgba_to_linear(color: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(srgb_to_linear(color.rgb), color.a);
 }
 
-/// Hsla to linear RGBA conversion.
 fn hsla_to_rgba(hsla: Hsla) -> vec4<f32> {
-    let h = hsla.h * 6.0; // Now, it's an angle but scaled in [0, 6) range
+    let h = hsla.h * 6.0;
     let s = hsla.s;
     let l = hsla.l;
     let a = hsla.a;
@@ -294,8 +247,6 @@ fn hsla_to_rgba(hsla: Hsla) -> vec4<f32> {
     return vec4<f32>(color, a);
 }
 
-/// Convert a linear sRGB to Oklab space.
-/// Reference: https://bottosson.github.io/posts/oklab/#converting-from-linear-srgb-to-oklab
 fn linear_srgb_to_oklab(color: vec4<f32>) -> vec4<f32> {
 	let l = 0.4122214708 * color.r + 0.5363325363 * color.g + 0.0514459929 * color.b;
 	let m = 0.2119034982 * color.r + 0.6806995451 * color.g + 0.1073969566 * color.b;
@@ -313,7 +264,6 @@ fn linear_srgb_to_oklab(color: vec4<f32>) -> vec4<f32> {
 	);
 }
 
-/// Convert an Oklab color to linear sRGB space.
 fn oklab_to_linear_srgb(color: vec4<f32>) -> vec4<f32> {
 	let l_ = color.r + 0.3963377774 * color.g + 0.2158037573 * color.b;
 	let m_ = color.r - 0.1055613458 * color.g - 0.0638541728 * color.b;
@@ -337,12 +287,10 @@ fn over(below: vec4<f32>, above: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(color, alpha);
 }
 
-// A standard gaussian function, used for weighting samples
 fn gaussian(x: f32, sigma: f32) -> f32{
     return exp(-(x * x) / (2.0 * sigma * sigma)) / (sqrt(2.0 * M_PI_F) * sigma);
 }
 
-// This approximates the error function, needed for the gaussian integral
 fn erf(v: vec2<f32>) -> vec2<f32> {
     let s = sign(v);
     let a = abs(v);
@@ -371,7 +319,6 @@ fn blur_along_x(x: f32, y: f32, sigma: f32, corner: f32, half_size: vec2<f32>, c
   return integral.y - integral.x;
 }
 
-// Selects corner radius based on quadrant.
 fn pick_corner_radius(center_to_point: vec2<f32>, radii: Corners) -> f32 {
     if (center_to_point.x < 0.0) {
         if (center_to_point.y < 0.0) {
@@ -388,17 +335,10 @@ fn pick_corner_radius(center_to_point: vec2<f32>, radii: Corners) -> f32 {
     }
 }
 
-// Signed distance of the point to the quad's border - positive outside the
-// border, and negative inside.
-//
-// See comments on similar code using `quad_sdf_impl` in `fs_quad` for
-// explanation.
 fn quad_sdf(point: vec2<f32>, bounds: Bounds, corner_radii: Corners) -> f32 {
     return quad_sdf_smooth(point, bounds, corner_radii, 2.0);
 }
 
-// Distance to a rounded rect whose corners may be superelliptical. A fully
-// rounded rect is a circle or a pill, which keeps true arcs (see `fs_quad`).
 fn quad_sdf_smooth(point: vec2<f32>, bounds: Bounds, corner_radii: Corners, corner_smoothing: f32) -> f32 {
     let half_size = bounds.size / 2.0;
     let center = bounds.origin + half_size;
@@ -413,18 +353,12 @@ fn quad_sdf_smooth(point: vec2<f32>, bounds: Bounds, corner_radii: Corners, corn
     return quad_sdf_impl(corner_center_to_point, corner_radius, smoothing);
 }
 
-// `corner_smoothing` is a superellipse exponent: 2 is a circular corner arc,
-// 4 is a squircle (continuous corner). Above 2 the distance is a p-norm rather
-// than a true SDF; it under-reads by up to ~16% near the corner diagonal,
-// which is well under a pixel at antialiasing scale.
 fn quad_sdf_impl(corner_center_to_point: vec2<f32>, corner_radius: f32, corner_smoothing: f32) -> f32 {
     if (corner_radius == 0.0) {
-        // Fast path for unrounded corners.
         return max(corner_center_to_point.x, corner_center_to_point.y);
     } else if (min(corner_center_to_point.x, corner_center_to_point.y) <= 0.0) {
         return max(corner_center_to_point.x, corner_center_to_point.y) - corner_radius;
     } else {
-        // 0 inside the quad inset by corner_radius, positive outside.
         let outset = max(vec2<f32>(0.0), corner_center_to_point);
         var outset_distance: f32;
         if (corner_smoothing <= 2.001) {
@@ -434,9 +368,6 @@ fn quad_sdf_impl(corner_center_to_point: vec2<f32>, corner_radius: f32, corner_s
                 pow(outset.x, corner_smoothing) + pow(outset.y, corner_smoothing),
                 1.0 / corner_smoothing);
         }
-        // Signed distance of the point from the inset quad: adding the second
-        // term makes it negative inside, and subtracting the radius shifts the
-        // zero level set out to the rounded edge.
         let signed_distance_to_inset_quad = outset_distance +
             min(0.0, max(corner_center_to_point.x, corner_center_to_point.y));
 
@@ -444,9 +375,6 @@ fn quad_sdf_impl(corner_center_to_point: vec2<f32>, corner_radius: f32, corner_s
     }
 }
 
-// Antialiased coverage of the scene-wide rounded window mask at this position.
-// 1.0 everywhere when the mask is disabled (zero size). Drop shadows skip this
-// on purpose: a client-decorated window's shadow lives outside the mask.
 fn window_mask_alpha(position: vec2<f32>) -> f32 {
     if (globals.window_mask_size.x <= 0.0) {
         return 1.0;
@@ -458,21 +386,16 @@ fn window_mask_alpha(position: vec2<f32>) -> f32 {
         globals.window_mask_radii.z,
         globals.window_mask_radii.w,
     );
-    // The same curve the frame under it is drawn with, or the mask clips the
-    // frame's own border away over the arc where a circle and a squircle part.
     let distance = quad_sdf_smooth(position, mask_bounds, mask_radii,
         globals.window_mask_smoothing);
     return saturate(0.5 - distance);
 }
 
-// Abstract away the final color transformation based on the
-// target alpha compositing mode.
 fn blend_color(color: vec4<f32>, alpha_factor: f32) -> vec4<f32> {
     let alpha = color.a * alpha_factor;
     let multiplier = select(1.0, alpha, globals.premultiplied_alpha != 0u);
     return vec4<f32>(color.rgb * multiplier, alpha);
 }
-
 
 struct GradientColor {
     solid: vec4<f32>,
@@ -487,18 +410,13 @@ fn prepare_gradient_color(tag: u32, color_space: u32,
     if (tag == 0u || tag == 2u || tag == 3u) {
         result.solid = hsla_to_rgba(solid);
     } else if (tag == 1u) {
-        // The hsla_to_rgba is returns a linear sRGB color
         result.color0 = hsla_to_rgba(colors[0].color);
         result.color1 = hsla_to_rgba(colors[1].color);
 
-        // Prepare color space in vertex for avoid conversion
-        // in fragment shader for performance reasons
         if (color_space == 0u) {
-            // sRGB
             result.color0 = linear_to_srgba(result.color0);
             result.color1 = linear_to_srgba(result.color1);
         } else if (color_space == 1u) {
-            // Oklab
             result.color0 = linear_srgb_to_oklab(result.color0);
             result.color1 = linear_srgb_to_oklab(result.color1);
         }
@@ -516,34 +434,28 @@ fn gradient_color(background: Background, position: vec2<f32>, bounds: Bounds,
             return solid_color;
         }
         case 1u: {
-            // Linear gradient background.
-            // -90 degrees to match the CSS gradient angle.
             let angle = background.gradient_angle_or_pattern_height;
             let radians = (angle % 360.0 - 90.0) * M_PI_F / 180.0;
             var direction = vec2<f32>(cos(radians), sin(radians));
             let stop0_percentage = background.colors[0].percentage;
             let stop1_percentage = background.colors[1].percentage;
 
-            // Expand the short side to be the same as the long side
             if (bounds.size.x > bounds.size.y) {
                 direction.y *= bounds.size.y / bounds.size.x;
             } else {
                 direction.x *= bounds.size.x / bounds.size.y;
             }
 
-            // Get the t value for the linear gradient with the color stop percentages.
             let half_size = bounds.size / 2.0;
             let center = bounds.origin + half_size;
             let center_to_point = position - center;
             var t = dot(center_to_point, direction) / length(direction);
-            // Check the direct to determine the use x or y
             if (abs(direction.x) > abs(direction.y)) {
                 t = (t + half_size.x) / bounds.size.x;
             } else {
                 t = (t + half_size.y) / bounds.size.y;
             }
 
-            // Adjust t based on the stop percentages
             t = (t - stop0_percentage) / (stop1_percentage - stop0_percentage);
             t = clamp(t, 0.0, 1.0);
 
@@ -558,7 +470,6 @@ fn gradient_color(background: Background, position: vec2<f32>, bounds: Bounds,
             }
         }
         case 2u: {
-            // pattern slash
             let gradient_angle_or_pattern_height = background.gradient_angle_or_pattern_height;
             let pattern_width = (gradient_angle_or_pattern_height / 65535.0f) / 255.0f;
             let pattern_interval = (gradient_angle_or_pattern_height % 65535.0f) / 255.0f;
@@ -577,7 +488,6 @@ fn gradient_color(background: Background, position: vec2<f32>, bounds: Bounds,
             background_color.a *= saturate(0.5 - distance);
         }
         case 3u: {
-            // checkerboard
             let size = background.gradient_angle_or_pattern_height;
             let relative_position = position - bounds.origin;
 
@@ -593,8 +503,6 @@ fn gradient_color(background: Background, position: vec2<f32>, bounds: Bounds,
     return background_color;
 }
 
-// --- quads --- //
-
 struct Quad {
     order: u32,
     border_style: u32,
@@ -605,7 +513,6 @@ struct Quad {
     corner_radii: Corners,
     border_widths: Edges,
     corner_smoothing: f32,
-    // Pads to 44 words: 8-byte aligned, and whole texels for the WebGL decoder.
     pad0: u32,
     pad1: u32,
     pad2: u32,
@@ -654,7 +561,6 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
         quad.corner_radii.top_right == 0.0 &&
         quad.corner_radii.bottom_right == 0.0;
 
-    // Fast path when the quad is not rounded and doesn't have any border
     if (quad.border_widths.top == 0.0 &&
             quad.border_widths.left == 0.0 &&
             quad.border_widths.right == 0.0 &&
@@ -668,24 +574,15 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
     let point = input.position.xy - quad.bounds.origin;
     let center_to_point = point - half_size;
 
-    // Signed distance field threshold for inclusion of pixels. 0.5 is the
-    // minimum distance between the center of the pixel and the edge.
     let antialias_threshold = 0.5;
 
-    // Radius of the nearest corner
     let corner_radius = pick_corner_radius(center_to_point, quad.corner_radii);
 
-    // A fully rounded quad is a circle or a pill rather than a rounded
-    // rectangle, and those read as shapes in their own right: smoothing one
-    // into a superellipse turns a switch thumb into a lozenge. Radii are
-    // clamped to half the shorter side before reaching the GPU, so testing for
-    // equality there selects exactly the fully rounded quads.
     var corner_smoothing = quad.corner_smoothing;
     if (corner_radius >= min(half_size.x, half_size.y) - 0.01) {
         corner_smoothing = 2.0;
     }
 
-    // Width of the nearest borders
     let border = vec2<f32>(
         select(
             quad.border_widths.right,
@@ -696,125 +593,71 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
             quad.border_widths.top,
             center_to_point.y < 0.0));
 
-    // 0-width borders are reduced so that `inner_sdf >= antialias_threshold`.
-    // The purpose of this is to not draw antialiasing pixels in this case.
     let reduced_border =
         vec2<f32>(select(border.x, -antialias_threshold, border.x == 0.0),
                   select(border.y, -antialias_threshold, border.y == 0.0));
 
-    // Vector from the corner of the quad bounds to the point, after mirroring
-    // the point into the bottom right quadrant. Both components are <= 0.
     let corner_to_point = abs(center_to_point) - half_size;
 
-    // Vector from the point to the center of the rounded corner's circle, also
-    // mirrored into bottom right quadrant.
     let corner_center_to_point = corner_to_point + corner_radius;
 
-    // Whether the nearest point on the border is rounded
     let is_near_rounded_corner =
             corner_center_to_point.x >= 0 &&
             corner_center_to_point.y >= 0;
 
-    // Vector from straight border inner corner to point.
     let straight_border_inner_corner_to_point = corner_to_point + reduced_border;
 
-    // Whether the point is beyond the inner edge of the straight border.
     let is_beyond_inner_straight_border =
             straight_border_inner_corner_to_point.x > 0 ||
             straight_border_inner_corner_to_point.y > 0;
 
-    // Whether the point is far enough inside the quad, such that the pixels are
-    // not affected by the straight border.
     let is_within_inner_straight_border =
         straight_border_inner_corner_to_point.x < -antialias_threshold &&
         straight_border_inner_corner_to_point.y < -antialias_threshold;
 
-    // Fast path for points that must be part of the background.
-    //
-    // This could be optimized further for large rounded corners by including
-    // points in an inscribed rectangle, or some other quick linear check.
-    // However, that might negatively impact performance in the case of
-    // reasonable sizes for rounded corners.
     if (is_within_inner_straight_border && !is_near_rounded_corner) {
         return blend_color(background_color, window_mask_alpha(input.position.xy));
     }
 
-    // Signed distance of the point to the outside edge of the quad's border. It
-    // is positive outside this edge, and negative inside.
     let outer_sdf = quad_sdf_impl(corner_center_to_point, corner_radius, corner_smoothing);
 
-    // Approximate signed distance of the point to the inside edge of the quad's
-    // border. It is negative outside this edge (within the border), and
-    // positive inside.
-    //
-    // This is not always an accurate signed distance:
-    // * The rounded portions with varying border width use an approximation of
-    //   nearest-point-on-ellipse.
-    // * When it is quickly known to be outside the edge, -1.0 is used.
     var inner_sdf = 0.0;
     if (corner_center_to_point.x <= 0 || corner_center_to_point.y <= 0) {
-        // Fast paths for straight borders.
         inner_sdf = -max(straight_border_inner_corner_to_point.x,
                          straight_border_inner_corner_to_point.y);
     } else if (is_beyond_inner_straight_border) {
-        // Fast path for points that must be outside the inner edge.
         inner_sdf = -1.0;
     } else if (reduced_border.x == reduced_border.y) {
-        // Fast path for circular inner edge.
         inner_sdf = -(outer_sdf + reduced_border.x);
     } else {
         let ellipse_radii = max(vec2<f32>(0.0), corner_radius - reduced_border);
         inner_sdf = quarter_ellipse_sdf(corner_center_to_point, ellipse_radii);
     }
 
-    // Negative when inside the border
     let border_sdf = max(inner_sdf, outer_sdf);
 
     var color = background_color;
     if (border_sdf < antialias_threshold) {
         var border_color = input.border_color;
 
-        // Dashed border logic when border_style == 1
         if (quad.border_style == 1) {
-            // Position along the perimeter in "dash space", where each dash
-            // period has length 1
             var t = 0.0;
 
-            // Total number of dash periods, so that the dash spacing can be
-            // adjusted to evenly divide it
             var max_t = 0.0;
 
-            // Border width is proportional to dash size. This is the behavior
-            // used by browsers, but also avoids dashes from different segments
-            // overlapping when dash size is smaller than the border width.
-            //
-            // Dash pattern: (2 * border width) dash, (1 * border width) gap
             let dash_length_per_width = 2.0;
             let dash_gap_per_width = 1.0;
             let dash_period_per_width = dash_length_per_width + dash_gap_per_width;
 
-            // Since the dash size is determined by border width, the density of
-            // dashes varies. Multiplying a pixel distance by this returns a
-            // position in dash space - it has units (dash period / pixels). So
-            // a dash velocity of (1 / 10) is 1 dash every 10 pixels.
             var dash_velocity = 0.0;
 
-            // Dividing this by the border width gives the dash velocity
             let dv_numerator = 1.0 / dash_period_per_width;
 
             if (unrounded) {
-                // When corners aren't rounded, the dashes are separately laid
-                // out on each straight line, rather than around the whole
-                // perimeter. This way each line starts and ends with a dash.
                 let is_horizontal =
                         corner_center_to_point.x <
                         corner_center_to_point.y;
 
-                // When applying dashed borders to just some, not all, the sides.
-                // The way we chose border widths above sometimes comes with a 0 width value.
-                // So we choose again to avoid division by zero.
-                // TODO: A better solution exists taking a look at the whole file.
-                // this does not fix single dashed borders at the corners
                 let dashed_border = vec2<f32>(
                         max(
                             quad.border_widths.bottom,
@@ -831,8 +674,6 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
                 t = select(point.y, point.x, is_horizontal) * dash_velocity;
                 max_t = select(size.y, size.x, is_horizontal) * dash_velocity;
             } else {
-                // When corners are rounded, the dashes are laid out clockwise
-                // around the whole perimeter.
 
                 let r_tr = quad.corner_radii.top_right;
                 let r_br = quad.corner_radii.bottom_right;
@@ -844,13 +685,11 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
                 let w_b = quad.border_widths.bottom;
                 let w_l = quad.border_widths.left;
 
-                // Straight side dash velocities
                 let dv_t = select(dv_numerator / w_t, 0.0, w_t <= 0.0);
                 let dv_r = select(dv_numerator / w_r, 0.0, w_r <= 0.0);
                 let dv_b = select(dv_numerator / w_b, 0.0, w_b <= 0.0);
                 let dv_l = select(dv_numerator / w_l, 0.0, w_l <= 0.0);
 
-                // Straight side lengths in dash space
                 let s_t = (size.x - r_tl - r_tr) * dv_t;
                 let s_r = (size.y - r_tr - r_br) * dv_r;
                 let s_b = (size.x - r_br - r_bl) * dv_b;
@@ -861,13 +700,11 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
                 let corner_dash_velocity_bl = corner_dash_velocity(dv_b, dv_l);
                 let corner_dash_velocity_tl = corner_dash_velocity(dv_t, dv_l);
 
-                // Corner lengths in dash space
                 let c_tr = r_tr * (M_PI_F / 2.0) * corner_dash_velocity_tr;
                 let c_br = r_br * (M_PI_F / 2.0) * corner_dash_velocity_br;
                 let c_bl = r_bl * (M_PI_F / 2.0) * corner_dash_velocity_bl;
                 let c_tl = r_tl * (M_PI_F / 2.0) * corner_dash_velocity_tl;
 
-                // Cumulative dash space upto each segment
                 let upto_tr = s_t;
                 let upto_r = upto_tr + c_tr;
                 let upto_br = upto_r + s_r;
@@ -885,33 +722,21 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
                     if (center_to_point.x >= 0.0) {
                         if (center_to_point.y < 0.0) {
                             dash_velocity = corner_dash_velocity_tr;
-                            // Subtracted because radians is pi/2 to 0 when
-                            // going clockwise around the top right corner,
-                            // since the y axis has been flipped
                             t = upto_r - corner_t * dash_velocity;
                         } else {
                             dash_velocity = corner_dash_velocity_br;
-                            // Added because radians is 0 to pi/2 when going
-                            // clockwise around the bottom-right corner
                             t = upto_br + corner_t * dash_velocity;
                         }
                     } else {
                         if (center_to_point.y >= 0.0) {
                             dash_velocity = corner_dash_velocity_bl;
-                            // Subtracted because radians is pi/2 to 0 when
-                            // going clockwise around the bottom-left corner,
-                            // since the x axis has been flipped
                             t = upto_l - corner_t * dash_velocity;
                         } else {
                             dash_velocity = corner_dash_velocity_tl;
-                            // Added because radians is 0 to pi/2 when going
-                            // clockwise around the top-left corner, since both
-                            // axis were flipped
                             t = upto_tl + corner_t * dash_velocity;
                         }
                     }
                 } else {
-                    // Straight borders
                     let is_horizontal =
                             corner_center_to_point.x <
                             corner_center_to_point.y;
@@ -938,11 +763,8 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
             let dash_length = dash_length_per_width / dash_period_per_width;
             let desired_dash_gap = dash_gap_per_width / dash_period_per_width;
 
-            // Straight borders should start and end with a dash, so max_t is
-            // reduced to cause this.
             max_t -= select(0.0, dash_length, unrounded);
             if (max_t >= 1.0) {
-                // Adjust dash gap to evenly divide max_t.
                 let dash_count = floor(max_t);
                 let dash_period = max_t / dash_count;
                 border_color.a *= dash_alpha(
@@ -952,9 +774,6 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
                     dash_velocity,
                     antialias_threshold);
             } else if (unrounded) {
-                // When there isn't enough space for the full gap between the
-                // two start / end dashes of a straight border, reduce gap to
-                // make them fit.
                 let dash_gap = max_t - dash_length;
                 if (dash_gap > 0.0) {
                     let dash_period = dash_length + dash_gap;
@@ -968,8 +787,6 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
             }
         }
 
-        // Blend the border on top of the background and then linearly interpolate
-        // between the two as we slide inside the background.
         let blended_border = over(background_color, border_color);
         color = mix(background_color, blended_border,
                     saturate(antialias_threshold - inner_sdf));
@@ -989,14 +806,6 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
     return blend_color(color, outer_coverage * window_mask_alpha(input.position.xy));
 }
 
-// Returns the dash velocity of a corner given the dash velocity of the two
-// sides, by returning the slower velocity (larger dashes).
-//
-// Since 0 is used for dash velocity when the border width is 0 (instead of
-// +inf), this returns the other dash velocity in that case.
-//
-// An alternative to this might be to appropriately interpolate the dash
-// velocity around the corner, but that seems overcomplicated.
 fn corner_dash_velocity(dv1: f32, dv2: f32) -> f32 {
     if (dv1 == 0.0) {
         return dv2;
@@ -1007,58 +816,34 @@ fn corner_dash_velocity(dv1: f32, dv2: f32) -> f32 {
     }
 }
 
-// Returns alpha used to render antialiased dashes.
-// `t` is within the dash when `fmod(t, period) < length`.
 fn dash_alpha(t: f32, period: f32, length: f32, dash_velocity: f32, antialias_threshold: f32) -> f32 {
     let half_period = period / 2;
     let half_length = length / 2;
-    // Value in [-half_period, half_period].
-    // The dash is in [-half_length, half_length].
     let centered = fmod(t + half_period - half_length, period) - half_period;
-    // Signed distance for the dash, negative values are inside the dash.
     let signed_distance = abs(centered) - half_length;
-    // Antialiased alpha based on the signed distance.
     return saturate(antialias_threshold - signed_distance / dash_velocity);
 }
 
-// This approximates distance to the nearest point to a quarter ellipse in a way
-// that is sufficient for anti-aliasing when the ellipse is not very eccentric.
-// The components of `point` are expected to be positive.
-//
-// Negative on the outside and positive on the inside.
 fn quarter_ellipse_sdf(point: vec2<f32>, radii: vec2<f32>) -> f32 {
-    // Scale the space to treat the ellipse like a unit circle.
     let circle_vec = point / radii;
     let unit_circle_sdf = length(circle_vec) - 1.0;
-    // Approximate up-scaling of the length by using the average of the radii.
-    //
-    // TODO: A better solution would be to use the gradient of the implicit
-    // function for an ellipse to approximate a scaling factor.
     return unit_circle_sdf * (radii.x + radii.y) * -0.5;
 }
 
-// Modulus that has the same sign as `a`.
 fn fmod(a: f32, b: f32) -> f32 {
     return a - b * trunc(a / b);
 }
 
-// --- shadows --- //
-
 struct Shadow {
     order: u32,
     blur_radius: f32,
-    // The shadow rect for drop shadows; the "hole" rect for inset shadows.
     bounds: Bounds,
     corner_radii: Corners,
     content_mask: Bounds,
     color: Hsla,
-    // Only consulted when `inset == 1u`: the element's own bounds, used as a rounded-rect
-    // clip so the shadow never escapes the element.
     element_bounds: Bounds,
     element_corner_radii: Corners,
-    // 0 = drop shadow, 1 = inset shadow.
     inset: u32,
-    // Superellipse exponent for the corners; only honored when unblurred.
     corner_smoothing: f32,
 }
 
@@ -1077,7 +862,6 @@ fn vs_shadow(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index) ins
     if (shadow.inset != 0u) {
         geometry = shadow.element_bounds;
     } else {
-        // Leave room for the gaussian tail outside the shadow rect.
         let margin = 3.0 * shadow.blur_radius;
         geometry = shadow.bounds;
         geometry.origin -= vec2<f32>(margin);
@@ -1114,8 +898,6 @@ fn fs_shadow(input: ShadowVarying) -> @location(0) vec4<f32> {
             shadow.corner_radii, shadow.corner_smoothing);
         alpha = saturate(0.5 - distance);
     } else if (largest_corner <= 0.25 * shadow.blur_radius) {
-        // Corners this small against the blur barely change the result, so blur
-        // a sharp rectangle instead: the gaussian separates into two erf pairs.
         let edges = (vec4<f32>(center_to_point, center_to_point) +
             vec4<f32>(half_size, -half_size)) * (sqrt(0.5) / shadow.blur_radius);
         let integral = erf4(edges);
@@ -1123,13 +905,11 @@ fn fs_shadow(input: ShadowVarying) -> @location(0) vec4<f32> {
     } else {
         let smoothing = select(shadow.corner_smoothing, 2.0,
             corner_radius >= min(half_size.x, half_size.y) - 0.01);
-        // The signal is only non-zero in a limited range, so don't waste samples
         let low = center_to_point.y - half_size.y;
         let high = center_to_point.y + half_size.y;
         let start = clamp(-3.0 * shadow.blur_radius, low, high);
         let end = clamp(3.0 * shadow.blur_radius, low, high);
 
-        // Accumulate samples (we can get away with surprisingly few samples)
         let step = (end - start) / 4.0;
         var y = start + step * 0.5;
         alpha = 0.0;
@@ -1142,8 +922,6 @@ fn fs_shadow(input: ShadowVarying) -> @location(0) vec4<f32> {
     }
 
     if (shadow.inset != 0u) {
-        // The inset shadow is the complement of the (blurred) hole rect, clipped to the element.
-        // `saturate(0.5 - d)` gives a 1-pixel antialiased edge: d <= -0.5 -> 1, d >= 0.5 -> 0.
         alpha = 1.0 - alpha;
         let element_distance = quad_sdf_smooth(input.position.xy, shadow.element_bounds,
         shadow.element_corner_radii, shadow.corner_smoothing);
@@ -1161,8 +939,6 @@ fn fs_shadow(input: ShadowVarying) -> @location(0) vec4<f32> {
     return blend_color(color, 1.0);
 }
 
-// --- path rasterization --- //
-
 struct PathRasterizationVertex {
     xy_position: vec2<f32>,
     st_position: vec2<f32>,
@@ -1170,13 +946,10 @@ struct PathRasterizationVertex {
     bounds: Bounds,
 }
 
-
-
 struct PathRasterizationVarying {
     @builtin(position) position: vec4<f32>,
     @location(0) st_position: vec2<f32>,
     @location(1) @interpolate(flat) vertex_id: u32,
-    //TODO: use `clip_distance` once Naga supports it
     @location(3) clip_distances: vec4<f32>,
 }
 
@@ -1206,7 +979,6 @@ fn fs_path_rasterization(input: PathRasterizationVarying) -> @location(0) vec4<f
 
     var alpha: f32;
     if (length(vec2<f32>(dx.x, dy.x)) < 0.001) {
-        // If the gradient is too small, return a solid color.
         alpha = 1.0;
     } else {
         let gradient = 2.0 * input.st_position.xx * vec2<f32>(dx.x, dy.x) - vec2<f32>(dx.y, dy.y);
@@ -1225,12 +997,9 @@ fn fs_path_rasterization(input: PathRasterizationVarying) -> @location(0) vec4<f
     return vec4<f32>(color.rgb * color.a * alpha, color.a * alpha);
 }
 
-// --- paths --- //
-
 struct PathSprite {
     bounds: Bounds,
 }
-
 
 struct PathVarying {
     @builtin(position) position: vec4<f32>,
@@ -1241,7 +1010,6 @@ struct PathVarying {
 fn vs_path(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index) instance_id: u32) -> PathVarying {
     let unit_vertex = vec2<f32>(f32(vertex_id & 1u), 0.5 * f32(vertex_id & 2u));
     let sprite = load_path_sprite(instance_id);
-    // Don't apply content mask because it was already accounted for when rasterizing the path.
     let device_position = to_device_position(unit_vertex, sprite.bounds);
     let screen_position = sprite.bounds.origin + unit_vertex * sprite.bounds.size;
     let texture_coords = (screen_position - globals.path_origin) / vec2<f32>(textureDimensions(t_sprite, 0));
@@ -1256,11 +1024,8 @@ fn vs_path(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index) insta
 @fragment
 fn fs_path(input: PathVarying) -> @location(0) vec4<f32> {
     let sample = textureSample(t_sprite, s_sprite, input.texture_coords);
-    // The intermediate texture is premultiplied, so scale all components.
     return sample * window_mask_alpha(input.position.xy);
 }
-
-// --- underlines --- //
 
 struct Underline {
     order: u32,
@@ -1271,7 +1036,6 @@ struct Underline {
     thickness: f32,
     wavy: u32,
 }
-
 
 struct UnderlineVarying {
     @builtin(position) position: vec4<f32>,
@@ -1318,8 +1082,6 @@ fn fs_underline(input: UnderlineVarying) -> @location(0) vec4<f32> {
     return blend_color(input.color, alpha * input.color.a * window_mask_alpha(input.position.xy));
 }
 
-// --- monochrome sprites --- //
-
 struct MonochromeSprite {
     order: u32,
     pad: u32,
@@ -1329,7 +1091,6 @@ struct MonochromeSprite {
     tile: AtlasTile,
     transformation: TransformationMatrix,
 }
-
 
 struct MonoSpriteVarying {
     @builtin(position) position: vec4<f32>,
@@ -1359,15 +1120,12 @@ fn fs_mono_sprite(input: MonoSpriteVarying) -> @location(0) vec4<f32> {
     let sample = textureSample(t_sprite, s_sprite, input.tile_position).r;
     let alpha_corrected = apply_contrast_and_gamma_correction(sample, input.color.rgb, gamma_params.grayscale_enhanced_contrast, gamma_params.gamma_ratios);
 
-    // Alpha clip after using the derivatives.
     if (any(input.clip_distances < vec4<f32>(0.0))) {
         return vec4<f32>(0.0);
     }
 
     return blend_color(input.color, alpha_corrected * window_mask_alpha(input.position.xy));
 }
-
-// --- polychrome sprites --- //
 
 struct PolychromeSprite {
     order: u32,
@@ -1378,10 +1136,9 @@ struct PolychromeSprite {
     content_mask: Bounds,
     corner_radii: Corners,
     corner_smoothing: f32,
-    pad2: u32, // align to 8 bytes
+    pad2: u32,
     tile: AtlasTile,
 }
-
 
 struct PolySpriteVarying {
     @builtin(position) position: vec4<f32>,
@@ -1418,8 +1175,6 @@ fn fs_poly_sprite(input: PolySpriteVarying) -> @location(0) vec4<f32> {
         sprite.opacity * saturate(0.5 - distance) * window_mask_alpha(input.position.xy));
 }
 
-// --- surfaces --- //
-
 struct SurfaceParams {
     bounds: Bounds,
     content_mask: Bounds,
@@ -1450,9 +1205,6 @@ fn vs_surface(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index) in
 @fragment
 fn fs_surface(input: SurfaceVarying) -> @location(0) vec4<f32> {
     let sample = textureSampleLevel(t_sprite, s_sprite, input.texture_position, 0.0);
-    // Cut the texture with the same superellipse the pane's quads draw, as
-    // surface_fragment does on Metal; the content mask is rectangular, so
-    // without this a surface in a rounded pane overflows the frame's corners.
     let surface = load_surface(input.surface_id);
     let coverage = saturate(0.5 - quad_sdf_smooth(
         input.position.xy, surface.bounds,

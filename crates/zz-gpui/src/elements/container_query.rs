@@ -1,7 +1,3 @@
-//! A container query element, in the spirit of CSS container queries.
-//! The element's own size is determined solely by its style and the space
-//! offered by its parent.
-
 use crate::refineable::Refineable as _;
 
 use crate::{
@@ -10,26 +6,6 @@ use crate::{
     Window, relative,
 };
 
-/// Construct a container query element with the given render callback.
-/// The callback receives the size the element was assigned during layout and
-/// returns the contents to display within it.
-///
-/// By default the element fills its parent (equivalent to `.size_full()`);
-/// use the [`Styled`] methods to size it differently. Because the contents
-/// don't exist until after layout, they cannot influence the element's size.
-///
-/// # Example
-///
-/// ```
-/// # use zz_gpui::{container_query, div, px, IntoElement, ParentElement};
-/// container_query(|size, _window, _cx| {
-///     if size.width < px(240.) {
-///         div().child("Narrow layout")
-///     } else {
-///         div().child("Wide layout")
-///     }
-/// });
-/// ```
 pub fn container_query<E>(
     render: impl 'static + FnOnce(Size<Pixels>, &mut Window, &mut App) -> E,
 ) -> ContainerQuery
@@ -48,7 +24,6 @@ where
     }
 }
 
-/// A container query element, created with [`container_query`].
 pub struct ContainerQuery {
     render: Option<Box<dyn FnOnce(Size<Pixels>, &mut Window, &mut App) -> AnyElement>>,
     style: StyleRefinement,

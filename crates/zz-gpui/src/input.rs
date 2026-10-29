@@ -4,14 +4,7 @@ use crate::{
 };
 use std::ops::Range;
 
-/// Implement this trait to allow views to handle textual input when implementing an editor, field, etc.
-///
-/// Once your view implements this trait, you can use it to construct an [`ElementInputHandler<V>`].
-/// This input handler can then be assigned during paint by calling [`Window::handle_input`].
-///
-/// See [`InputHandler`] for details on how to implement each method.
 pub trait EntityInputHandler: 'static + Sized {
-    /// See [`InputHandler::text_for_range`] for details
     fn text_for_range(
         &mut self,
         range: Range<usize>,
@@ -20,7 +13,6 @@ pub trait EntityInputHandler: 'static + Sized {
         cx: &mut Context<Self>,
     ) -> Option<String>;
 
-    /// See [`InputHandler::selected_text_range`] for details
     fn selected_text_range(
         &mut self,
         ignore_disabled_input: bool,
@@ -28,24 +20,20 @@ pub trait EntityInputHandler: 'static + Sized {
         cx: &mut Context<Self>,
     ) -> Option<UTF16Selection>;
 
-    /// See [`InputHandler::marked_text_range`] for details
     fn marked_text_range(
         &self,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Option<Range<usize>>;
 
-    /// See [`InputHandler::unmark_text`] for details
     fn unmark_text(&mut self, window: &mut Window, cx: &mut Context<Self>);
 
-    /// See [`InputHandler::paste`] for details
     fn paste(&mut self, item: ClipboardItem, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(text) = item.text() {
             self.replace_text_in_range(None, &text, window, cx);
         }
     }
 
-    /// See [`InputHandler::replace_text_in_range`] for details
     fn replace_text_in_range(
         &mut self,
         range: Option<Range<usize>>,
@@ -54,7 +42,6 @@ pub trait EntityInputHandler: 'static + Sized {
         cx: &mut Context<Self>,
     );
 
-    /// See [`InputHandler::replace_and_mark_text_in_range`] for details
     fn replace_and_mark_text_in_range(
         &mut self,
         range: Option<Range<usize>>,
@@ -64,7 +51,6 @@ pub trait EntityInputHandler: 'static + Sized {
         cx: &mut Context<Self>,
     );
 
-    /// See [`InputHandler::bounds_for_range`] for details
     fn bounds_for_range(
         &mut self,
         range_utf16: Range<usize>,
@@ -73,7 +59,6 @@ pub trait EntityInputHandler: 'static + Sized {
         cx: &mut Context<Self>,
     ) -> Option<Bounds<Pixels>>;
 
-    /// See [`InputHandler::character_index_for_point`] for details
     fn character_index_for_point(
         &mut self,
         point: crate::Point<Pixels>,
@@ -81,7 +66,6 @@ pub trait EntityInputHandler: 'static + Sized {
         cx: &mut Context<Self>,
     ) -> Option<usize>;
 
-    /// See [`InputHandler::set_selected_text_range`] for details
     fn set_selected_text_range(
         &mut self,
         _range_utf16: Range<usize>,
@@ -90,7 +74,6 @@ pub trait EntityInputHandler: 'static + Sized {
     ) {
     }
 
-    /// See [`InputHandler::text_length_utf16`] for details
     fn text_length_utf16(
         &mut self,
         _window: &mut Window,
@@ -99,12 +82,10 @@ pub trait EntityInputHandler: 'static + Sized {
         None
     }
 
-    /// See [`InputHandler::accepts_text_input`] for details
     fn accepts_text_input(&self, _window: &mut Window, _cx: &mut Context<Self>) -> bool {
         true
     }
 
-    /// See [`InputHandler::text_input_configuration`] for details
     fn text_input_configuration(
         &mut self,
         _window: &mut Window,
@@ -113,7 +94,6 @@ pub trait EntityInputHandler: 'static + Sized {
         TextInputConfiguration::default()
     }
 
-    /// See [`InputHandler::text_input_editable_range`] for details
     fn text_input_editable_range(
         &mut self,
         _window: &mut Window,
@@ -123,17 +103,12 @@ pub trait EntityInputHandler: 'static + Sized {
     }
 }
 
-/// The canonical implementation of [`crate::PlatformInputHandler`]. Call [`Window::handle_input`]
-/// with an instance during your element's paint.
 pub struct ElementInputHandler<V> {
     view: Entity<V>,
     element_bounds: Bounds<Pixels>,
 }
 
 impl<V: 'static> ElementInputHandler<V> {
-    /// Used in [`Element::paint`][element_paint] with the element's bounds, a `Window`, and a `App` context.
-    ///
-    /// [element_paint]: crate::Element::paint
     pub fn new(element_bounds: Bounds<Pixels>, view: Entity<V>) -> Self {
         ElementInputHandler {
             view,
@@ -314,7 +289,6 @@ mod tests {
                 .unwrap();
         };
 
-        // Nothing is focused, so the platform learns the default configuration.
         draw(cx);
         assert_eq!(
             test_window.text_input_configurations(),
@@ -322,7 +296,6 @@ mod tests {
         );
         assert!(test_window.text_input_state_changes().is_empty());
 
-        // Focusing the view routes its configuration to the platform.
         cx.update_window(window, |_, window, cx| {
             let focus_handle = view.read(cx).focus_handle.clone();
             window.focus(&focus_handle, cx);
@@ -338,12 +311,10 @@ mod tests {
             vec![TextInputStateChange::FocusGained]
         );
 
-        // Redrawing without a change forwards nothing.
         draw(cx);
         assert_eq!(test_window.text_input_configurations().len(), 2);
         assert_eq!(test_window.text_input_state_changes().len(), 1);
 
-        // Changing the configuration forwards the new value.
         let updated = TextInputConfiguration {
             suggestions: true,
             ..custom
@@ -363,7 +334,6 @@ mod tests {
         assert_eq!(test_window.text_input_configurations().len(), 3);
         assert_eq!(test_window.text_input_state_changes().len(), 1);
 
-        // Losing focus reverts the platform to the default configuration.
         cx.update_window(window, |_, window, cx| window.blur(cx))
             .unwrap();
         draw(cx);

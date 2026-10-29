@@ -109,8 +109,6 @@ impl LinuxDispatcher {
                 let signal = event_loop.get_signal();
                 handle
                     .insert_source(timer_channel, move |e, _, _| {
-                        // The dispatcher owning the sender is gone; timers already
-                        // scheduled would run tasks nothing can observe.
                         if let channel::Event::Closed = e {
                             signal.stop();
                         }
@@ -190,14 +188,6 @@ impl PlatformDispatcher for LinuxDispatcher {
         self.main_sender
             .send(priority, runnable)
             .unwrap_or_else(|runnable| {
-                // NOTE: Runnable may wrap a Future that is !Send.
-                //
-                // This is usually safe because we only poll it on the main thread.
-                // However if the send fails, we know that:
-                // 1. main_receiver has been dropped (which implies the app is shutting down)
-                // 2. we are on a background thread.
-                // It is not safe to drop something !Send on the wrong thread, and
-                // the app will exit soon anyway, so we must forget the runnable.
                 std::mem::forget(runnable);
             });
     }
@@ -207,26 +197,20 @@ impl PlatformDispatcher for LinuxDispatcher {
             return;
         };
         if let Err(err) = self.timer_sender.send(TimerAfter { duration, runnable }) {
-            // The timer thread has shut down. Dropping a scheduled runnable cancels its task
-            // and makes the next poll of any awaiter panic. Leaking leaves the task pending,
-            // which is acceptable during shutdown.
             std::mem::forget(err);
         }
     }
 
     fn spawn_realtime(&self, f: Box<dyn FnOnce() + Send>) {
         std::thread::spawn(move || {
-            // SAFETY: always safe to call
             let thread_id = unsafe { libc::pthread_self() };
 
             let policy = libc::SCHED_FIFO;
             let sched_priority = 65;
 
-            // SAFETY: all sched_param members are valid when initialized to zero.
             let mut sched_param =
                 unsafe { MaybeUninit::<libc::sched_param>::zeroed().assume_init() };
             sched_param.sched_priority = sched_priority;
-            // SAFETY: sched_param is a valid initialized structure
             let result = unsafe { libc::pthread_setschedparam(thread_id, policy, &sched_param) };
             if result != 0 {
                 log::warn!("failed to set realtime thread priority");
@@ -817,14 +801,12 @@ mod tests {
             })
             .unwrap();
 
-        // nothing is sent, nothing is received
         event_loop
             .dispatch(Some(::std::time::Duration::ZERO), &mut data)
             .unwrap();
 
         assert!(!data.got_msg);
         assert!(!data.got_closed);
-        // a message is send
 
         tx.send(Priority::Medium, ()).unwrap();
         event_loop
@@ -834,7 +816,6 @@ mod tests {
         assert!(data.got_msg);
         assert!(!data.got_closed);
 
-        // the sender is dropped
         drop(tx);
         event_loop
             .dispatch(Some(::std::time::Duration::ZERO), &mut data)

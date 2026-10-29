@@ -130,8 +130,6 @@ fn generate_test_function(
     let seeds = quote!( #(#seeds),* );
 
     let mut outer_fn: ItemFn = if inner_fn.sig.asyncness.is_some() {
-        // Pass to the test function the number of app contexts that it needs,
-        // based on its parameter list.
         let mut cx_vars = proc_macro2::TokenStream::new();
         let mut cx_teardowns = proc_macro2::TokenStream::new();
         let mut inner_fn_args = proc_macro2::TokenStream::new();
@@ -197,10 +195,6 @@ fn generate_test_function(
                         zz_gpui::ForegroundExecutor::new(exec.clone()).block_test(#inner_fn_name(#inner_fn_args));
                         drop(exec);
                         #cx_teardowns
-                        // Ideally we would only drop cancelled tasks, that way we could detect leaks due to task <-> entity
-                        // cycles as cancelled tasks will be dropped properly once the runnable gets run again
-                        //
-                        // async-task does not give us the power to do this just yet though
                         dispatcher.drain_tasks();
                         drop(dispatcher);
                     },
@@ -209,8 +203,6 @@ fn generate_test_function(
             }
         }
     } else {
-        // Pass to the test function the number of app contexts that it needs,
-        // based on its parameter list.
         let mut cx_vars = proc_macro2::TokenStream::new();
         let mut cx_teardowns = proc_macro2::TokenStream::new();
         let mut inner_fn_args = proc_macro2::TokenStream::new();
@@ -288,10 +280,6 @@ fn generate_test_function(
                         #cx_vars
                         #inner_fn_name(#inner_fn_args);
                         #cx_teardowns
-                        // Ideally we would only drop cancelled tasks, that way we could detect leaks due to task <-> entity
-                        // cycles as cancelled tasks will be dropped properly once they runnable gets run again
-                        //
-                        // async-task does not give us the power to do this just yet though
                         dispatcher.drain_tasks();
                         drop(dispatcher);
                     },

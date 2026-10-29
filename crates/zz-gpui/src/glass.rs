@@ -1,15 +1,3 @@
-//! Liquid glass: a material that refracts, frosts, tints, and lights whatever
-//! was painted beneath it.
-//!
-//! Paint it with [`Window::paint_glass`], [`Window::paint_glass_shapes`], or
-//! [`Styled::glass`](crate::Styled::glass). The knobs live on
-//! [`GlassMaterial`]; [`LiquidRect`] moves a shape on springs and stretches it
-//! along its velocity, which is most of what makes glass read as liquid.
-//!
-//! Renderers that can read back the frame draw it in one pass per glass
-//! batch over a blur chain that only covers the glass regions (see
-//! `glass.wgsl`). Others paint a translucent fill in its place.
-
 use std::time::Duration;
 
 use schemars::JsonSchema;
@@ -20,99 +8,47 @@ use crate::{
     SpringState, WindowCornerMask, black, hsla, point, px, size, white,
 };
 
-/// The WGSL source every renderer draws glass with.
 pub const GLASS_SHADER: &str = include_str!("glass.wgsl");
 
-/// The most shapes one glass primitive melts together.
 pub const GLASS_MAX_SHAPES: usize = 8;
 
-/// The deepest level of the blur chain. Level `n` is the viewport scaled by
-/// `2^-n`.
 pub const GLASS_MAX_BLUR_LEVELS: u32 = 6;
 
-/// How light passes through a glass surface. Every field is a knob; the
-/// constructors are starting points, fitted by eye to iOS.
-///
-/// Lengths are logical pixels. Materials interpolate field by field, so a
-/// spring or an animation can carry one material into another; glass
-/// appears best by growing out of [`Self::vanished`] rather than fading in.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GlassMaterial {
-    /// Standard deviation of the backdrop blur, the frost. Zero is clear.
     pub blur: Pixels,
-    /// Width of the rim where the surface curves and lenses the backdrop.
-    /// Each shape caps it at a quarter of its shorter side.
     pub bezel: Pixels,
-    /// How far inward the rim pulls the backdrop at the very edge. Negative
-    /// values push outward and pull in what lies past the edge. Each shape
-    /// caps it at half its shorter side.
     pub refraction: Pixels,
-    /// Splits the lensing by wavelength along the rim, as a fraction of the
-    /// pull; 0.1 is a faint fringe, 0.5 a rainbow.
     pub dispersion: f32,
-    /// Color mixed over the backdrop; its alpha is how much.
     pub tint: Hsla,
-    /// Backdrop saturation: 1 keeps it, above 1 makes it more vivid.
     pub saturation: f32,
-    /// Added to the backdrop color, from -1 to 1.
     pub brightness: f32,
-    /// Backdrop contrast around mid gray: 1 keeps it.
     pub contrast: f32,
-    /// Brightness of the glint, the thin line where the edge catches light.
     pub specular: f32,
-    /// Width of the glint line.
     pub glint_width: Pixels,
-    /// The axis light falls along, in radians clockwise from the right edge;
-    /// `-3π/4` lights the top left and bottom right edges.
     pub light_angle: f32,
-    /// How far the light favors the edge facing it, from 0 to 1: 0 lights
-    /// both edges along the axis alike, 1 puts the glint on the facing edge
-    /// and the contour on the far one.
     #[serde(default)]
     pub light_directionality: f32,
-    /// How much of the rim's light, the lensing and the color boost fade
-    /// while the window is inactive, from 0 to 1. The tint, blur and contour
-    /// stay.
     #[serde(default)]
     pub inactive_flattening: f32,
-    /// Color of the glint and the fresnel glow; its alpha scales both.
     #[serde(default = "white")]
     pub light_color: Hsla,
-    /// Glow filling the rim, strongest at the edge: how far the rim turns to
-    /// the light color, so it shows on a light surface too.
     pub fresnel: f32,
-    /// Darkness of the contour just outside the edge.
     pub edge_shadow: f32,
-    /// Width of that contour.
     pub edge_width: Pixels,
-    /// Color of that contour; its alpha scales it.
     #[serde(default = "black")]
     pub edge_color: Hsla,
-    /// How evenly the contour runs around the edge, from 0 to 1: 0 follows
-    /// the light, darkest along its axis, 1 is as dark all the way around,
-    /// like a hairline.
     #[serde(default)]
     pub edge_spread: f32,
-    /// Frosted grain over the surface; 0.02 hides banding.
     pub noise: f32,
-    /// Light from inside the glass, as a press would cause.
     pub glow: f32,
-    /// How far the glow reaches.
     pub glow_radius: Pixels,
-    /// Where the glow starts, as a fraction of the glass's bounds.
     pub glow_center: Point<f32>,
-    /// Shapes closer than this melt into one body.
     pub merge: Pixels,
-    /// Fades the whole surface, backdrop included.
     pub opacity: f32,
-    /// What renderers that cannot read back the frame paint in its place.
-    /// Unset, they paint a translucent fill derived from the tint.
     #[serde(default)]
     pub fallback: Option<Hsla>,
-    /// Draws only the light along the rim, its glint and fresnel glow, over
-    /// whatever lies under it: no face, no contour, nothing read back. See
-    /// [`Self::rim`].
     #[serde(skip)]
     pub rim_only: bool,
 }
@@ -124,7 +60,6 @@ impl Default for GlassMaterial {
 }
 
 impl GlassMaterial {
-    /// Every preset by name, as settings and URLs spell them.
     pub const PRESETS: &[(&str, fn() -> Self)] = &[
         ("regular", Self::regular),
         ("clear", Self::clear),
@@ -133,7 +68,6 @@ impl GlassMaterial {
         ("smoked", Self::smoked),
     ];
 
-    /// The preset called `name` in [`Self::PRESETS`].
     pub fn preset(name: &str) -> Option<Self> {
         Self::PRESETS
             .iter()
@@ -141,7 +75,6 @@ impl GlassMaterial {
             .map(|(_, material)| material())
     }
 
-    /// The everyday material: strong lensing at the rim, barely frosted.
     pub fn regular() -> Self {
         Self {
             blur: px(2.),
@@ -174,7 +107,6 @@ impl GlassMaterial {
         }
     }
 
-    /// No frost: a lens over sharp content.
     pub fn clear() -> Self {
         Self {
             blur: px(0.35),
@@ -185,7 +117,6 @@ impl GlassMaterial {
         }
     }
 
-    /// Heavy frost for panels that carry text.
     pub fn frosted() -> Self {
         Self {
             blur: px(16.),
@@ -200,7 +131,6 @@ impl GlassMaterial {
         }
     }
 
-    /// A thick drop: deep rim, strong lensing, rainbow fringe.
     pub fn bubble() -> Self {
         Self {
             blur: px(0.),
@@ -216,7 +146,6 @@ impl GlassMaterial {
         }
     }
 
-    /// Dark smoked glass.
     pub fn smoked() -> Self {
         Self {
             blur: px(10.),
@@ -229,8 +158,6 @@ impl GlassMaterial {
         }
     }
 
-    /// Colored glass, as a prominent button: the backdrop still lenses
-    /// through, washed in `color`.
     pub fn tinted(color: impl Into<Hsla>) -> Self {
         let color = color.into();
         Self {
@@ -244,10 +171,6 @@ impl GlassMaterial {
         }
     }
 
-    /// Opaque glass that only lights its edge over a fill of `fill`: a fine
-    /// glint, a faint fresnel glow and a thin contour. It reads nothing
-    /// under it, so past the rim it draws like a plain fill, which suits
-    /// surfaces that cover most of the window.
     pub fn edge(fill: impl Into<Hsla>) -> Self {
         let fill = fill.into();
         Self {
@@ -269,10 +192,6 @@ impl GlassMaterial {
         }
     }
 
-    /// Only the light this material casts along its rim, to paint over
-    /// opaque content that covers the rim of the same glass painted under
-    /// it. It reads nothing under it and draws nothing past the rim, so it
-    /// stays cheap and leaves the content as it was.
     pub fn rim(&self) -> Self {
         Self {
             blur: px(0.),
@@ -288,8 +207,6 @@ impl GlassMaterial {
         }
     }
 
-    /// This material with every effect off: it draws the backdrop unchanged.
-    /// Interpolate from here to make glass appear by lensing in.
     pub fn vanished(&self) -> Self {
         Self {
             blur: px(0.),
@@ -330,164 +247,134 @@ impl GlassMaterial {
         }
     }
 
-    /// Sets [`Self::blur`].
     pub fn blur(mut self, blur: impl Into<Pixels>) -> Self {
         self.blur = blur.into();
         self
     }
 
-    /// Sets [`Self::bezel`].
     pub fn bezel(mut self, bezel: impl Into<Pixels>) -> Self {
         self.bezel = bezel.into();
         self
     }
 
-    /// Sets [`Self::refraction`].
     pub fn refraction(mut self, refraction: impl Into<Pixels>) -> Self {
         self.refraction = refraction.into();
         self
     }
 
-    /// Sets [`Self::dispersion`].
     pub fn dispersion(mut self, dispersion: f32) -> Self {
         self.dispersion = dispersion;
         self
     }
 
-    /// Sets [`Self::tint`].
     pub fn tint(mut self, tint: impl Into<Hsla>) -> Self {
         self.tint = tint.into();
         self
     }
 
-    /// Sets [`Self::saturation`].
     pub fn saturation(mut self, saturation: f32) -> Self {
         self.saturation = saturation;
         self
     }
 
-    /// Sets [`Self::brightness`].
     pub fn brightness(mut self, brightness: f32) -> Self {
         self.brightness = brightness;
         self
     }
 
-    /// Sets [`Self::contrast`].
     pub fn contrast(mut self, contrast: f32) -> Self {
         self.contrast = contrast;
         self
     }
 
-    /// Sets [`Self::specular`].
     pub fn specular(mut self, specular: f32) -> Self {
         self.specular = specular;
         self
     }
 
-    /// Sets [`Self::glint_width`].
     pub fn glint_width(mut self, glint_width: impl Into<Pixels>) -> Self {
         self.glint_width = glint_width.into();
         self
     }
 
-    /// Sets [`Self::light_angle`].
     pub fn light_angle(mut self, light_angle: f32) -> Self {
         self.light_angle = light_angle;
         self
     }
 
-    /// Sets [`Self::light_color`].
     pub fn light_color(mut self, light_color: impl Into<Hsla>) -> Self {
         self.light_color = light_color.into();
         self
     }
 
-    /// Sets [`Self::fresnel`].
     pub fn fresnel(mut self, fresnel: f32) -> Self {
         self.fresnel = fresnel;
         self
     }
 
-    /// Sets [`Self::edge_shadow`].
     pub fn edge_shadow(mut self, edge_shadow: f32) -> Self {
         self.edge_shadow = edge_shadow;
         self
     }
 
-    /// Sets [`Self::edge_width`].
     pub fn edge_width(mut self, edge_width: impl Into<Pixels>) -> Self {
         self.edge_width = edge_width.into();
         self
     }
 
-    /// Sets [`Self::edge_color`].
     pub fn edge_color(mut self, edge_color: impl Into<Hsla>) -> Self {
         self.edge_color = edge_color.into();
         self
     }
 
-    /// Sets [`Self::edge_spread`].
     pub fn edge_spread(mut self, edge_spread: f32) -> Self {
         self.edge_spread = edge_spread;
         self
     }
 
-    /// Sets [`Self::noise`].
     pub fn noise(mut self, noise: f32) -> Self {
         self.noise = noise;
         self
     }
 
-    /// Sets [`Self::glow`].
     pub fn glow(mut self, glow: f32) -> Self {
         self.glow = glow;
         self
     }
 
-    /// Sets [`Self::glow_radius`].
     pub fn glow_radius(mut self, glow_radius: impl Into<Pixels>) -> Self {
         self.glow_radius = glow_radius.into();
         self
     }
 
-    /// Sets [`Self::glow_center`].
     pub fn glow_center(mut self, glow_center: Point<f32>) -> Self {
         self.glow_center = glow_center;
         self
     }
 
-    /// Sets [`Self::merge`].
     pub fn merge(mut self, merge: impl Into<Pixels>) -> Self {
         self.merge = merge.into();
         self
     }
 
-    /// Sets [`Self::opacity`].
     pub fn opacity(mut self, opacity: f32) -> Self {
         self.opacity = opacity;
         self
     }
 
-    /// Sets [`Self::fallback`].
     pub fn fallback(mut self, fill: impl Into<Hsla>) -> Self {
         self.fallback = Some(fill.into());
         self
     }
 
-    /// Whether the glass shows any of what lies under it. A fully opaque tint
-    /// covers the backdrop, so renderers need not copy it out of the frame.
     pub fn reads_backdrop(&self) -> bool {
         !self.rim_only && self.tint.a < 1.
     }
 
-    /// Whether the material lights nothing: rim-only glass with neither a
-    /// glint nor a glow.
     pub fn draws_nothing(&self) -> bool {
         self.rim_only && self.specular <= 0. && self.fresnel <= 0.
     }
 
-    /// Whether the tint hides the backdrop and nothing draws over it, so the
-    /// surface looks exactly like a fill of the tint and is painted as one.
     pub fn is_opaque_fill(&self) -> bool {
         !self.rim_only
             && !self.reads_backdrop()
@@ -498,17 +385,12 @@ impl GlassMaterial {
             && self.noise == 0.
     }
 
-    /// How far past its shape this material reads the backdrop: the blur's
-    /// reach, plus the pull when it points outward.
     pub fn backdrop_reach(&self) -> Pixels {
         let blur = self.blur.as_f32().max(0.) * 2.5;
         let outward = (-self.refraction.as_f32()).max(0.);
         px(blur + outward + 2.)
     }
 
-    /// The fill painted in place of the glass where the renderer cannot read
-    /// back the frame.
-    /// It fades with the material, so [`Self::vanished`] paints nothing.
     pub fn fallback_fill(&self) -> Hsla {
         if let Some(fill) = self.fallback {
             return Hsla {
@@ -593,17 +475,13 @@ impl Interpolate for GlassMaterial {
     }
 }
 
-/// One rounded rectangle of a glass body, in window coordinates.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct GlassShape {
-    /// Where the shape sits.
     pub bounds: Bounds<Pixels>,
-    /// Its corner radii, clamped to half its shorter side when drawn.
     pub corner_radii: Corners<Pixels>,
 }
 
 impl GlassShape {
-    /// A rounded rectangle with one radius on every corner.
     pub fn new(bounds: Bounds<Pixels>, radius: impl Into<Pixels>) -> Self {
         Self {
             bounds,
@@ -611,29 +489,19 @@ impl GlassShape {
         }
     }
 
-    /// A pill or circle filling `bounds`.
     pub fn capsule(bounds: Bounds<Pixels>) -> Self {
         let radius = bounds.size.width.min(bounds.size.height) / 2.;
         Self::new(bounds, radius)
     }
 }
 
-/// How a glass region's blur runs: how many times the chain halves the
-/// backdrop, and how far apart its taps sit.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GlassBlurPlan {
-    /// Halvings, 0 for no blur. The result always lands on level 1.
     pub levels: u32,
-    /// Tap offset in source texels.
     pub offset: f32,
 }
 
 impl GlassBlurPlan {
-    /// Plans a blur with standard deviation `sigma` device pixels.
-    ///
-    /// A dual Kawase chain `n` levels deep with offset `o` spreads by about
-    /// `1.4 · o · 2^n`. It stays smooth for `o` up to about 2, so the
-    /// shallowest chain that reaches `sigma` there is chosen and `o` fitted.
     pub fn new(sigma: f32, max_levels: u32) -> Self {
         if sigma.is_nan() || sigma < 0.5 || max_levels == 0 {
             return Self {
@@ -650,8 +518,6 @@ impl GlassBlurPlan {
     }
 }
 
-/// The texels a region covers at blur level `level`, as min and max corners,
-/// rounded outward.
 pub fn glass_level_rect(region: Bounds<i32>, level: u32) -> Bounds<i32> {
     let shift = |value: i32, up: bool| {
         let scale = 1 << level;
@@ -671,75 +537,41 @@ pub fn glass_level_rect(region: Bounds<i32>, level: u32) -> Bounds<i32> {
     }
 }
 
-/// The uniform block `glass.wgsl` reads for one glass draw.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[repr(C)]
 pub struct GlassUniform {
-    /// Up to [`GLASS_MAX_SHAPES`] shapes: `[x, y, width, height]` then
-    /// `[top_left, top_right, bottom_right, bottom_left]` radii.
     pub shapes: [[[f32; 4]; 2]; GLASS_MAX_SHAPES],
-    /// The rectangle drawn.
     pub quad: [f32; 4],
-    /// Level 0 texels holding the backdrop: min and max corners.
     pub backdrop: [f32; 4],
-    /// Straight RGBA tint.
     pub tint: [f32; 4],
-    /// Bezel, refraction, dispersion, blurred level (0 = sharp).
     pub optics: [f32; 4],
-    /// Light direction, glint strength, glint width.
     pub light: [f32; 4],
-    /// Saturation, brightness, contrast, grain.
     pub tone: [f32; 4],
-    /// Fresnel glow, edge shadow strength and width, opacity.
     pub rim: [f32; 4],
-    /// Shape count, corner smoothing, merge radius, then how deep inside a
-    /// shape the face is flat, where the shader skips the field (0 never).
     pub shape: [f32; 4],
-    /// Glow center, radius, strength.
     pub glow: [f32; 4],
-    /// Viewport size, then where the chain's level 0 starts in the frame.
     pub viewport: [f32; 4],
-    /// The window's rounded clip, as a shape: `[x, y, width, height]`.
     pub mask_rect: [f32; 4],
-    /// Its corner radii.
     pub mask_radii: [f32; 4],
-    /// Its corner smoothing, 1 when there is a clip, then how directional
-    /// the light is and how evenly the contour runs around the edge.
     pub mask: [f32; 4],
-    /// The glint and fresnel glow's color, scaled by its alpha, then
-    /// padding.
     pub light_color: [f32; 4],
-    /// The contour's color, its alpha already in the edge shadow strength,
-    /// then 1 when the glass draws only its rim.
     pub edge_color: [f32; 4],
-    /// The rectangle casting the shadow: `[x, y, width, height]`.
     pub shadow_bounds: [f32; 4],
-    /// Its corner radii.
     pub shadow_radii: [f32; 4],
-    /// Straight RGBA shadow color.
     pub shadow_color: [f32; 4],
-    /// Blur radius, corner smoothing, then 1 when the draw is only the
-    /// shadow, then padding.
     pub shadow: [f32; 4],
 }
 
 impl GlassUniform {
-    /// Whether the draw reads its backdrop, and so writes its pixels with
-    /// blending off: the pipeline it needs.
     pub fn reads_backdrop(&self) -> bool {
         self.shadow[2] == 0. && self.tint[3] < 1.
     }
 
-    /// The vertices its strip takes: a shadow is a ring around the part of
-    /// the body that covers it, anything else one quad.
     pub fn vertex_count(&self) -> u32 {
         if self.shadow[2] > 0. { 10 } else { 4 }
     }
 
-    /// The block's bytes, as the shader lays them out.
     pub fn as_bytes(&self) -> &[u8] {
-        // SAFETY: `GlassUniform` is `repr(C)` and only holds `f32`s, so it
-        // has no padding and every byte is initialized.
         unsafe {
             std::slice::from_raw_parts(
                 (self as *const Self).cast::<u8>(),
@@ -749,18 +581,14 @@ impl GlassUniform {
     }
 }
 
-/// The uniform block `glass.wgsl` reads for one blur pass over one region.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[repr(C)]
 pub struct GlassBlurUniform {
-    /// Source texels holding valid data: min and max corners.
     pub source: [f32; 4],
-    /// Tap offset in source texels, then padding.
     pub params: [f32; 4],
 }
 
 impl GlassBlurUniform {
-    /// A pass reading `source` with taps `offset` texels apart.
     pub fn new(source: Bounds<i32>, offset: f32) -> Self {
         Self {
             source: [
@@ -773,7 +601,6 @@ impl GlassBlurUniform {
         }
     }
 
-    /// A copy of the frame's `region` to `destination` in level 0.
     pub fn copy(region: Bounds<i32>, destination: Point<i32>) -> Self {
         Self {
             source: [0.; 4],
@@ -786,9 +613,7 @@ impl GlassBlurUniform {
         }
     }
 
-    /// The block's bytes, as the shader lays them out.
     pub fn as_bytes(&self) -> &[u8] {
-        // SAFETY: as for `GlassUniform`.
         unsafe {
             std::slice::from_raw_parts(
                 (self as *const Self).cast::<u8>(),
@@ -798,50 +623,33 @@ impl GlassBlurUniform {
     }
 }
 
-/// A drop shadow cast by glass, drawn after it and only outside its body,
-/// so translucent glass never shows its own shadow through its face.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GlassShadow {
-    /// The rectangle casting the shadow, offset and spread applied.
     pub bounds: Bounds<ScaledPixels>,
-    /// Its corner radii, spread applied.
     pub corner_radii: Corners<ScaledPixels>,
-    /// Standard deviation of the shadow's blur.
     pub blur_radius: ScaledPixels,
-    /// The shadow's color; its alpha is how dark it is.
     pub color: Hsla,
-    /// Superellipse exponent for its corners.
     pub corner_smoothing: f32,
 }
 
-/// Glass painted into a scene, sized in device pixels.
 #[derive(Clone, Debug)]
-#[expect(missing_docs)]
 pub struct Glass {
     pub order: crate::DrawOrder,
-    /// What the glass draws over: its shapes and the contour around them.
     pub bounds: Bounds<ScaledPixels>,
-    /// What the glass reads: its bounds grown by the material's reach.
     pub backdrop_bounds: Bounds<ScaledPixels>,
     pub content_mask: crate::ContentMask<ScaledPixels>,
     pub shapes: [(Bounds<ScaledPixels>, Corners<ScaledPixels>); GLASS_MAX_SHAPES],
     pub shape_count: u32,
     pub corner_smoothing: f32,
-    /// The material with its lengths in device pixels.
     pub material: GlassMaterial,
-    /// Set when this draw is only a shadow the glass casts; see
-    /// [`Self::with_shadow`].
     pub shadow: Option<GlassShadow>,
 }
 
 impl Glass {
-    /// Whether drawing this glass reads the frame under it.
     pub fn reads_backdrop(&self) -> bool {
         self.shadow.is_none() && self.material.reads_backdrop()
     }
 
-    /// A draw of only `shadow`, masked by this glass's body. It reads
-    /// nothing, so it shares a pass with the glass it follows.
     pub fn with_shadow(&self, shadow: GlassShadow) -> Self {
         let bounds = shadow
             .bounds
@@ -854,8 +662,6 @@ impl Glass {
         }
     }
 
-    /// The blur this glass asks for, given how deep the chain may go. Glass
-    /// that does not read its backdrop blurs nothing.
     pub fn blur_plan(&self, max_levels: u32) -> GlassBlurPlan {
         let sigma = if self.reads_backdrop() {
             self.material.blur.as_f32()
@@ -865,7 +671,6 @@ impl Glass {
         GlassBlurPlan::new(sigma, max_levels)
     }
 
-    /// The level 0 texels this glass reads, clipped to the viewport.
     pub fn backdrop_region(&self, viewport: Size<i32>) -> Option<Bounds<i32>> {
         let bounds = self.backdrop_bounds;
         let left = (bounds.origin.x.0.floor() as i32).max(0);
@@ -878,8 +683,6 @@ impl Glass {
         })
     }
 
-    /// The scissor the glass draws through: its bounds within its content
-    /// mask, in whole pixels, clipped to the viewport.
     pub fn scissor(&self, viewport: Size<i32>) -> Option<Bounds<i32>> {
         let bounds = self.bounds.intersect(&self.content_mask.bounds);
         let left = (bounds.origin.x.0.floor() as i32).max(0);
@@ -892,9 +695,6 @@ impl Glass {
         })
     }
 
-    /// The uniform block for drawing this glass over a blur chain whose
-    /// level 0 starts at `origin` in the frame and holds `region` of it,
-    /// blurred at `blurred_level` when that is nonzero.
     pub fn uniform(
         &self,
         region: Bounds<i32>,
@@ -930,7 +730,6 @@ impl Glass {
                 ],
             ];
         }
-        // Each shape caps its own bezel and lensing in the shader.
         let bezel = material.bezel.as_f32().max(0.5);
         let refraction = material.refraction.as_f32();
         let tint = material.tint.to_rgb();
@@ -1064,7 +863,6 @@ impl Glass {
         }
     }
 
-    /// The union of the shapes, without the contour's margin.
     pub fn shape_bounds(&self) -> Bounds<ScaledPixels> {
         self.shapes
             .iter()
@@ -1075,9 +873,6 @@ impl Glass {
     }
 }
 
-/// How deep inside its shapes glass has a flat face: past the bezel, where
-/// lensing and the fresnel glow end, and past the glint's faint bleed, with
-/// a pixel to spare. Zero while [`with_full_field`] runs.
 fn face_depth(material: &GlassMaterial) -> f32 {
     #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
     if FULL_FIELD.get() {
@@ -1092,9 +887,6 @@ thread_local! {
     static FULL_FIELD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// Runs `f` with the glass this thread plans computing its field at every
-/// pixel, as before the flat face was skipped, for checks and benchmarks to
-/// compare against.
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 fn with_full_field<R>(f: impl FnOnce() -> R) -> R {
     let previous = FULL_FIELD.replace(true);
@@ -1103,49 +895,24 @@ fn with_full_field<R>(f: impl FnOnce() -> R) -> R {
     result
 }
 
-/// One run of a glass batch, worked out for a renderer to carry out in
-/// order: copy each frame rectangle into level 0 of the blur chain, run the
-/// blur passes, then draw each glass over the frame. A run whose glass reads
-/// no backdrop has no copies and no passes, and needs no chain.
-///
-/// The chain is addressed in device pixels relative to [`Self::origin`],
-/// scaled down by `2^level`, so every region keeps its place at every level.
 #[derive(Clone, Debug, Default)]
 pub struct GlassRun {
-    /// Where level 0 of the chain starts in the frame.
     pub origin: Point<i32>,
-    /// The level 0 texels the chain must span.
     pub extent: Size<i32>,
-    /// How many levels below 0 the blur passes reach.
     pub depth: u32,
-    /// Frame rectangles to copy, each with where it lands in level 0.
     pub copies: Vec<(Bounds<i32>, Point<i32>)>,
-    /// The blur passes, in order.
     pub passes: Vec<GlassBlurPass>,
-    /// One draw per glass: its uniform block and its scissor in the frame.
     pub draws: Vec<(GlassUniform, Bounds<i32>)>,
 }
 
-/// A render pass over one level of the blur chain.
 #[derive(Clone, Debug)]
 pub struct GlassBlurPass {
-    /// The level read.
     pub source: u32,
-    /// The level written.
     pub destination: u32,
-    /// Down passes halve the resolution and write every texel later passes
-    /// read, so the destination's old contents can be dropped. Up passes
-    /// double it and must keep what they do not cover.
     pub down: bool,
-    /// One draw per region: its uniform block and its scissor in the
-    /// destination level.
     pub draws: Vec<(GlassBlurUniform, Bounds<i32>)>,
 }
 
-/// Plans a batch of glass drawn into a frame of `viewport` device pixels.
-///
-/// Glass whose backdrop overlaps an earlier one's goes in a later run, so
-/// that it sees the earlier glass and the chain holds one region per texel.
 pub fn plan_glass(
     glasses: &[Glass],
     viewport: Size<i32>,
@@ -1169,8 +936,6 @@ pub fn plan_glass(
         })
         .collect();
 
-    // Two regions closer than a texel at the deepest level either blurs to
-    // would share texels down the chain, so they count as overlapping.
     let overlap = |a: &Planned, b: &Planned| {
         let reach = 1 << a.blur.levels.max(b.blur.levels);
         let grown = Bounds {
@@ -1288,8 +1053,6 @@ fn intersects(a: Bounds<i32>, b: Bounds<i32>) -> bool {
         && b.origin.y < a.origin.y + a.size.height
 }
 
-/// The size of blur chain level `level` for a chain spanning `extent` at
-/// level 0.
 pub fn glass_level_size(extent: Size<i32>, level: u32) -> Size<i32> {
     let scale = 1 << level;
     size(
@@ -1298,15 +1061,8 @@ pub fn glass_level_size(extent: Size<i32>, level: u32) -> Size<i32> {
     )
 }
 
-/// A rectangle whose center and size each chase their target on a spring,
-/// reporting the velocity it moves with.
-///
-/// Step it once per frame and paint [`Self::stretched`]: squashing a shape
-/// along its motion and swelling it across is what makes moving glass look
-/// like liquid rather than a sliding pane.
 #[derive(Clone, Debug)]
 pub struct LiquidRect {
-    /// The spring every axis follows.
     pub config: SpringConfig,
     center: [SpringState; 2],
     size: [SpringState; 2],
@@ -1314,7 +1070,6 @@ pub struct LiquidRect {
 }
 
 impl LiquidRect {
-    /// A rectangle resting at `bounds`.
     pub fn new(bounds: Bounds<Pixels>, config: SpringConfig) -> Self {
         let center = bounds.center();
         Self {
@@ -1343,28 +1098,23 @@ impl LiquidRect {
         }
     }
 
-    /// Where the rectangle is heading.
     pub fn target(&self) -> Bounds<Pixels> {
         self.target
     }
 
-    /// Retargets without losing velocity.
     pub fn set_target(&mut self, target: Bounds<Pixels>) {
         self.target = target;
     }
 
-    /// Jumps to `bounds` and stops.
     pub fn snap(&mut self, bounds: Bounds<Pixels>) {
         *self = Self::new(bounds, self.config);
     }
 
-    /// Adds velocity, in logical pixels per second, as a flick would.
     pub fn push(&mut self, velocity: Point<Pixels>) {
         self.center[0].velocity += velocity.x.as_f32();
         self.center[1].velocity += velocity.y.as_f32();
     }
 
-    /// Advances every axis by `delta`. Returns whether anything still moves.
     pub fn step(&mut self, delta: Duration) -> bool {
         let delta = delta.as_secs_f32().min(0.1);
         let center = self.target.center();
@@ -1395,7 +1145,6 @@ impl LiquidRect {
         moving
     }
 
-    /// Whether every axis has come to rest on its target.
     pub fn is_settled(&self) -> bool {
         self.center
             .iter()
@@ -1404,12 +1153,10 @@ impl LiquidRect {
             && self.bounds() == self.target
     }
 
-    /// The center's velocity in logical pixels per second.
     pub fn velocity(&self) -> Point<Pixels> {
         point(px(self.center[0].velocity), px(self.center[1].velocity))
     }
 
-    /// Where the rectangle is now.
     pub fn bounds(&self) -> Bounds<Pixels> {
         let size = size(
             px(self.size[0].position.max(0.)),
@@ -1419,9 +1166,6 @@ impl LiquidRect {
         Bounds::new(center - point(size.width / 2., size.height / 2.), size)
     }
 
-    /// Where the rectangle is now, stretched along its motion and thinned
-    /// across it with the area kept. `amount` is the stretch per 1000
-    /// logical pixels per second, and `limit` caps it (0.3 is a 30% stretch).
     pub fn stretched(&self, amount: f32, limit: f32) -> Bounds<Pixels> {
         let bounds = self.bounds();
         let velocity = [self.center[0].velocity, self.center[1].velocity];
@@ -1436,8 +1180,6 @@ impl LiquidRect {
     }
 }
 
-/// Melts a list of shapes into the glass primitive's fixed slots, keeping
-/// the first [`GLASS_MAX_SHAPES`].
 pub(crate) fn glass_shape_slots(
     shapes: &[GlassShape],
     scale_factor: f32,
@@ -1466,16 +1208,11 @@ pub(crate) fn glass_shape_slots(
     (slots, count, union.unwrap_or_default())
 }
 
-/// A 64 by 64 device pixel scene for renderer tests: red left of x = 12,
-/// blue right of it, and glass with `material` (lengths in device pixels)
-/// over (8, 8) to (56, 56) when one is given.
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 pub fn glass_test_scene(material: Option<GlassMaterial>) -> crate::Scene {
     glass_scene_over(1., material)
 }
 
-/// [`glass_test_scene`] with its stripes at `alpha`, the way a translucent
-/// window holds its backdrop.
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 fn glass_scene_over(alpha: f32, material: Option<GlassMaterial>) -> crate::Scene {
     use crate::{ContentMask, Quad, Scene};
@@ -1516,12 +1253,6 @@ fn glass_scene_over(alpha: f32, material: Option<GlassMaterial>) -> crate::Scene
     scene
 }
 
-/// Times the glass cases every renderer is benchmarked on, at `width` by
-/// `height` device pixels over 24 colored stripes, and prints one line per
-/// case. `time` draws a scene repeatedly and returns its milliseconds per
-/// frame; each case keeps its best of five. Glass is timed twice: as drawn,
-/// and with the field computed at every pixel, which shows what skipping it
-/// on the flat face saves.
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 pub fn bench_glass_rendering(
     width: f32,
@@ -1562,8 +1293,6 @@ pub fn bench_glass_rendering(
                 ..Default::default()
             });
         }
-        // The inset accent glow zz's active pane drew until its glass frame
-        // replaced it: a 96 px blur offset by (16, 24), at 2x.
         for (bounds, radius) in glows {
             scene.insert_primitive(Shadow {
                 order: 0,
@@ -1603,8 +1332,6 @@ pub fn bench_glass_rendering(
         scene.finish();
         scene
     };
-    // Lengths are device pixels, as the scene holds them: a 2x display
-    // doubles the logical values.
     let regular = GlassMaterial::regular().scale(2.);
     let frosted = GlassMaterial::frosted().scale(2.);
     let clear = GlassMaterial::clear().scale(2.);
@@ -1621,7 +1348,6 @@ pub fn bench_glass_rendering(
         .collect();
     let mut toolbar = vec![(rect(150., 170., 1450., 160.), 80., 2., regular)];
     toolbar.extend(buttons.iter().copied());
-    // Four panes split by 16 pixel gaps, as zz tiles a window.
     let gap = 16.;
     let (pane_width, pane_height) = ((width - 3. * gap) / 2., (height - 3. * gap) / 2.);
     let panes: Vec<_> = (0..4)
@@ -1715,10 +1441,6 @@ pub fn bench_glass_rendering(
     Ok(())
 }
 
-/// What a renderer must draw over a translucent frame, the way a window
-/// with a see-through background holds what lies under its glass: clear
-/// glass leaves it as it was, since the blend already keeps it. `render`
-/// draws a scene at 64 by 64 device pixels into a transparent target.
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 pub fn check_glass_over_a_translucent_frame(
     mut render: impl FnMut(&crate::Scene) -> anyhow::Result<image::RgbaImage>,
@@ -1748,11 +1470,6 @@ pub fn check_glass_over_a_translucent_frame(
     Ok(())
 }
 
-/// Glass over a translucent frame hides the frame under its face behind the
-/// blurred copy it draws: a bright line under a dark face must not show
-/// through sharp, as it did while the blend kept part of the frame and the
-/// glass could only add to it. `render` draws a scene at 64 by 64 device
-/// pixels on a target that keeps the frame's alpha.
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 pub fn check_glass_hides_the_frame_under_it(
     mut render: impl FnMut(&crate::Scene) -> anyhow::Result<image::RgbaImage>,
@@ -1813,9 +1530,6 @@ pub fn check_glass_hides_the_frame_under_it(
     Ok(())
 }
 
-/// Rim-only glass over opaque content lights the content along the rim and
-/// leaves its face and everything past the edge as they were. `render`
-/// draws a scene at 64 by 64 device pixels.
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 pub fn check_rim_glass_lights_only_the_edge(
     mut render: impl FnMut(&crate::Scene) -> anyhow::Result<image::RgbaImage>,
@@ -1881,8 +1595,6 @@ pub fn check_rim_glass_lights_only_the_edge(
     Ok(())
 }
 
-/// What a renderer must draw for [`glass_test_scene`]; `render` draws a
-/// scene at 64 by 64 device pixels.
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 pub fn check_glass_rendering(
     mut render: impl FnMut(&crate::Scene) -> anyhow::Result<image::RgbaImage>,
@@ -1939,8 +1651,6 @@ pub fn check_glass_rendering(
         "glass should stay inside the window's rounded clip, got {lensed_clipped:?} for {clipped:?}"
     );
 
-    // Whatever the scene paints after the glass draws in the same pass, so
-    // the glass must leave that pass's scissor as it found it.
     let mut covered = glass_test_scene(Some(lens));
     let corner = Bounds {
         origin: point(ScaledPixels(2.), ScaledPixels(2.)),
@@ -1960,7 +1670,6 @@ pub fn check_glass_rendering(
         "a quad painted after the glass should draw, got {after:?}"
     );
 
-    // The contour darkens only past the edge, even under translucent glass.
     let faded = GlassMaterial::regular()
         .vanished()
         .edge_shadow(0.8)
@@ -2242,8 +1951,6 @@ pub fn check_glass_rendering(
     Ok(())
 }
 
-/// A 64 by 64 device pixel scene over a checkerboard of hues, with one
-/// glass body made of `shapes`.
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 fn glass_body_scene(
     shapes: &[(Bounds<ScaledPixels>, Corners<ScaledPixels>)],
@@ -2304,8 +2011,6 @@ fn glass_body_scene(
     scene
 }
 
-/// The flat face must draw what computing the field there would: checked
-/// for each shape, smoothing, material and clip below.
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 fn check_flat_face(
     mut render: impl FnMut(&crate::Scene) -> anyhow::Result<image::RgbaImage>,

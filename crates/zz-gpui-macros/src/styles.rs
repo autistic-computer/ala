@@ -51,15 +51,11 @@ pub fn visibility_style_methods(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as StyleableMacroInput);
     let visibility = input.method_visibility;
     let output = quote! {
-        /// Sets the visibility of the element to `visible`.
-        /// [Docs](https://tailwindcss.com/docs/visibility)
         #visibility fn visible(mut self) -> Self {
             self.style().visibility = Some(zz_gpui::Visibility::Visible);
             self
         }
 
-        /// Sets the visibility of the element to `hidden`.
-        /// [Docs](https://tailwindcss.com/docs/visibility)
         #visibility fn invisible(mut self) -> Self {
             self.style().visibility = Some(zz_gpui::Visibility::Hidden);
             self
@@ -106,15 +102,11 @@ pub fn position_style_methods(input: TokenStream) -> TokenStream {
         visibility.clone(),
     );
     let output = quote! {
-        /// Sets the position of the element to `relative`.
-        /// [Docs](https://tailwindcss.com/docs/position)
         #visibility fn relative(mut self) -> Self {
             self.style().position = Some(zz_gpui::Position::Relative);
             self
         }
 
-        /// Sets the position of the element to `absolute`.
-        /// [Docs](https://tailwindcss.com/docs/position)
         #visibility fn absolute(mut self) -> Self {
             self.style().position = Some(zz_gpui::Position::Absolute);
             self
@@ -130,23 +122,17 @@ pub fn overflow_style_methods(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as StyleableMacroInput);
     let visibility = input.method_visibility;
     let output = quote! {
-        /// Sets the behavior of content that overflows the container to be hidden.
-        /// [Docs](https://tailwindcss.com/docs/overflow#hiding-content-that-overflows)
         #visibility fn overflow_hidden(mut self) -> Self {
             self.style().overflow.x = Some(zz_gpui::Overflow::Hidden);
             self.style().overflow.y = Some(zz_gpui::Overflow::Hidden);
             self
         }
 
-        /// Sets the behavior of content that overflows the container on the X axis to be hidden.
-        /// [Docs](https://tailwindcss.com/docs/overflow#hiding-content-that-overflows)
         #visibility fn overflow_x_hidden(mut self) -> Self {
             self.style().overflow.x = Some(zz_gpui::Overflow::Hidden);
             self
         }
 
-        /// Sets the behavior of content that overflows the container on the Y axis to be hidden.
-        /// [Docs](https://tailwindcss.com/docs/overflow#hiding-content-that-overflows)
         #visibility fn overflow_y_hidden(mut self) -> Self {
             self.style().overflow.y = Some(zz_gpui::Overflow::Hidden);
             self
@@ -160,168 +146,121 @@ pub fn cursor_style_methods(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as StyleableMacroInput);
     let visibility = input.method_visibility;
     let output = quote! {
-        /// Set the cursor style when hovering over this element
         #visibility fn cursor(mut self, cursor: CursorStyle) -> Self {
             self.style().mouse_cursor = Some(cursor);
             self
         }
 
-        /// Sets the cursor style when hovering an element to `default`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_default(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::Arrow);
             self
         }
 
-        /// Sets the cursor style when hovering an element to `pointer`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_pointer(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::PointingHand);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `text`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_text(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::IBeam);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `move`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_move(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ClosedHand);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `not-allowed`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_not_allowed(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::OperationNotAllowed);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `context-menu`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_context_menu(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ContextualMenu);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `crosshair`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_crosshair(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::Crosshair);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `vertical-text`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_vertical_text(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::IBeamCursorForVerticalLayout);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `alias`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_alias(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::DragLink);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `copy`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_copy(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::DragCopy);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `no-drop`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_no_drop(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::OperationNotAllowed);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `grab`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_grab(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::OpenHand);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `grabbing`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_grabbing(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ClosedHand);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `ew-resize`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_ew_resize(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ResizeLeftRight);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `ns-resize`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_ns_resize(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ResizeUpDown);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `nesw-resize`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_nesw_resize(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ResizeUpRightDownLeft);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `nwse-resize`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_nwse_resize(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ResizeUpLeftDownRight);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `col-resize`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_col_resize(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ResizeColumn);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `row-resize`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_row_resize(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ResizeRow);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `n-resize`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_n_resize(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ResizeUp);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `e-resize`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_e_resize(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ResizeRight);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `s-resize`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_s_resize(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ResizeDown);
             self
         }
 
-        /// Sets cursor style when hovering over an element to `w-resize`.
-        /// [Docs](https://tailwindcss.com/docs/cursor)
         #visibility fn cursor_w_resize(mut self) -> Self {
             self.style().mouse_cursor = Some(zz_gpui::CursorStyle::ResizeLeft);
             self
@@ -365,7 +304,6 @@ pub fn border_style_methods(input: TokenStream) -> TokenStream {
     }
 
     let output = quote! {
-        /// Sets the border color of the element.
         #visibility fn border_color<C>(mut self, border_color: C) -> Self
         where
             C: Into<zz_gpui::Hsla>,
@@ -385,22 +323,16 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as StyleableMacroInput);
     let visibility = input.method_visibility;
     let output = quote! {
-        /// Sets the box shadow of the element.
-        /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow(mut self, shadows: std::vec::Vec<zz_gpui::BoxShadow>) -> Self {
             self.style().box_shadow = Some(shadows);
             self
         }
 
-        /// Clears the box shadow of the element.
-        /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_none(mut self) -> Self {
             self.style().box_shadow = Some(Default::default());
             self
         }
 
-        /// Sets the box shadow of the element.
-        /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_2xs(mut self) -> Self {
             use zz_gpui::{BoxShadow, hsla, px};
             use std::vec;
@@ -411,8 +343,6 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
             self
         }
 
-        /// Sets the box shadow of the element.
-        /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_xs(mut self) -> Self {
             use zz_gpui::{BoxShadow, hsla, px};
             use std::vec;
@@ -423,8 +353,6 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
             self
         }
 
-        /// Sets the box shadow of the element.
-        /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_sm(mut self) -> Self {
             use zz_gpui::{BoxShadow, hsla, px};
             use std::vec;
@@ -436,8 +364,6 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
             self
         }
 
-        /// Sets the box shadow of the element.
-        /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_md(mut self) -> Self {
             use zz_gpui::{BoxShadow, hsla, px};
             use std::vec;
@@ -449,8 +375,6 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
             self
         }
 
-        /// Sets the box shadow of the element.
-        /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_lg(mut self) -> Self {
             use zz_gpui::{BoxShadow, hsla, px};
             use std::vec;
@@ -462,8 +386,6 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
             self
         }
 
-        /// Sets the box shadow of the element.
-        /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_xl(mut self) -> Self {
             use zz_gpui::{BoxShadow, hsla, px};
             use std::vec;
@@ -475,8 +397,6 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
             self
         }
 
-        /// Sets the box shadow of the element.
-        /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_2xl(mut self) -> Self {
             use zz_gpui::{BoxShadow, hsla, px};
             use std::vec;
@@ -872,8 +792,6 @@ fn box_prefixes() -> Vec<BoxStylePrefix> {
             fields: vec![quote! { min_size.width }],
             doc_string_prefix: "Sets the minimum width of the element. [Docs](https://tailwindcss.com/docs/min-width)",
         },
-        // TODO: These don't use the same size ramp as the others
-        // see https://tailwindcss.com/docs/max-width
         BoxStylePrefix {
             prefix: "min_h",
             auto_allowed: true,
@@ -886,16 +804,12 @@ fn box_prefixes() -> Vec<BoxStylePrefix> {
             fields: vec![quote! {max_size.width}, quote! {max_size.height}],
             doc_string_prefix: "Sets the maximum width and height of the element.",
         },
-        // TODO: These don't use the same size ramp as the others
-        // see https://tailwindcss.com/docs/max-width
         BoxStylePrefix {
             prefix: "max_w",
             auto_allowed: true,
             fields: vec![quote! { max_size.width }],
             doc_string_prefix: "Sets the maximum width of the element. [Docs](https://tailwindcss.com/docs/max-width)",
         },
-        // TODO: These don't use the same size ramp as the others
-        // see https://tailwindcss.com/docs/max-width
         BoxStylePrefix {
             prefix: "max_h",
             auto_allowed: true,

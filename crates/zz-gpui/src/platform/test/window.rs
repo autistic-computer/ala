@@ -25,7 +25,6 @@ pub(crate) struct TestWindowState {
     pub(crate) edited: bool,
     pub(crate) document_path: Option<std::path::PathBuf>,
     platform: Weak<TestPlatform>,
-    // TODO: Replace with `Rc`
     sprite_atlas: Arc<dyn PlatformAtlas>,
     renderer: Option<Box<dyn PlatformHeadlessRenderer>>,
     pub(crate) should_close_handler: Option<Box<dyn FnMut() -> bool>>,
@@ -65,8 +64,6 @@ pub(crate) struct TestWindowState {
 #[derive(Clone)]
 pub struct TestWindow(pub(crate) Rc<Mutex<TestWindowState>>);
 
-// Test windows are not backed by a real platform window, so there is no raw
-// handle to report; `NotSupported` is `raw_window_handle`'s variant for exactly this.
 impl HasWindowHandle for TestWindow {
     fn window_handle(
         &self,
@@ -133,7 +130,6 @@ impl TestWindow {
             text_input_configurations: Vec::new(),
             text_input_state_changes: Vec::new(),
             is_fullscreen: false,
-            // Preserve the test platform's historical 2x default.
             scale_factor: 2.0,
             appearance: WindowAppearance::Light,
             external_drag_files: Vec::new(),
@@ -207,7 +203,6 @@ impl TestWindow {
         self.0.lock().virtual_keyboard_dismissals
     }
 
-    /// Every [`TextInputConfiguration`] forwarded to this window, in order.
     pub fn text_input_configurations(&self) -> Vec<TextInputConfiguration> {
         self.0.lock().text_input_configurations.clone()
     }
@@ -219,7 +214,6 @@ impl TestWindow {
     pub fn simulate_resize(&mut self, size: Size<Pixels>) {
         let scale_factor = self.scale_factor();
         let mut lock = self.0.lock();
-        // Always update bounds, even if no callback is registered
         lock.bounds.size = size;
         let Some(mut callback) = lock.resize_callback.take() else {
             return;
@@ -229,7 +223,6 @@ impl TestWindow {
         self.0.lock().resize_callback = Some(callback);
     }
 
-    /// Simulates a display scale change through the resize callback, preserving logical bounds.
     pub fn simulate_scale_factor_change(&mut self, scale_factor: f32) {
         let size = {
             let mut lock = self.0.lock();
@@ -282,13 +275,10 @@ impl TestWindow {
         self.0.lock().frame_delay
     }
 
-    /// Returns how many times this window's frame waker has been invoked.
     pub fn frame_wake_count(&self) -> usize {
         self.0.lock().frame_wake_count.get()
     }
 
-    /// Delivers a frame request to the window, as the platform's frame source
-    /// would.
     pub fn simulate_frame_request(&self, options: RequestFrameOptions) {
         let mut lock = self.0.lock();
         let Some(mut callback) = lock.request_frame_callback.take() else {
@@ -496,7 +486,6 @@ impl PlatformWindow for TestWindow {
     }
 
     fn frame_waker(&self) -> Option<Rc<dyn Fn()>> {
-        // Tests can inspect wakes without delivering a frame synchronously.
         let frame_wake_count = self.0.lock().frame_wake_count.clone();
         #[cfg(feature = "bench-support")]
         let window = Rc::downgrade(&self.0);

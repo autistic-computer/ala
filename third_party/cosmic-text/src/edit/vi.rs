@@ -19,7 +19,6 @@ fn undo_2_action<'buffer, E: Edit<'buffer>>(
             editor.apply_change(change);
         }
         cosmic_undo_2::Action::Undo(change) => {
-            //TODO: make this more efficient
             let mut reversed = change.clone();
             reversed.reverse();
             editor.apply_change(&reversed);
@@ -33,7 +32,6 @@ fn finish_change<'buffer, E: Edit<'buffer>>(
     changed: &mut bool,
     pivot: Option<usize>,
 ) -> Option<Change> {
-    //TODO: join changes together
     match editor.finish_change() {
         Some(change) => {
             if !change.items.is_empty() {
@@ -46,20 +44,10 @@ fn finish_change<'buffer, E: Edit<'buffer>>(
     }
 }
 
-/// Evaluate if an [`ViEditor`] changed based on its last saved state.
 fn eval_changed(commands: &cosmic_undo_2::Commands<Change>, pivot: Option<usize>) -> bool {
-    // Editors are considered modified if the current change index is unequal to the last
-    // saved index or if `pivot` is None.
-    // The latter case handles a never saved editor with a current command index of None.
-    // Check the unit tests for an example.
     match (commands.current_command_index(), pivot) {
         (Some(current), Some(pivot)) => current != pivot,
-        // Edge case for an editor with neither a save point nor any changes.
-        // This could be a new editor or an editor without a save point where undo() is called
-        // until the editor is fresh.
         (None, None) => false,
-        // Default to true because it's safer to assume a buffer has been modified so as to not
-        // lose changes
         _ => true,
     }
 }
@@ -117,10 +105,8 @@ fn search<'buffer, E: Edit<'buffer>>(editor: &mut E, value: &str, forwards: bool
 }
 
 fn select_in<'buffer, E: Edit<'buffer>>(editor: &mut E, start_c: char, end_c: char, include: bool) {
-    // Find the largest encompasing object, or if there is none, find the next one.
     let cursor = editor.cursor();
     let (start, end) = editor.with_buffer(|buffer| {
-        // Search forwards for isolated end character, counting start and end characters found
         let mut end = cursor;
         let mut starts = 0;
         let mut ends = 0;
@@ -146,7 +132,6 @@ fn select_in<'buffer, E: Edit<'buffer>>(editor: &mut E, start_c: char, end_c: ch
             }
         }
 
-        // Search backwards to resolve starts and ends
         let mut start = cursor;
         'find_start: loop {
             let line = &buffer.lines[start.line];
@@ -203,15 +188,10 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
         }
     }
 
-    /// Modifies the theme of the [`SyntaxEditor`], returning false if the theme is missing
     pub fn update_theme(&mut self, theme_name: &str) -> bool {
         self.editor.update_theme(theme_name)
     }
 
-    /// Load text from a file, and also set syntax to the best option
-    ///
-    /// ## Errors
-    /// Returns an `io::Error` if reading the file fails
     #[cfg(feature = "std")]
     pub fn load_text<P: AsRef<std::path::Path>>(
         &mut self,
@@ -222,56 +202,39 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
         self.editor.load_text(font_system, path, attrs)
     }
 
-    /// Get the default background color
     pub fn background_color(&self) -> Color {
         self.editor.background_color()
     }
 
-    /// Get the default foreground (text) color
     pub fn foreground_color(&self) -> Color {
         self.editor.foreground_color()
     }
 
-    /// Get the default cursor color
     pub fn cursor_color(&self) -> Color {
         self.editor.cursor_color()
     }
 
-    /// Get the default selection color
     pub fn selection_color(&self) -> Color {
         self.editor.selection_color()
     }
 
-    /// Get the current syntect theme
     pub fn theme(&self) -> &SyntaxTheme {
         self.editor.theme()
     }
 
-    /// Get changed flag
     pub fn changed(&self) -> bool {
         self.changed
     }
 
-    /// Set changed flag
     pub fn set_changed(&mut self, changed: bool) {
         self.changed = changed;
     }
 
-    /// Set current change as the save (or pivot) point.
-    ///
-    /// A pivot point is the last saved index. Anything before or after the pivot indicates that
-    /// the editor has been changed or is unsaved.
-    ///
-    /// Undoing changes down to the pivot point sets the editor as unchanged.
-    /// Redoing changes up to the pivot point sets the editor as unchanged.
-    ///
-    /// Undoing or redoing changes beyond the pivot point sets the editor to changed.
     pub fn save_point(&mut self) {
         self.save_pivot = Some(self.commands.current_command_index().unwrap_or_default());
         self.changed = false;
     }
 
-    /// Set passthrough mode (true will turn off vi features)
     pub fn set_passthrough(&mut self, passthrough: bool) {
         if passthrough != self.passthrough {
             self.passthrough = passthrough;
@@ -279,12 +242,10 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
         }
     }
 
-    /// Get current vi parser
     pub fn parser(&self) -> &ViParser {
         &self.parser
     }
 
-    /// Redo a change
     pub fn redo(&mut self) {
         log::debug!("Redo");
         for action in self.commands.redo() {
@@ -293,7 +254,6 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
         self.changed = eval_changed(&self.commands, self.save_pivot);
     }
 
-    /// Undo a change
     pub fn undo(&mut self) {
         log::debug!("Undo");
         for action in self.commands.undo() {
@@ -302,9 +262,6 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
         self.changed = eval_changed(&self.commands, self.save_pivot);
     }
 
-    /// Draw the editor.
-    ///
-    /// Automatically resolves any pending dirty state before drawing.
     #[cfg(feature = "swash")]
     pub fn draw<F>(
         &mut self,
@@ -323,10 +280,6 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
         self.render(&mut renderer);
     }
 
-    /// Render the editor using the provided renderer.
-    ///
-    /// The caller is responsible for calling [`Edit::shape_as_needed`] first
-    /// to ensure layout is up to date.
     pub fn render<R: Renderer>(&self, renderer: &mut R) {
         let background_color = self.background_color();
         let foreground_color = self.foreground_color();
@@ -347,12 +300,10 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
                 let line_height = run.line_height;
 
                 let cursor_glyph_opt = |cursor: &Cursor| -> Option<(usize, f32, f32)> {
-                    //TODO: better calculation of width
                     let default_width = font_size / 2.0;
                     if cursor.line == line_i {
                         for (glyph_i, glyph) in run.glyphs.iter().enumerate() {
                             if cursor.index >= glyph.start && cursor.index < glyph.end {
-                                // Guess x offset based on characters
                                 let mut before = 0;
                                 let mut total = 0;
 
@@ -383,12 +334,10 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
                     None
                 };
 
-                // Highlight selection
                 if let Some((start, end)) = self.selection_bounds() {
                     if line_i >= start.line && line_i <= end.line {
                         let mut range_opt = None;
                         for glyph in run.glyphs.iter() {
-                            // Guess x offset based on characters
                             let cluster = &run.text[glyph.start..glyph.end];
                             let total = cluster.grapheme_indices(true).count();
                             let mut c_x = glyph.x;
@@ -420,13 +369,11 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
                         }
 
                         if run.glyphs.is_empty() && end.line > line_i {
-                            // Highlight all of internal empty lines
                             range_opt = Some((0, buffer.size().0.unwrap_or(0.0) as i32));
                         }
 
                         if let Some((mut min, mut max)) = range_opt.take() {
                             if end.line > line_i {
-                                // Draw to end of line
                                 if run.rtl {
                                     min = 0;
                                 } else {
@@ -444,7 +391,6 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
                     }
                 }
 
-                // Draw cursor
                 if let Some((cursor_glyph, cursor_glyph_offset, cursor_glyph_width)) =
                     cursor_glyph_opt(&self.cursor())
                 {
@@ -453,13 +399,12 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
                     } else {
                         match self.parser.mode {
                             ViMode::Insert | ViMode::Replace => false,
-                            _ => true, /*TODO: determine block cursor in other modes*/
+                            _ => true,
                         }
                     };
 
                     let (start_x, end_x) = match run.glyphs.get(cursor_glyph) {
                         Some(glyph) => {
-                            // Start of detected glyph
                             if glyph.level.is_rtl() {
                                 (
                                     (glyph.x + glyph.w - cursor_glyph_offset) as i32,
@@ -475,7 +420,6 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
                         }
                         None => match run.glyphs.last() {
                             Some(glyph) => {
-                                // End of last glyph
                                 if glyph.level.is_rtl() {
                                     (glyph.x as i32, (glyph.x - cursor_glyph_width) as i32)
                                 } else {
@@ -485,10 +429,7 @@ impl<'syntax_system, 'buffer> ViEditor<'syntax_system, 'buffer> {
                                     )
                                 }
                             }
-                            None => {
-                                // Start of empty line
-                                (0, cursor_glyph_width as i32)
-                            }
+                            None => (0, cursor_glyph_width as i32),
                         },
                     };
 
@@ -611,12 +552,10 @@ impl<'buffer> Edit<'buffer> for ViEditor<'_, 'buffer> {
 
         let editor = &mut self.editor;
 
-        // Ensure a change is always started
         editor.start_change();
 
         if self.passthrough {
             editor.action(font_system, action);
-            // Always finish change when passing through (TODO: group changes)
             finish_change(
                 editor,
                 &mut self.commands,
@@ -627,7 +566,6 @@ impl<'buffer> Edit<'buffer> for ViEditor<'_, 'buffer> {
         }
 
         let key = match action {
-            //TODO: this leaves lots of room for issues in translation, should we directly accept Key?
             Action::Backspace => Key::Backspace,
             Action::Delete => Key::Delete,
             Action::Motion(Motion::Down) => Key::Down,
@@ -646,7 +584,6 @@ impl<'buffer> Edit<'buffer> for ViEditor<'_, 'buffer> {
             _ => {
                 log::debug!("Pass through action {action:?}");
                 editor.action(font_system, action);
-                // Always finish change when passing through (TODO: group changes)
                 finish_change(
                     editor,
                     &mut self.commands,
@@ -725,25 +662,19 @@ impl<'buffer> Edit<'buffer> for ViEditor<'_, 'buffer> {
                                 Selection::Line(_) => {
                                     let mut cursor = editor.cursor();
                                     if after {
-                                        // Insert at next line
                                         cursor.line += 1;
                                     } else {
-                                        // Previous line will be moved down, so set cursor to next line
                                         cursor.line += 1;
                                         editor.set_cursor(cursor);
                                         cursor.line -= 1;
                                     }
-                                    // Insert at start of line
                                     cursor.index = 0;
 
-                                    // Insert text
                                     editor.insert_at(cursor, "\n", None);
                                     editor.insert_at(cursor, data, None);
 
-                                    //TODO: Hack to allow immediate up/down
                                     editor.shape_as_needed(font_system, false);
 
-                                    // Move to inserted line, preserving cursor x position
                                     if after {
                                         editor.action(font_system, Action::Motion(Motion::Down));
                                     } else {
@@ -790,7 +721,6 @@ impl<'buffer> Edit<'buffer> for ViEditor<'_, 'buffer> {
                                 if search(editor, value, forwards) {
                                     let mut cursor = editor.cursor();
                                     editor.set_selection(Selection::Normal(cursor));
-                                    //TODO: traverse lines if necessary
                                     cursor.index += value.len();
                                     editor.set_cursor(cursor);
                                 }
@@ -812,9 +742,7 @@ impl<'buffer> Edit<'buffer> for ViEditor<'_, 'buffer> {
                                         selection = Selection::Normal(cursor);
                                         cursor.index += w.len();
                                     }
-                                    None => {
-                                        //TODO
-                                    }
+                                    None => {}
                                 }
                             });
                             editor.set_selection(selection);
@@ -848,305 +776,271 @@ impl<'buffer> Edit<'buffer> for ViEditor<'_, 'buffer> {
                     }
                     return;
                 }
-                Event::Motion(motion) => {
-                    match motion {
-                        modit::Motion::Around => {
-                            //TODO: what to do for this psuedo-motion?
-                            return;
-                        }
-                        modit::Motion::Down => Action::Motion(Motion::Down),
-                        modit::Motion::End => Action::Motion(Motion::End),
-                        modit::Motion::GotoLine(line) => {
-                            Action::Motion(Motion::GotoLine(line.saturating_sub(1)))
-                        }
-                        modit::Motion::GotoEof => Action::Motion(Motion::GotoLine(
-                            editor.with_buffer(|buffer| buffer.lines.len().saturating_sub(1)),
-                        )),
-                        modit::Motion::Home => Action::Motion(Motion::Home),
-                        modit::Motion::Inside => {
-                            //TODO: what to do for this psuedo-motion?
-                            return;
-                        }
-                        modit::Motion::Left => Action::Motion(Motion::Left),
-                        modit::Motion::LeftInLine => {
-                            let cursor = editor.cursor();
-                            if cursor.index > 0 {
-                                Action::Motion(Motion::Left)
-                            } else {
-                                return;
-                            }
-                        }
-                        modit::Motion::Line => {
-                            //TODO: what to do for this psuedo-motion?
-                            return;
-                        }
-                        modit::Motion::NextChar(find_c) => {
-                            let mut cursor = editor.cursor();
-                            editor.with_buffer(|buffer| {
-                                let text = buffer.lines[cursor.line].text();
-                                if cursor.index < text.len() {
-                                    if let Some((i, _)) = text[cursor.index..]
-                                        .char_indices()
-                                        .find(|&(i, c)| i > 0 && c == find_c)
-                                    {
-                                        cursor.index += i;
-                                    }
-                                }
-                            });
-                            editor.set_cursor(cursor);
-                            return;
-                        }
-                        modit::Motion::NextCharTill(find_c) => {
-                            let mut cursor = editor.cursor();
-                            editor.with_buffer(|buffer| {
-                                let text = buffer.lines[cursor.line].text();
-                                if cursor.index < text.len() {
-                                    let mut last_i = 0;
-                                    for (i, c) in text[cursor.index..].char_indices() {
-                                        if last_i > 0 && c == find_c {
-                                            cursor.index += last_i;
-                                            break;
-                                        } else {
-                                            last_i = i;
-                                        }
-                                    }
-                                }
-                            });
-                            editor.set_cursor(cursor);
-                            return;
-                        }
-                        modit::Motion::NextSearch => match &self.search_opt {
-                            Some((value, forwards)) => {
-                                search(editor, value, *forwards);
-                                return;
-                            }
-                            None => return,
-                        },
-                        modit::Motion::NextWordEnd(word) => {
-                            let mut cursor = editor.cursor();
-                            editor.with_buffer(|buffer| {
-                                loop {
-                                    let text = buffer.lines[cursor.line].text();
-                                    if cursor.index < text.len() {
-                                        cursor.index = WordIter::new(text, word)
-                                            .map(|(i, w)| {
-                                                i + w
-                                                    .char_indices()
-                                                    .last()
-                                                    .map(|(i, _)| i)
-                                                    .unwrap_or(0)
-                                            })
-                                            .find(|&i| i > cursor.index)
-                                            .unwrap_or(text.len());
-                                        if cursor.index == text.len() {
-                                            // Try again, searching next line
-                                            continue;
-                                        }
-                                    } else if cursor.line + 1 < buffer.lines.len() {
-                                        // Go to next line and rerun loop
-                                        cursor.line += 1;
-                                        cursor.index = 0;
-                                        continue;
-                                    }
-                                    break;
-                                }
-                            });
-                            editor.set_cursor(cursor);
-                            return;
-                        }
-                        modit::Motion::NextWordStart(word) => {
-                            let mut cursor = editor.cursor();
-                            editor.with_buffer(|buffer| {
-                                loop {
-                                    let text = buffer.lines[cursor.line].text();
-                                    if cursor.index < text.len() {
-                                        cursor.index = WordIter::new(text, word)
-                                            .map(|(i, _)| i)
-                                            .find(|&i| i > cursor.index)
-                                            .unwrap_or(text.len());
-                                        if cursor.index == text.len() {
-                                            // Try again, searching next line
-                                            continue;
-                                        }
-                                    } else if cursor.line + 1 < buffer.lines.len() {
-                                        // Go to next line and rerun loop
-                                        cursor.line += 1;
-                                        cursor.index = 0;
-                                        continue;
-                                    }
-                                    break;
-                                }
-                            });
-                            editor.set_cursor(cursor);
-                            return;
-                        }
-                        modit::Motion::PageDown => Action::Motion(Motion::PageDown),
-                        modit::Motion::PageUp => Action::Motion(Motion::PageUp),
-                        modit::Motion::PreviousChar(find_c) => {
-                            let mut cursor = editor.cursor();
-                            editor.with_buffer(|buffer| {
-                                let text = buffer.lines[cursor.line].text();
-                                if cursor.index > 0 {
-                                    if let Some((i, _)) = text[..cursor.index]
-                                        .char_indices()
-                                        .rfind(|&(_, c)| c == find_c)
-                                    {
-                                        cursor.index = i;
-                                    }
-                                }
-                            });
-                            editor.set_cursor(cursor);
-                            return;
-                        }
-                        modit::Motion::PreviousCharTill(find_c) => {
-                            let mut cursor = editor.cursor();
-                            editor.with_buffer(|buffer| {
-                                let text = buffer.lines[cursor.line].text();
-                                if cursor.index > 0 {
-                                    if let Some(i) = text[..cursor.index]
-                                        .char_indices()
-                                        .filter_map(|(i, c)| {
-                                            if c == find_c {
-                                                let end = i + c.len_utf8();
-                                                if end < cursor.index {
-                                                    return Some(end);
-                                                }
-                                            }
-                                            None
-                                        })
-                                        .next_back()
-                                    {
-                                        cursor.index = i;
-                                    }
-                                }
-                            });
-                            editor.set_cursor(cursor);
-                            return;
-                        }
-                        modit::Motion::PreviousSearch => match &self.search_opt {
-                            Some((value, forwards)) => {
-                                search(editor, value, !*forwards);
-                                return;
-                            }
-                            None => return,
-                        },
-                        modit::Motion::PreviousWordEnd(word) => {
-                            let mut cursor = editor.cursor();
-                            editor.with_buffer(|buffer| {
-                                loop {
-                                    let text = buffer.lines[cursor.line].text();
-                                    if cursor.index > 0 {
-                                        cursor.index = WordIter::new(text, word)
-                                            .map(|(i, w)| {
-                                                i + w
-                                                    .char_indices()
-                                                    .last()
-                                                    .map(|(i, _)| i)
-                                                    .unwrap_or(0)
-                                            })
-                                            .filter(|&i| i < cursor.index)
-                                            .last()
-                                            .unwrap_or(0);
-                                        if cursor.index == 0 {
-                                            // Try again, searching previous line
-                                            continue;
-                                        }
-                                    } else if cursor.line > 0 {
-                                        // Go to previous line and rerun loop
-                                        cursor.line -= 1;
-                                        cursor.index = buffer.lines[cursor.line].text().len();
-                                        continue;
-                                    }
-                                    break;
-                                }
-                            });
-                            editor.set_cursor(cursor);
-                            return;
-                        }
-                        modit::Motion::PreviousWordStart(word) => {
-                            let mut cursor = editor.cursor();
-                            editor.with_buffer(|buffer| {
-                                loop {
-                                    let text = buffer.lines[cursor.line].text();
-                                    if cursor.index > 0 {
-                                        cursor.index = WordIter::new(text, word)
-                                            .map(|(i, _)| i)
-                                            .filter(|&i| i < cursor.index)
-                                            .last()
-                                            .unwrap_or(0);
-                                        if cursor.index == 0 {
-                                            // Try again, searching previous line
-                                            continue;
-                                        }
-                                    } else if cursor.line > 0 {
-                                        // Go to previous line and rerun loop
-                                        cursor.line -= 1;
-                                        cursor.index = buffer.lines[cursor.line].text().len();
-                                        continue;
-                                    }
-                                    break;
-                                }
-                            });
-                            editor.set_cursor(cursor);
-                            return;
-                        }
-                        modit::Motion::Right => Action::Motion(Motion::Right),
-                        modit::Motion::RightInLine => {
-                            let cursor = editor.cursor();
-                            if cursor.index
-                                < editor
-                                    .with_buffer(|buffer| buffer.lines[cursor.line].text().len())
-                            {
-                                Action::Motion(Motion::Right)
-                            } else {
-                                return;
-                            }
-                        }
-                        modit::Motion::ScreenHigh => {
-                            //TODO: is this efficient?
-                            if let Some(line_i) = editor.with_buffer(|buffer| {
-                                buffer.layout_runs().next().map(|first| first.line_i)
-                            }) {
-                                Action::Motion(Motion::GotoLine(line_i))
-                            } else {
-                                return;
-                            }
-                        }
-                        modit::Motion::ScreenLow => {
-                            //TODO: is this efficient?
-                            if let Some(line_i) = editor.with_buffer(|buffer| {
-                                buffer.layout_runs().last().map(|last| last.line_i)
-                            }) {
-                                Action::Motion(Motion::GotoLine(line_i))
-                            } else {
-                                return;
-                            }
-                        }
-                        modit::Motion::ScreenMiddle => {
-                            //TODO: is this efficient?
-                            let action_opt = editor.with_buffer(|buffer| {
-                                let mut layout_runs = buffer.layout_runs();
-
-                                match (layout_runs.next(), layout_runs.last()) {
-                                    (Some(first), Some(last)) => Some(Action::Motion(
-                                        Motion::GotoLine((last.line_i + first.line_i) / 2),
-                                    )),
-                                    _ => None,
-                                }
-                            });
-                            match action_opt {
-                                Some(action) => action,
-                                None => return,
-                            }
-                        }
-                        modit::Motion::Selection => {
-                            //TODO: what to do for this psuedo-motion?
-                            return;
-                        }
-                        modit::Motion::SoftHome => Action::Motion(Motion::SoftHome),
-                        modit::Motion::Up => Action::Motion(Motion::Up),
+                Event::Motion(motion) => match motion {
+                    modit::Motion::Around => {
+                        return;
                     }
-                }
+                    modit::Motion::Down => Action::Motion(Motion::Down),
+                    modit::Motion::End => Action::Motion(Motion::End),
+                    modit::Motion::GotoLine(line) => {
+                        Action::Motion(Motion::GotoLine(line.saturating_sub(1)))
+                    }
+                    modit::Motion::GotoEof => Action::Motion(Motion::GotoLine(
+                        editor.with_buffer(|buffer| buffer.lines.len().saturating_sub(1)),
+                    )),
+                    modit::Motion::Home => Action::Motion(Motion::Home),
+                    modit::Motion::Inside => {
+                        return;
+                    }
+                    modit::Motion::Left => Action::Motion(Motion::Left),
+                    modit::Motion::LeftInLine => {
+                        let cursor = editor.cursor();
+                        if cursor.index > 0 {
+                            Action::Motion(Motion::Left)
+                        } else {
+                            return;
+                        }
+                    }
+                    modit::Motion::Line => {
+                        return;
+                    }
+                    modit::Motion::NextChar(find_c) => {
+                        let mut cursor = editor.cursor();
+                        editor.with_buffer(|buffer| {
+                            let text = buffer.lines[cursor.line].text();
+                            if cursor.index < text.len() {
+                                if let Some((i, _)) = text[cursor.index..]
+                                    .char_indices()
+                                    .find(|&(i, c)| i > 0 && c == find_c)
+                                {
+                                    cursor.index += i;
+                                }
+                            }
+                        });
+                        editor.set_cursor(cursor);
+                        return;
+                    }
+                    modit::Motion::NextCharTill(find_c) => {
+                        let mut cursor = editor.cursor();
+                        editor.with_buffer(|buffer| {
+                            let text = buffer.lines[cursor.line].text();
+                            if cursor.index < text.len() {
+                                let mut last_i = 0;
+                                for (i, c) in text[cursor.index..].char_indices() {
+                                    if last_i > 0 && c == find_c {
+                                        cursor.index += last_i;
+                                        break;
+                                    } else {
+                                        last_i = i;
+                                    }
+                                }
+                            }
+                        });
+                        editor.set_cursor(cursor);
+                        return;
+                    }
+                    modit::Motion::NextSearch => match &self.search_opt {
+                        Some((value, forwards)) => {
+                            search(editor, value, *forwards);
+                            return;
+                        }
+                        None => return,
+                    },
+                    modit::Motion::NextWordEnd(word) => {
+                        let mut cursor = editor.cursor();
+                        editor.with_buffer(|buffer| loop {
+                            let text = buffer.lines[cursor.line].text();
+                            if cursor.index < text.len() {
+                                cursor.index = WordIter::new(text, word)
+                                    .map(|(i, w)| {
+                                        i + w.char_indices().last().map(|(i, _)| i).unwrap_or(0)
+                                    })
+                                    .find(|&i| i > cursor.index)
+                                    .unwrap_or(text.len());
+                                if cursor.index == text.len() {
+                                    continue;
+                                }
+                            } else if cursor.line + 1 < buffer.lines.len() {
+                                cursor.line += 1;
+                                cursor.index = 0;
+                                continue;
+                            }
+                            break;
+                        });
+                        editor.set_cursor(cursor);
+                        return;
+                    }
+                    modit::Motion::NextWordStart(word) => {
+                        let mut cursor = editor.cursor();
+                        editor.with_buffer(|buffer| loop {
+                            let text = buffer.lines[cursor.line].text();
+                            if cursor.index < text.len() {
+                                cursor.index = WordIter::new(text, word)
+                                    .map(|(i, _)| i)
+                                    .find(|&i| i > cursor.index)
+                                    .unwrap_or(text.len());
+                                if cursor.index == text.len() {
+                                    continue;
+                                }
+                            } else if cursor.line + 1 < buffer.lines.len() {
+                                cursor.line += 1;
+                                cursor.index = 0;
+                                continue;
+                            }
+                            break;
+                        });
+                        editor.set_cursor(cursor);
+                        return;
+                    }
+                    modit::Motion::PageDown => Action::Motion(Motion::PageDown),
+                    modit::Motion::PageUp => Action::Motion(Motion::PageUp),
+                    modit::Motion::PreviousChar(find_c) => {
+                        let mut cursor = editor.cursor();
+                        editor.with_buffer(|buffer| {
+                            let text = buffer.lines[cursor.line].text();
+                            if cursor.index > 0 {
+                                if let Some((i, _)) = text[..cursor.index]
+                                    .char_indices()
+                                    .rfind(|&(_, c)| c == find_c)
+                                {
+                                    cursor.index = i;
+                                }
+                            }
+                        });
+                        editor.set_cursor(cursor);
+                        return;
+                    }
+                    modit::Motion::PreviousCharTill(find_c) => {
+                        let mut cursor = editor.cursor();
+                        editor.with_buffer(|buffer| {
+                            let text = buffer.lines[cursor.line].text();
+                            if cursor.index > 0 {
+                                if let Some(i) = text[..cursor.index]
+                                    .char_indices()
+                                    .filter_map(|(i, c)| {
+                                        if c == find_c {
+                                            let end = i + c.len_utf8();
+                                            if end < cursor.index {
+                                                return Some(end);
+                                            }
+                                        }
+                                        None
+                                    })
+                                    .next_back()
+                                {
+                                    cursor.index = i;
+                                }
+                            }
+                        });
+                        editor.set_cursor(cursor);
+                        return;
+                    }
+                    modit::Motion::PreviousSearch => match &self.search_opt {
+                        Some((value, forwards)) => {
+                            search(editor, value, !*forwards);
+                            return;
+                        }
+                        None => return,
+                    },
+                    modit::Motion::PreviousWordEnd(word) => {
+                        let mut cursor = editor.cursor();
+                        editor.with_buffer(|buffer| loop {
+                            let text = buffer.lines[cursor.line].text();
+                            if cursor.index > 0 {
+                                cursor.index = WordIter::new(text, word)
+                                    .map(|(i, w)| {
+                                        i + w.char_indices().last().map(|(i, _)| i).unwrap_or(0)
+                                    })
+                                    .filter(|&i| i < cursor.index)
+                                    .last()
+                                    .unwrap_or(0);
+                                if cursor.index == 0 {
+                                    continue;
+                                }
+                            } else if cursor.line > 0 {
+                                cursor.line -= 1;
+                                cursor.index = buffer.lines[cursor.line].text().len();
+                                continue;
+                            }
+                            break;
+                        });
+                        editor.set_cursor(cursor);
+                        return;
+                    }
+                    modit::Motion::PreviousWordStart(word) => {
+                        let mut cursor = editor.cursor();
+                        editor.with_buffer(|buffer| loop {
+                            let text = buffer.lines[cursor.line].text();
+                            if cursor.index > 0 {
+                                cursor.index = WordIter::new(text, word)
+                                    .map(|(i, _)| i)
+                                    .filter(|&i| i < cursor.index)
+                                    .last()
+                                    .unwrap_or(0);
+                                if cursor.index == 0 {
+                                    continue;
+                                }
+                            } else if cursor.line > 0 {
+                                cursor.line -= 1;
+                                cursor.index = buffer.lines[cursor.line].text().len();
+                                continue;
+                            }
+                            break;
+                        });
+                        editor.set_cursor(cursor);
+                        return;
+                    }
+                    modit::Motion::Right => Action::Motion(Motion::Right),
+                    modit::Motion::RightInLine => {
+                        let cursor = editor.cursor();
+                        if cursor.index
+                            < editor.with_buffer(|buffer| buffer.lines[cursor.line].text().len())
+                        {
+                            Action::Motion(Motion::Right)
+                        } else {
+                            return;
+                        }
+                    }
+                    modit::Motion::ScreenHigh => {
+                        if let Some(line_i) = editor.with_buffer(|buffer| {
+                            buffer.layout_runs().next().map(|first| first.line_i)
+                        }) {
+                            Action::Motion(Motion::GotoLine(line_i))
+                        } else {
+                            return;
+                        }
+                    }
+                    modit::Motion::ScreenLow => {
+                        if let Some(line_i) = editor.with_buffer(|buffer| {
+                            buffer.layout_runs().last().map(|last| last.line_i)
+                        }) {
+                            Action::Motion(Motion::GotoLine(line_i))
+                        } else {
+                            return;
+                        }
+                    }
+                    modit::Motion::ScreenMiddle => {
+                        let action_opt = editor.with_buffer(|buffer| {
+                            let mut layout_runs = buffer.layout_runs();
+
+                            match (layout_runs.next(), layout_runs.last()) {
+                                (Some(first), Some(last)) => Some(Action::Motion(
+                                    Motion::GotoLine((last.line_i + first.line_i) / 2),
+                                )),
+                                _ => None,
+                            }
+                        });
+                        match action_opt {
+                            Some(action) => action,
+                            None => return,
+                        }
+                    }
+                    modit::Motion::Selection => {
+                        return;
+                    }
+                    modit::Motion::SoftHome => Action::Motion(Motion::SoftHome),
+                    modit::Motion::Up => Action::Motion(Motion::Up),
+                },
             };
             editor.action(font_system, action);
         });
@@ -1158,10 +1052,6 @@ impl<'buffer> Edit<'buffer> for ViEditor<'_, 'buffer> {
 }
 
 impl BorrowedWithFontSystem<'_, ViEditor<'_, '_>> {
-    /// Load text from a file, and also set syntax to the best option
-    ///
-    /// ## Errors
-    /// Returns an `io::Error` if reading the file fails
     #[cfg(feature = "std")]
     pub fn load_text<P: AsRef<std::path::Path>>(
         &mut self,

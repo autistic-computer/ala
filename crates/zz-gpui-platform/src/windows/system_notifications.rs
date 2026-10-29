@@ -1,5 +1,3 @@
-//! System notifications as Windows toast notifications.
-
 use std::cell::RefCell;
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::hash::{Hash as _, Hasher as _};
@@ -53,8 +51,6 @@ impl SystemNotificationState {
 
         let document = toast_document(&notification)?;
         let toast = ToastNotification::CreateToastNotification(&document)?;
-        // Windows caps toast tags at 64 characters (post-Creators Update),
-        // so hash the arbitrary GPUI tag down to a fixed-width value.
         let tag = {
             let mut hasher = DefaultHasher::new();
             notification.tag.hash(&mut hasher);
@@ -113,9 +109,6 @@ impl SystemNotificationState {
             let callback = self.callback.clone();
             self._response_task = Some(executor.spawn(async move {
                 while let Some(response) = receiver.next().await {
-                    // Take the callback out for the call: it may re-enter the
-                    // platform (e.g. to dismiss the notification it was told
-                    // about) or replace itself.
                     let taken = callback.borrow_mut().take();
                     if let Some(mut taken) = taken {
                         taken(response);
@@ -187,7 +180,6 @@ fn toast_document(notification: &SystemNotification) -> windows::core::Result<Xm
     Ok(document)
 }
 
-/// Registers the app's AUMID so toasts display correctly for an unpackaged app without a Start Menu shortcut.
 fn register_app_user_model_id(app_identifier: &str, app_name: &str) {
     let result = windows_registry::CURRENT_USER
         .create(format!(r"Software\Classes\AppUserModelId\{app_identifier}"))

@@ -9,12 +9,9 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering::SeqCst},
 };
 
-/// A source of assets for this app to use.
 pub trait AssetSource: 'static + Send + Sync {
-    /// Load the given asset from the source path.
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>>;
 
-    /// List the assets at the given path.
     fn list(&self, path: &str) -> Result<Vec<SharedString>>;
 }
 
@@ -28,22 +25,17 @@ impl AssetSource for () {
     }
 }
 
-/// A unique identifier for the image cache
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ImageId(pub usize);
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-#[expect(missing_docs)]
 pub struct RenderImageParams {
     pub image_id: ImageId,
     pub frame_index: usize,
 }
 
-/// A cached and processed image, in BGRA format
 pub struct RenderImage {
-    /// The ID associated with this image
     pub id: ImageId,
-    /// The scale factor of this image on render.
     pub(crate) scale_factor: f32,
     data: SmallVec<[Frame; 1]>,
 }
@@ -57,7 +49,6 @@ impl PartialEq for RenderImage {
 impl Eq for RenderImage {}
 
 impl RenderImage {
-    /// Create a new image from the given data.
     pub fn new(data: impl Into<SmallVec<[Frame; 1]>>) -> Self {
         static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -68,22 +59,16 @@ impl RenderImage {
         }
     }
 
-    /// Convert this image into a byte slice.
     pub fn as_bytes(&self, frame_index: usize) -> Option<&[u8]> {
         self.data
             .get(frame_index)
             .map(|frame| frame.buffer().as_raw().as_slice())
     }
 
-    /// Consume this image, returning its underlying frames.
-    ///
-    /// Lets a caller holding the last reference reclaim the frame buffers
-    /// (e.g. to recycle large streaming allocations) instead of dropping them.
     pub fn into_frames(self) -> SmallVec<[Frame; 1]> {
         self.data
     }
 
-    /// Get the size of this image, in pixels.
     pub fn size(&self, frame_index: usize) -> Size<DevicePixels> {
         self.data
             .get(frame_index)
@@ -94,13 +79,11 @@ impl RenderImage {
             .unwrap_or_default()
     }
 
-    /// Get the size of this image, in pixels for display, adjusted for the scale factor.
     pub(crate) fn render_size(&self, frame_index: usize) -> Size<Pixels> {
         self.size(frame_index)
             .map(|v| (v.0 as f32 / self.scale_factor).into())
     }
 
-    /// Get the delay of this frame from the previous
     pub fn delay(&self, frame_index: usize) -> Delay {
         self.data
             .get(frame_index)
@@ -108,7 +91,6 @@ impl RenderImage {
             .unwrap_or(Delay::from_numer_denom_ms(100, 1))
     }
 
-    /// Get the number of frames for this image.
     pub fn frame_count(&self) -> usize {
         self.data.len()
     }

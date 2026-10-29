@@ -147,20 +147,14 @@ impl Render for Shadow {
                         .w_full()
                         .children(vec![
                             example("None", Shadow::base()),
-                            // 2Xsmall shadow
                             example("2X Small", Shadow::base().shadow_2xs()),
-                            // Xsmall shadow
                             example("Extra Small", Shadow::base().shadow_xs()),
-                            // Small shadow
                             example("Small", Shadow::base().shadow_sm()),
-                            // Medium shadow
                             example("Medium", Shadow::base().shadow_md()),
-                            // Large shadow
                             example("Large", Shadow::base().shadow_lg()),
                             example("Extra Large", Shadow::base().shadow_xl()),
                             example("2X Large", Shadow::base().shadow_2xl()),
                         ]),
-                    // Horizontal list of increasing blur radii
                     div()
                         .border_b_1()
                         .border_color(hsla(0.0, 0.0, 0.0, 1.0))
@@ -203,7 +197,6 @@ impl Render for Shadow {
                                 ]),
                             ),
                         ]),
-                    // Horizontal list of increasing spread radii
                     div()
                         .border_b_1()
                         .border_color(hsla(0.0, 0.0, 0.0, 1.0))
@@ -249,7 +242,6 @@ impl Render for Shadow {
                                 ]),
                             ),
                         ]),
-                    // Square spread examples
                     div()
                         .border_b_1()
                         .border_color(hsla(0.0, 0.0, 0.0, 1.0))
@@ -279,7 +271,6 @@ impl Render for Shadow {
                                 ]),
                             ),
                         ]),
-                    // Rounded large spread examples
                     div()
                         .border_b_1()
                         .border_color(hsla(0.0, 0.0, 0.0, 1.0))
@@ -309,7 +300,6 @@ impl Render for Shadow {
                                 ]),
                             ),
                         ]),
-                    // Directional shadows
                     div()
                         .border_b_1()
                         .border_color(hsla(0.0, 0.0, 0.0, 1.0))
@@ -344,7 +334,6 @@ impl Render for Shadow {
                                 ]),
                             ),
                         ]),
-                    // Square directional shadows
                     div()
                         .border_b_1()
                         .border_color(hsla(0.0, 0.0, 0.0, 1.0))
@@ -379,7 +368,6 @@ impl Render for Shadow {
                                 ]),
                             ),
                         ]),
-                    // Rounded large directional shadows
                     div()
                         .border_b_1()
                         .border_color(hsla(0.0, 0.0, 0.0, 1.0))
@@ -414,7 +402,6 @@ impl Render for Shadow {
                                 ]),
                             ),
                         ]),
-                    // Multiple shadows for different shapes
                     div()
                         .border_b_1()
                         .border_color(hsla(0.0, 0.0, 0.0, 1.0))
@@ -520,7 +507,6 @@ impl Render for Shadow {
                                 ]),
                             ),
                         ]),
-                    // Inset shadows (CSS `box-shadow: inset ...`).
                     div()
                         .border_b_1()
                         .border_color(hsla(0.0, 0.0, 0.0, 1.0))
@@ -570,7 +556,6 @@ impl Render for Shadow {
                                 ]),
                             ),
                         ]),
-                    // Combined: drop + inset shadows on the same element.
                     div()
                         .border_b_1()
                         .border_color(hsla(0.0, 0.0, 0.0, 1.0))

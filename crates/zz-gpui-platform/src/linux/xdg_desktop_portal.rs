@@ -1,7 +1,3 @@
-//! Provides a [calloop] event source from [XDG Desktop Portal] events
-//!
-//! This module uses the [ashpd] crate
-
 use ashpd::desktop::settings::{ColorScheme, Settings};
 use calloop::channel::Channel;
 use calloop::{EventSource, Poll, PostAction, Readiness, Token, TokenFactory};
@@ -52,7 +48,6 @@ impl XDPEventSource {
                     sender.send(Event::CursorTheme(initial_theme))?;
                 }
 
-                // If u32 is used here, it throws invalid type error
                 if let Ok(initial_size) = settings
                     .read::<i32>("org.gnome.desktop.interface", "cursor-size")
                     .await
@@ -207,9 +202,6 @@ impl EventSource for XDPEventSource {
     }
 }
 
-/// Reads the desktop interface font before any text is shaped, so windows
-/// never draw their first frames in a fallback family. Later changes arrive
-/// through [`XDPEventSource`].
 #[allow(
     clippy::disallowed_methods,
     reason = "runs while the platform is constructed, before any GPUI executor can drive a timer"
@@ -243,8 +235,6 @@ const SYSTEM_FONT_SETTINGS: [(&str, &str, FontSettingParser); 2] = [
     ("org.kde.kdeglobals.General", "font", qt_font_families),
 ];
 
-/// Candidate families for a Pango description such as `Ubuntu Sans Bold 11`,
-/// longest first, since style words and the family share one space-separated list.
 fn pango_font_families(description: &str) -> Vec<String> {
     let mut families = description.split(',').map(str::trim).collect::<Vec<_>>();
     let Some(last) = families.pop() else {
@@ -266,7 +256,6 @@ fn pango_font_families(description: &str) -> Vec<String> {
     candidates
 }
 
-/// The family of a Qt font string such as `Noto Sans,10,-1,5,50,0,0,0,0,0`.
 fn qt_font_families(description: &str) -> Vec<String> {
     description
         .split(',')

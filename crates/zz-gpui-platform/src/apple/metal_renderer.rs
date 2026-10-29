@@ -33,17 +33,13 @@ use std::{
     sync::Arc,
 };
 
-// Exported to metal
 pub(crate) type PointF = zz_gpui::Point<f32>;
 
 #[cfg(not(feature = "runtime_shaders"))]
 const SHADERS_METALLIB: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/shaders.metallib"));
 #[cfg(feature = "runtime_shaders")]
 const SHADERS_SOURCE_FILE: &str = include_str!(concat!(env!("OUT_DIR"), "/stitched_shaders.metal"));
-// Use 4x MSAA, all devices support it.
-// https://developer.apple.com/documentation/metal/mtldevice/1433355-supportstexturesamplecount
 const PATH_SAMPLE_COUNT: u32 = 4;
-/// Metal requires the offset a buffer is bound at to be 256-byte aligned.
 const INSTANCE_BUFFER_ALIGNMENT: usize = 256;
 const MAX_INSTANCE_BUFFER_SIZE: usize = 256 * 1024 * 1024;
 
@@ -93,8 +89,6 @@ impl InstanceBufferPool {
         let buffer = self.buffers.pop().unwrap_or_else(|| {
             let options = if unified_memory {
                 MTLResourceOptions::StorageModeShared
-                    // Buffers are write only which can benefit from the combined cache
-                    // https://developer.apple.com/documentation/metal/mtlresourceoptions/cpucachemodewritecombined
                     | MTLResourceOptions::CPUCacheModeWriteCombined
             } else {
                 MTLResourceOptions::StorageModeManaged
@@ -122,7 +116,6 @@ pub struct MetalRenderer {
     is_unified_memory: bool,
     presents_with_transaction: bool,
     underlay_active: bool,
-    /// For headless rendering, tracks whether output should be opaque
     opaque: bool,
     command_queue: CommandQueue,
     paths_rasterization_pipeline_state: metal::RenderPipelineState,
@@ -141,7 +134,6 @@ pub struct MetalRenderer {
     shader_layer_targets: Vec<metal::Texture>,
     shader_layer_inputs: Vec<metal::Texture>,
     shader_layers_drawn: bool,
-    /// Built when a scene first paints glass; `Err` once building failed.
     glass: Option<Result<MetalGlass, ()>>,
     unit_vertices: metal::Buffer,
     #[allow(clippy::arc_with_non_send_sync)]
@@ -151,8 +143,6 @@ pub struct MetalRenderer {
     path_intermediate_texture: Option<metal::Texture>,
     path_intermediate_msaa_texture: Option<metal::Texture>,
     path_sample_count: u32,
-    /// Offscreen render target reused across `render_scene` calls when
-    /// rendering headlessly without reading pixels back.
     #[cfg(any(test, feature = "bench-support", feature = "test-support"))]
     headless_render_target: Option<metal::Texture>,
 }
@@ -166,18 +156,14 @@ pub struct PathRasterizationVertex {
 }
 
 impl MetalRenderer {
-    /// Creates a new MetalRenderer with a CAMetalLayer for window-based rendering.
     pub fn new(instance_buffer_pool: Arc<Mutex<InstanceBufferPool>>, transparent: bool) -> Self {
         let device = Self::create_device();
 
         let layer = metal::MetalLayer::new();
         layer.set_device(&device);
         layer.set_pixel_format(MTLPixelFormat::BGRA8Unorm);
-        // Support direct-to-display rendering if the window is not transparent
-        // https://developer.apple.com/documentation/metal/managing-your-game-window-for-metal-in-macos
         layer.set_opaque(!transparent);
         layer.set_maximum_drawable_count(3);
-        // Allow texture reading for visual tests (captures screenshots without ScreenCaptureKit)
         #[cfg(any(test, feature = "test-support"))]
         layer.set_framebuffer_only(false);
         unsafe {
@@ -193,10 +179,6 @@ impl MetalRenderer {
         Self::new_internal(device, Some(layer), !transparent, instance_buffer_pool)
     }
 
-    /// Creates a new headless MetalRenderer for offscreen rendering without a window.
-    ///
-    /// This renderer can render scenes to images without requiring a CAMetalLayer,
-    /// window, or AppKit. Use `render_scene_to_image()` to render scenes.
     #[cfg(any(test, feature = "bench-support", feature = "test-support"))]
     pub fn new_headless(instance_buffer_pool: Arc<Mutex<InstanceBufferPool>>) -> Self {
         let device = Self::create_device();
@@ -204,17 +186,12 @@ impl MetalRenderer {
     }
 
     fn create_device() -> metal::Device {
-        // Prefer low‐power integrated GPUs on Intel Mac. On Apple
-        // Silicon, there is only ever one GPU, so this is equivalent to
-        // `metal::Device::system_default()`.
         if let Some(d) = metal::Device::all()
             .into_iter()
             .min_by_key(|d| (d.is_removable(), !d.is_low_power()))
         {
             d
         } else {
-            // For some reason `all()` can return an empty list, see https://github.com/zed-industries/zed/issues/37689
-            // In that case, we fall back to the system default device.
             log::error!(
                 "Unable to enumerate Metal devices; attempting to use system default device"
             );
@@ -247,13 +224,7 @@ impl MetalRenderer {
             output
         }
 
-        // Shared memory can be used only if CPU and GPU share the same memory space.
-        // https://developer.apple.com/documentation/metal/setting-resource-storage-modes
         let is_unified_memory = device.has_unified_memory();
-        // Apple GPU families support memoryless textures, which can significantly reduce
-        // memory usage by keeping render targets in on-chip tile memory instead of
-        // allocating backing store in system memory.
-        // https://developer.apple.com/documentation/metal/mtlgpufamily
         let is_apple_gpu = device.supports_family(MTLGPUFamily::Apple1);
 
         let unit_vertices = [
@@ -432,7 +403,6 @@ impl MetalRenderer {
         }
     }
 
-    /// See `Window::set_underlay_active`.
     pub fn set_underlay_active(&mut self, active: bool) {
         if self.underlay_active == active {
             return;
@@ -448,9 +418,6 @@ impl MetalRenderer {
         self.presents_with_transaction || self.underlay_active
     }
 
-    /// Whether this renderer can draw glass, building its pipelines the
-    /// first time it is asked. Windows paint a plain fill in its place when
-    /// it cannot.
     pub fn supports_glass(&mut self) -> bool {
         let glass = self.glass.get_or_insert_with(|| {
             MetalGlass::new(&self.device)
@@ -481,9 +448,6 @@ impl MetalRenderer {
     }
 
     fn update_path_intermediate_textures(&mut self, size: Size<DevicePixels>) {
-        // We are uncertain when this happens, but sometimes size can be 0 here. Most likely before
-        // the layout pass on window creation. Zero-sized texture creation causes SIGABRT.
-        // https://github.com/zed-industries/zed/issues/36229
         if size.width.0 <= 0 || size.height.0 <= 0 {
             self.path_intermediate_texture = None;
             self.path_intermediate_msaa_texture = None;
@@ -500,8 +464,6 @@ impl MetalRenderer {
         self.path_intermediate_texture = Some(self.device.new_texture(&texture_descriptor));
 
         if self.path_sample_count > 1 {
-            // https://developer.apple.com/documentation/metal/choosing-a-resource-storage-mode-for-apple-gpus
-            // Rendering MSAA textures are done in a single pass, so we can use memory-less storage on Apple Silicon
             let storage_mode = if self.is_apple_gpu {
                 metal::MTLStorageMode::Memoryless
             } else {
@@ -525,9 +487,7 @@ impl MetalRenderer {
         }
     }
 
-    pub fn destroy(&self) {
-        // nothing to do
-    }
+    pub fn destroy(&self) {}
 
     pub fn draw(&mut self, scene: &Scene) {
         let layer = match &self.layer {
@@ -626,7 +586,6 @@ impl MetalRenderer {
             }
             atlas_frame.complete();
         });
-        // SAFETY: Both pointee types are opaque views of the same Objective-C block pointer ABI.
         unsafe {
             command_buffer.add_completed_handler(&*RcBlock::as_ptr(&block).cast());
         }
@@ -634,12 +593,6 @@ impl MetalRenderer {
         Ok(command_buffer)
     }
 
-    /// Renders the scene to a texture and returns the pixel data as an RGBA image.
-    /// This does not present the frame to screen - useful for visual testing
-    /// where we want to capture what would be rendered without displaying it.
-    ///
-    /// Note: This requires a layer-backed renderer. For headless rendering,
-    /// use `render_scene_to_image()` instead.
     #[cfg(any(test, feature = "test-support"))]
     pub fn render_to_image(&mut self, scene: &Scene) -> Result<RgbaImage> {
         let layer = self
@@ -657,17 +610,12 @@ impl MetalRenderer {
 
         let command_buffer = self.render_frame(scene, drawable.texture(), viewport_size)?;
 
-        // Commit and wait for completion without presenting
         command_buffer.commit();
         command_buffer.wait_until_completed();
 
         read_texture_to_image(drawable.texture())
     }
 
-    /// Renders a scene to an image without requiring a window or CAMetalLayer.
-    ///
-    /// This is the primary method for headless rendering. It creates an offscreen
-    /// texture, renders the scene to it, and returns the pixel data as an RGBA image.
     #[cfg(any(test, feature = "bench-support", feature = "test-support"))]
     pub fn render_scene_to_image(
         &mut self,
@@ -678,13 +626,9 @@ impl MetalRenderer {
             anyhow::bail!("Invalid size for render_scene_to_image: {:?}", size);
         }
 
-        // Headless callers do not have a Cocoa event-loop pool to release
-        // autoreleased command buffers and render-pass descriptors.
         objc2::rc::autoreleasepool(|_| {
-            // Update path intermediate textures for this size
             self.update_path_intermediate_textures(size);
 
-            // Create an offscreen texture as render target
             let texture_descriptor = metal::TextureDescriptor::new();
             texture_descriptor.set_width(size.width.0 as u64);
             texture_descriptor.set_height(size.height.0 as u64);
@@ -697,16 +641,12 @@ impl MetalRenderer {
 
             let command_buffer = self.render_frame(scene, &target_texture, size)?;
 
-            // On discrete GPUs (non-unified memory), Managed textures require an
-            // explicit blit synchronize before the CPU can read back the rendered
-            // data. Without this, get_bytes returns stale zeros.
             if !self.is_unified_memory {
                 let blit = command_buffer.new_blit_command_encoder();
                 blit.synchronize_resource(&target_texture);
                 blit.end_encoding();
             }
 
-            // Commit and wait for completion
             command_buffer.commit();
             command_buffer.wait_until_completed();
 
@@ -714,13 +654,6 @@ impl MetalRenderer {
         })
     }
 
-    /// Renders a scene to a reused offscreen texture without reading pixels
-    /// back or blocking on GPU completion.
-    ///
-    /// This mirrors the CPU cost of presenting a frame to a window (scene
-    /// encoding, instance buffer writes, command submission) and is used by
-    /// headless benchmark rendering, where the produced pixels are never
-    /// inspected.
     #[cfg(any(test, feature = "bench-support", feature = "test-support"))]
     pub fn render_scene(&mut self, scene: &Scene, size: Size<DevicePixels>) -> Result<()> {
         if size.width.0 <= 0 || size.height.0 <= 0 {
@@ -751,8 +684,6 @@ impl MetalRenderer {
 
             let command_buffer = self.render_frame(scene, &target_texture, size)?;
 
-            // Commit without waiting, mirroring presentation to a real window where
-            // the CPU doesn't block on the GPU.
             command_buffer.commit();
             Ok(())
         })
@@ -1283,13 +1214,6 @@ impl MetalRenderer {
             Some(intermediate_texture),
         );
 
-        // When copying paths from the intermediate texture to the drawable,
-        // each pixel must only be copied once, in case of transparent paths.
-        //
-        // If all paths have the same draw order, then their bounds are all
-        // disjoint, so we can copy each path's bounds individually. If this
-        // batch combines different draw orders, we perform a single copy
-        // for a minimal spanning rect.
         let sprites;
         if paths.last().unwrap().order == first_path.order {
             sprites = paths
@@ -1668,7 +1592,6 @@ fn read_texture_to_image(texture: &metal::TextureRef) -> Result<RgbaImage> {
         0,
     );
 
-    // Convert BGRA to RGBA (swap B and R channels)
     for chunk in pixels.chunks_exact_mut(4) {
         chunk.swap(0, 2);
     }
@@ -1887,8 +1810,6 @@ impl InstanceBufferWriter {
             buffer: self.current.metal_buffer.clone(),
             offset,
         };
-        // Safety: the reservation lies within a buffer this frame owns
-        // exclusively, and never overlaps one handed out earlier.
         let values = unsafe {
             let start = (self.current.metal_buffer.contents() as *mut u8).add(offset);
             slice::from_raw_parts_mut(start.cast::<MaybeUninit<T>>(), count)
@@ -1972,8 +1893,6 @@ impl InstanceBufferWriter {
             }
         }
 
-        // Metal retains encoded resources until the command buffer completes.
-        // Only the final, largest buffer is worth keeping in the pool.
         drop(filled);
         current
     }
@@ -2057,7 +1976,6 @@ fn texture_has_size(texture: &metal::TextureRef, size: Size<DevicePixels>) -> bo
     texture.width() == size.width.0 as u64 && texture.height() == size.height.0 as u64
 }
 
-/// The whole device pixels a layer covers, clipped to the viewport.
 fn shader_layer_region(
     bounds: Bounds<ScaledPixels>,
     viewport_size: Size<DevicePixels>,

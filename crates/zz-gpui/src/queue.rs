@@ -24,8 +24,6 @@ impl<T> PriorityQueues<T> {
 }
 
 struct PriorityQueueState<T> {
-    // std's Wasm atomic backend unlocks and notifies without acquiring another
-    // lock. parking_lot can park during those operations, even after try_lock.
     queues: Mutex<PriorityQueues<T>>,
     condvar: Condvar,
     receiver_count: AtomicUsize,
@@ -83,8 +81,6 @@ impl<T> PriorityQueueState<T> {
     fn recv<'a>(&'a self) -> Result<MutexGuard<'a, PriorityQueues<T>>, RecvError> {
         let mut queues = self.queues.lock().unwrap_or_else(PoisonError::into_inner);
 
-        // Re-checked after every wake: dropping the last sender wakes waiting receivers
-        // so they can end instead of blocking forever on a queue nothing can fill.
         while queues.is_empty() {
             if self.sender_count.load(std::sync::atomic::Ordering::Acquire) == 0 {
                 return Err(crate::queue::RecvError);
@@ -163,11 +159,6 @@ impl<T> Drop for PriorityQueueSender<T> {
             .sender_count
             .fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
         if previous == 1 {
-            // A receiver checks the sender count and starts waiting under the queue lock,
-            // atomically. Acquiring that lock once, even with nothing to do under it,
-            // means any receiver that saw a live sender is already waiting, so the
-            // notification below reaches it; without this, a receiver between its check
-            // and its wait would miss the wake-up and block forever.
             drop(
                 self.state
                     .queues
@@ -238,7 +229,6 @@ impl<T> PriorityQueueReceiver<T> {
         (sender, receiver)
     }
 
-    /// Returns whether the queue currently contains no elements.
     pub fn is_empty(&self) -> bool {
         self.state
             .queues
@@ -247,7 +237,6 @@ impl<T> PriorityQueueReceiver<T> {
             .is_empty()
     }
 
-    /// Returns the number of queued elements across all priorities.
     pub(crate) fn len(&self) -> usize {
         let queues = self
             .state
@@ -257,16 +246,6 @@ impl<T> PriorityQueueReceiver<T> {
         queues.high_priority.len() + queues.medium_priority.len() + queues.low_priority.len()
     }
 
-    /// Tries to pop one element from the priority queue without blocking.
-    ///
-    /// This will early return if there are no elements in the queue.
-    ///
-    /// This method is best suited if you only intend to pop one element, for better performance
-    /// on large queues see [`Self::try_iter`]
-    ///
-    /// # Errors
-    ///
-    /// If the sender was dropped
     pub fn try_pop(&mut self) -> Result<Option<T>, RecvError> {
         self.pop_inner(false)
     }
@@ -309,20 +288,10 @@ impl<T> PriorityQueueReceiver<T> {
         Ok(None)
     }
 
-    /// Pops an element from the priority queue blocking if necessary.
-    ///
-    /// This method is best suited if you only intend to pop one element, for better performance
-    /// on large queues see [`Self::iter``]
-    ///
-    /// # Errors
-    ///
-    /// If the sender was dropped
     pub fn pop(&mut self) -> Result<T, RecvError> {
         self.pop_inner(true).map(|e| e.unwrap())
     }
 
-    /// Returns an iterator over the elements of the queue
-    /// this iterator will end when all elements have been consumed and will not wait for new ones.
     pub fn try_iter(self) -> TryIter<T> {
         TryIter {
             receiver: self,
@@ -330,15 +299,11 @@ impl<T> PriorityQueueReceiver<T> {
         }
     }
 
-    /// Returns an iterator over the elements of the queue
-    /// this iterator will wait for new elements if the queue is empty.
     pub fn iter(self) -> Iter<T> {
         Iter(self)
     }
 
     #[inline(always)]
-    // algorithm is the loaded die from biased coin from
-    // https://www.keithschwarz.com/darts-dice-coins/
     fn pop_inner(&mut self, block: bool) -> Result<Option<T>, RecvError> {
         use Priority as P;
 
@@ -354,7 +319,7 @@ impl<T> PriorityQueueReceiver<T> {
         let high = P::High.weight() * !queues.high_priority.is_empty() as u32;
         let medium = P::Medium.weight() * !queues.medium_priority.is_empty() as u32;
         let low = P::Low.weight() * !queues.low_priority.is_empty() as u32;
-        let mut mass = high + medium + low; //%
+        let mut mass = high + medium + low;
 
         if !queues.high_priority.is_empty() {
             let flip = self.rand.random_ratio(P::High.weight(), mass);

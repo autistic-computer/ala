@@ -87,7 +87,6 @@ fn run_example() {
         let window_size = size(px(420.), px(280.0));
         let base = Bounds::centered(None, window_size, cx);
 
-        // (label, is_movable, appears_transparent, app_owns_titlebar_drag, col, row)
         let windows = [
             ("Native titlebar, movable", true, false, false, 0.0, 0.0),
             (

@@ -1,35 +1,21 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 bitflags::bitflags! {
-    /// Flags that change rendering
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[repr(transparent)]
     pub struct CacheKeyFlags: u32 {
-        /// Skew by 14 degrees to synthesize italic
         const FAKE_ITALIC = 1;
-        /// Disable hinting
         const DISABLE_HINTING = 2;
-        /// Render as a pixel font
         const PIXEL_FONT = 4;
     }
 }
 
-/// Key for building a glyph cache
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CacheKey {
-    /// Font ID
     pub font_id: fontdb::ID,
-    /// Glyph ID
     pub glyph_id: u16,
-    /// `f32` bits of font size
     pub font_size_bits: u32,
-    /// Binning of fractional X offset
     pub x_bin: SubpixelBin,
-    /// Binning of fractional Y offset
     pub y_bin: SubpixelBin,
-    /// Font weight
     pub font_weight: fontdb::Weight,
-    /// [`CacheKeyFlags`]
     pub flags: CacheKeyFlags,
 }
 
@@ -60,7 +46,6 @@ impl CacheKey {
     }
 }
 
-/// Binning of subpixel position for cache optimization
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SubpixelBin {
     Zero,
@@ -114,55 +99,41 @@ impl SubpixelBin {
 
 #[test]
 fn test_subpixel_bins() {
-    // POSITIVE TESTS
-
-    // Maps to 0.0
     assert_eq!(SubpixelBin::new(0.0), (0, SubpixelBin::Zero));
     assert_eq!(SubpixelBin::new(0.124), (0, SubpixelBin::Zero));
 
-    // Maps to 0.25
     assert_eq!(SubpixelBin::new(0.125), (0, SubpixelBin::One));
     assert_eq!(SubpixelBin::new(0.25), (0, SubpixelBin::One));
     assert_eq!(SubpixelBin::new(0.374), (0, SubpixelBin::One));
 
-    // Maps to 0.5
     assert_eq!(SubpixelBin::new(0.375), (0, SubpixelBin::Two));
     assert_eq!(SubpixelBin::new(0.5), (0, SubpixelBin::Two));
     assert_eq!(SubpixelBin::new(0.624), (0, SubpixelBin::Two));
 
-    // Maps to 0.75
     assert_eq!(SubpixelBin::new(0.625), (0, SubpixelBin::Three));
     assert_eq!(SubpixelBin::new(0.75), (0, SubpixelBin::Three));
     assert_eq!(SubpixelBin::new(0.874), (0, SubpixelBin::Three));
 
-    // Maps to 1.0
     assert_eq!(SubpixelBin::new(0.875), (1, SubpixelBin::Zero));
     assert_eq!(SubpixelBin::new(0.999), (1, SubpixelBin::Zero));
     assert_eq!(SubpixelBin::new(1.0), (1, SubpixelBin::Zero));
     assert_eq!(SubpixelBin::new(1.124), (1, SubpixelBin::Zero));
 
-    // NEGATIVE TESTS
-
-    // Maps to 0.0
     assert_eq!(SubpixelBin::new(-0.0), (0, SubpixelBin::Zero));
     assert_eq!(SubpixelBin::new(-0.124), (0, SubpixelBin::Zero));
 
-    // Maps to 0.25
     assert_eq!(SubpixelBin::new(-0.125), (-1, SubpixelBin::Three));
     assert_eq!(SubpixelBin::new(-0.25), (-1, SubpixelBin::Three));
     assert_eq!(SubpixelBin::new(-0.374), (-1, SubpixelBin::Three));
 
-    // Maps to 0.5
     assert_eq!(SubpixelBin::new(-0.375), (-1, SubpixelBin::Two));
     assert_eq!(SubpixelBin::new(-0.5), (-1, SubpixelBin::Two));
     assert_eq!(SubpixelBin::new(-0.624), (-1, SubpixelBin::Two));
 
-    // Maps to 0.75
     assert_eq!(SubpixelBin::new(-0.625), (-1, SubpixelBin::One));
     assert_eq!(SubpixelBin::new(-0.75), (-1, SubpixelBin::One));
     assert_eq!(SubpixelBin::new(-0.874), (-1, SubpixelBin::One));
 
-    // Maps to 1.0
     assert_eq!(SubpixelBin::new(-0.875), (-1, SubpixelBin::Zero));
     assert_eq!(SubpixelBin::new(-0.999), (-1, SubpixelBin::Zero));
     assert_eq!(SubpixelBin::new(-1.0), (-1, SubpixelBin::Zero));

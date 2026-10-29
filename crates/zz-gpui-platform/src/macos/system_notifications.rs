@@ -1,10 +1,3 @@
-//! System notifications through the `UNUserNotificationCenter` API.
-//!
-//! Everything here runs lazily: nothing touches the notification center (and
-//! so nothing can trigger the authorization prompt or the framework's
-//! not-in-a-bundle abort) until the application posts a notification or
-//! registers a response callback.
-
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -82,14 +75,9 @@ impl SystemNotificationState {
             return;
         }
 
-        // Responses arrive from the delegate on an arbitrary thread; this task
-        // hands them to the registered callback on the main thread.
         let callback = self.callback.clone();
         self._response_task = Some(executor.spawn(async move {
             while let Some(response) = receiver.next().await {
-                // Take the callback out for the call: it may re-enter the
-                // platform (e.g. to dismiss the notification it was told
-                // about) or replace itself.
                 let taken = callback.borrow_mut().take();
                 if let Some(mut taken) = taken {
                     taken(response);
@@ -102,12 +90,7 @@ impl SystemNotificationState {
 
 struct NotificationCenter {
     center: Retained<UNUserNotificationCenter>,
-    /// The center's `delegate` property is weak; keeping the delegate retained
-    /// here keeps response handling alive for the app's lifetime.
     _delegate: Retained<NotificationResponseDelegate>,
-    /// The union of every action set registered so far. Categories are shared
-    /// by notifications with identical actions because macOS replaces the
-    /// entire registered set whenever a category is added.
     categories: RefCell<
         HashMap<Vec<SystemNotificationAction>, (SharedString, Retained<UNNotificationCategory>)>,
     >,
@@ -116,11 +99,6 @@ struct NotificationCenter {
 
 impl NotificationCenter {
     fn new(sender: mpsc::UnboundedSender<SystemNotificationResponse>) -> Option<Self> {
-        // `UNUserNotificationCenter` raises `NSInternalInconsistencyException`
-        // ("bundleProxyForCurrentProcess is nil"), aborting the process, when
-        // the binary isn't part of an app bundle — which is how dev builds run
-        // via `cargo run`. A bundle identifier is only present when launched
-        // from a real `.app`, so use it as the guard.
         if NSBundle::mainBundle().bundleIdentifier().is_none() {
             log::info!("system notifications disabled: not running from an app bundle");
             return None;
@@ -143,8 +121,6 @@ impl NotificationCenter {
             return;
         }
         let completion = RcBlock::new(|granted: Bool, error: *mut NSError| {
-            // SAFETY: when non-null, `error` is a valid `NSError` for the
-            // duration of the callback.
             if let Some(error) = unsafe { error.as_ref() } {
                 log::warn!(
                     "system notification authorization failed: {}",
@@ -172,17 +148,12 @@ impl NotificationCenter {
             content.setCategoryIdentifier(&NSString::from_str(&category_identifier));
         }
 
-        // A nil trigger delivers immediately. Reusing the tag as the request
-        // identifier makes a newer notification for the same tag replace the
-        // older one.
         let request = UNNotificationRequest::requestWithIdentifier_content_trigger(
             &NSString::from_str(&notification.tag),
             &content,
             None,
         );
         let completion = RcBlock::new(|error: *mut NSError| {
-            // SAFETY: when non-null, `error` is a valid `NSError` for the
-            // duration of the callback.
             if let Some(error) = unsafe { error.as_ref() } {
                 log::warn!(
                     "failed to deliver system notification: {}",
@@ -244,8 +215,6 @@ struct DelegateIvars {
 }
 
 define_class!(
-    // SAFETY: `NSObject` has no subclassing requirements and
-    // `NotificationResponseDelegate` does not implement `Drop`.
     #[unsafe(super(NSObject))]
     #[ivars = DelegateIvars]
     struct NotificationResponseDelegate;
@@ -253,9 +222,6 @@ define_class!(
     unsafe impl NSObjectProtocol for NotificationResponseDelegate {}
 
     unsafe impl UNUserNotificationCenterDelegate for NotificationResponseDelegate {
-        // Called when the user activates a delivered notification, possibly on
-        // a non-main thread; the channel hop hands the response to the
-        // foreground task holding the receiver.
         #[unsafe(method(userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:))]
         fn did_receive_notification_response(
             &self,
@@ -265,9 +231,6 @@ define_class!(
         ) {
             let tag = response.notification().request().identifier().to_string();
             let action = response.actionIdentifier();
-            // The other well-known identifier, `UNNotificationDismissActionIdentifier`,
-            // is only delivered for categories opting into dismiss callbacks,
-            // which we never request.
             let action_id = if &*action == unsafe { UNNotificationDefaultActionIdentifier } {
                 None
             } else {
@@ -283,9 +246,6 @@ define_class!(
             completion_handler.call(());
         }
 
-        // Without this, macOS suppresses banners while the app is frontmost.
-        // Posting is the application's decision; whether the app is focused is
-        // its criterion to apply, not the platform's.
         #[unsafe(method(userNotificationCenter:willPresentNotification:withCompletionHandler:))]
         fn will_present_notification(
             &self,
@@ -303,7 +263,6 @@ define_class!(
 impl NotificationResponseDelegate {
     fn new(sender: mpsc::UnboundedSender<SystemNotificationResponse>) -> Retained<Self> {
         let this = Self::alloc().set_ivars(DelegateIvars { sender });
-        // SAFETY: `NSObject`'s `init` is its designated initializer.
         unsafe { msg_send![super(this), init] }
     }
 }

@@ -40,8 +40,6 @@ impl Pasteboard {
     }
 
     unsafe fn new(inner: id) -> Self {
-        // These constructors return autoreleased objects, but a Pasteboard can
-        // outlive the autorelease pool in which it was created.
         Self {
             inner: unsafe { StrongPtr::retain(inner) },
             text_hash_type: unsafe { StrongPtr::retain(ns_string("zed-text-hash")) },
@@ -51,7 +49,6 @@ impl Pasteboard {
 
     pub fn read(&self) -> Option<ClipboardItem> {
         unsafe {
-            // Check for file paths first
             let filenames = NSPasteboard::propertyListForType(*self.inner, NSFilenamesPboardType);
             if filenames != nil && NSArray::count(filenames) > 0 {
                 let mut paths = SmallVec::new();
@@ -63,8 +60,6 @@ impl Pasteboard {
                 if !paths.is_empty() {
                     let mut entries = vec![ClipboardEntry::ExternalPaths(ExternalPaths(paths))];
 
-                    // Also include the string representation so text editors can
-                    // paste the path as text.
                     if let Some(string_item) = self.read_string_from_pasteboard() {
                         entries.push(string_item);
                     }
@@ -73,8 +68,6 @@ impl Pasteboard {
                 }
             }
 
-            // Next, check for a plain string, keeping the image flavor a mixed
-            // write put alongside it so paste targets can consume both.
             if let Some(string_entry) = self.read_string_from_pasteboard() {
                 let mut entries = vec![string_entry];
                 for format in ImageFormat::iter() {
@@ -86,7 +79,6 @@ impl Pasteboard {
                 return Some(ClipboardItem { entries });
             }
 
-            // Finally, try the various supported image types.
             for format in ImageFormat::iter() {
                 if let Some(item) = self.read_image(format) {
                     return Some(item);
@@ -166,7 +158,6 @@ impl Pasteboard {
         unsafe {
             match item.entries.as_slice() {
                 [] => {
-                    // Writing an empty list of entries just clears the clipboard.
                     self.inner.clearContents();
                 }
                 [ClipboardEntry::String(string)] => {
@@ -177,9 +168,6 @@ impl Pasteboard {
                 }
                 [ClipboardEntry::ExternalPaths(_)] => {}
                 _ => {
-                    // Every entry lands on the same pasteboard item, as a separate
-                    // flavor, so a paste target that wants text gets the text and one
-                    // that wants an image gets the image.
                     let mut combined: Option<ClipboardString> = None;
 
                     for entry in item.entries.iter() {
@@ -202,8 +190,6 @@ impl Pasteboard {
                         self.set_plaintext_data(combined);
                     }
 
-                    // A pasteboard item holds at most one representation per UTI, so
-                    // images that share a format collapse onto the last one written.
                     for entry in item.entries.iter() {
                         if let ClipboardEntry::Image(image) = entry {
                             self.set_image_data(image);
@@ -221,7 +207,6 @@ impl Pasteboard {
         }
     }
 
-    /// Adds the text flavors to the pasteboard's current item, without clearing it first.
     unsafe fn set_plaintext_data(&self, string: &ClipboardString) {
         unsafe {
             let text_bytes = NSData::dataWithBytes_length_(
@@ -259,7 +244,6 @@ impl Pasteboard {
         }
     }
 
-    /// Adds the image flavor to the pasteboard's current item, without clearing it first.
     unsafe fn set_image_data(&self, image: &Image) {
         unsafe {
             let bytes = NSData::dataWithBytes_length_(
@@ -276,7 +260,6 @@ impl Pasteboard {
 
 #[link(name = "AppKit", kind = "framework")]
 unsafe extern "C" {
-    /// [Apple's documentation](https://developer.apple.com/documentation/appkit/nspasteboardnamefind?language=objc)
     pub static NSPasteboardNameFind: id;
 }
 
@@ -296,52 +279,42 @@ impl From<ImageFormat> for UTType {
     }
 }
 
-// See https://developer.apple.com/documentation/uniformtypeidentifiers/uttype-swift.struct/
 pub struct UTType(id);
 
 impl UTType {
     pub fn png() -> Self {
-        // https://developer.apple.com/documentation/uniformtypeidentifiers/uttype-swift.struct/png
-        Self(unsafe { NSPasteboardTypePNG }) // This is a rare case where there's a built-in NSPasteboardType
+        Self(unsafe { NSPasteboardTypePNG })
     }
 
     pub fn jpeg() -> Self {
-        // https://developer.apple.com/documentation/uniformtypeidentifiers/uttype-swift.struct/jpeg
         Self(unsafe { ns_string("public.jpeg") })
     }
 
     pub fn gif() -> Self {
-        // https://developer.apple.com/documentation/uniformtypeidentifiers/uttype-swift.struct/gif
         Self(unsafe { ns_string("com.compuserve.gif") })
     }
 
     pub fn webp() -> Self {
-        // https://developer.apple.com/documentation/uniformtypeidentifiers/uttype-swift.struct/webp
         Self(unsafe { ns_string("org.webmproject.webp") })
     }
 
     pub fn bmp() -> Self {
-        // https://developer.apple.com/documentation/uniformtypeidentifiers/uttype-swift.struct/bmp
         Self(unsafe { ns_string("com.microsoft.bmp") })
     }
 
     pub fn svg() -> Self {
-        // https://developer.apple.com/documentation/uniformtypeidentifiers/uttype-swift.struct/svg
         Self(unsafe { ns_string("public.svg-image") })
     }
 
     pub fn ico() -> Self {
-        // https://developer.apple.com/documentation/uniformtypeidentifiers/uttype-swift.struct/ico
         Self(unsafe { ns_string("com.microsoft.ico") })
     }
 
     pub fn tiff() -> Self {
-        // https://developer.apple.com/documentation/uniformtypeidentifiers/uttype-swift.struct/tiff
-        Self(unsafe { NSPasteboardTypeTIFF }) // This is a rare case where there's a built-in NSPasteboardType
+        Self(unsafe { NSPasteboardTypeTIFF })
     }
 
     pub fn pnm() -> Self {
-        //https://en.wikipedia.org/w/index.php?title=Netpbm&oldid=1336679433 under Uniform Type Identifier
         Self(unsafe { ns_string("public.pbm") })
     }
 
@@ -368,7 +341,6 @@ mod tests {
 
     use super::*;
 
-    /// Smallest valid PNG: 1x1 transparent pixel
     const PNG_BYTES: &[u8] = &[
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
         0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F,
@@ -460,10 +432,8 @@ mod tests {
 
         let item = pasteboard.read().expect("should read clipboard item");
 
-        // Test both ExternalPaths and String entries exist
         assert_eq!(item.entries.len(), 2);
 
-        // Test first entry is ExternalPaths
         match &item.entries[0] {
             ClipboardEntry::ExternalPaths(ep) => {
                 assert_eq!(ep.paths(), &[PathBuf::from("/test.txt")]);
@@ -471,7 +441,6 @@ mod tests {
             other => panic!("expected ExternalPaths, got {:?}", other),
         }
 
-        // Test second entry is String
         match &item.entries[1] {
             ClipboardEntry::String(s) => {
                 assert_eq!(s.text(), "/test.txt");
@@ -511,7 +480,6 @@ mod tests {
         let item = pasteboard.read().expect("should read clipboard item");
         assert_eq!(item.entries.len(), 2);
 
-        // Test both ExternalPaths and String entries exist
         match &item.entries[0] {
             ClipboardEntry::ExternalPaths(ep) => {
                 assert_eq!(
@@ -552,7 +520,6 @@ mod tests {
 
         let item = pasteboard.read().expect("should read PNG image");
 
-        // Test Image entry exists
         assert_eq!(item.entries.len(), 1);
         match &item.entries[0] {
             ClipboardEntry::Image(img) => {
@@ -582,8 +549,6 @@ mod tests {
             ],
         });
 
-        // The round trip preserves both flavors: the concatenated strings and
-        // the image come back on the same item.
         let png_bytes = PNG_BYTES.to_vec();
         assert_eq!(
             pasteboard.read(),

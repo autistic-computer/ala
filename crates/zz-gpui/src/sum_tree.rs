@@ -16,7 +16,6 @@ pub const TREE_BASE: usize = 2;
 #[cfg(not(test))]
 pub const TREE_BASE: usize = 6;
 
-// Helper for when we cannot use ArrayVec::<T>::push().unwrap() as T doesn't impl Debug
 trait CapacityResultExt {
     fn unwrap_oob(self);
 }
@@ -27,26 +26,18 @@ impl<T> CapacityResultExt for Result<(), T> {
     }
 }
 
-/// An item that can be stored in a [`SumTree`]
-///
-/// Must be summarized by a type that implements [`Summary`]
 pub trait Item: Clone {
     type Summary: Summary;
 
     fn summary(&self, cx: <Self::Summary as Summary>::Context<'_>) -> Self::Summary;
 }
 
-/// An [`Item`] whose summary has a specific key that can be used to identify it
 pub trait KeyedItem: Item {
     type Key: for<'a> Dimension<'a, Self::Summary> + Ord;
 
     fn key(&self) -> Self::Key;
 }
 
-/// A type that describes the Sum of all [`Item`]s in a subtree of the [`SumTree`]
-///
-/// Each Summary type can have multiple [`Dimension`]s that it measures,
-/// which can be used to navigate the tree
 pub trait Summary: Clone {
     type Context<'a>: Copy;
     fn zero<'a>(cx: Self::Context<'a>) -> Self;
@@ -73,9 +64,6 @@ impl<T: ContextLessSummary> Summary for T {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NoSummary;
 
-/// Catch-all implementation for when you need something that implements [`Summary`] without a specific type.
-/// We implement it on a `NoSummary` instead of re-using `()`, as that avoids blanket impl collisions with `impl<T: Summary> Dimension for T`
-/// (as we also need unit type to be a fill-in dimension)
 impl ContextLessSummary for NoSummary {
     fn zero() -> Self {
         NoSummary
@@ -84,13 +72,6 @@ impl ContextLessSummary for NoSummary {
     fn add_summary(&mut self, _: &Self) {}
 }
 
-/// Each [`Summary`] type can have more than one [`Dimension`] type that it measures.
-///
-/// You can use dimensions to seek to a specific location in the [`SumTree`]
-///
-/// # Example:
-/// Zed's rope has a `TextSummary` type that summarizes lines, characters, and bytes.
-/// Each of these are different dimensions we may want to seek to
 pub trait Dimension<'a, S: Summary>: Clone {
     fn zero(cx: S::Context<'_>) -> Self;
 
@@ -163,33 +144,10 @@ where
     }
 }
 
-/// Bias is used to settle ambiguities when determining positions in an ordered sequence.
-///
-/// The primary use case is for text, where Bias influences
-/// which character an offset or anchor is associated with.
-///
-/// # Examples
-/// Given the buffer `AˇBCD`:
-/// - The offset of the cursor is 1
-/// - [Bias::Left] would attach the cursor to the character `A`
-/// - [Bias::Right] would attach the cursor to the character `B`
-///
-/// Given the buffer `A«BCˇ»D`:
-/// - The offset of the cursor is 3, and the selection is from 1 to 3
-/// - The left anchor of the selection has [Bias::Right], attaching it to the character `B`
-/// - The right anchor of the selection has [Bias::Left], attaching it to the character `C`
-///
-/// Given the buffer `{ˇ<...>`, where `<...>` is a folded region:
-/// - The display offset of the cursor is 1, but the offset in the buffer is determined by the bias
-/// - [Bias::Left] would attach the cursor to the character `{`, with a buffer offset of 1
-/// - [Bias::Right] would attach the cursor to the first character of the folded region,
-///   and the buffer offset would be the offset of the first character of the folded region
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug, Hash, Default)]
 pub enum Bias {
-    /// Attach to the character on the left
     #[default]
     Left,
-    /// Attach to the character on the right
     Right,
 }
 
@@ -202,12 +160,6 @@ impl Bias {
     }
 }
 
-/// A B+ tree in which each leaf node contains `Item`s of type `T` and a `Summary`s for each `Item`.
-/// Each internal node contains a `Summary` of the items in its subtree.
-///
-/// The maximum number of items per node is `TREE_BASE * 2`.
-///
-/// Any [`Dimension`] supported by the [`Summary`] type can be used to seek to a specific location in the tree.
 #[derive(Clone)]
 pub struct SumTree<T: Item>(Arc<Node<T>>);
 
@@ -230,7 +182,6 @@ impl<T: Item> SumTree<T> {
         }))
     }
 
-    /// Useful in cases where the item type has a non-trivial context type, but the zero value of the summary type doesn't depend on that context.
     pub fn from_summary(summary: T::Summary) -> Self {
         SumTree(Arc::new(Node::Leaf {
             summary,
@@ -392,9 +343,6 @@ impl<T: Item> SumTree<T> {
         Iter::new(self)
     }
 
-    /// A more efficient version of `Cursor::new()` + `Cursor::seek()` + `Cursor::item()`.
-    ///
-    /// Only returns the item that exactly has the target match.
     pub fn find_exact<'a, 'slf, D, Target>(
         &'slf self,
         cx: <T::Summary as Summary>::Context<'a>,
@@ -419,7 +367,6 @@ impl<T: Item> SumTree<T> {
         };
     }
 
-    /// A more efficient version of `Cursor::new()` + `Cursor::seek()` + `Cursor::item()`
     pub fn find<'a, 'slf, D, Target>(
         &'slf self,
         cx: <T::Summary as Summary>::Context<'a>,
@@ -503,7 +450,6 @@ impl<T: Item> SumTree<T> {
         }
     }
 
-    /// A more efficient version of `Cursor::new()` + `Cursor::seek()` + `Cursor::item()`
     pub fn find_with_prev<'a, 'slf, D, Target>(
         &'slf self,
         cx: <T::Summary as Summary>::Context<'a>,
@@ -600,8 +546,6 @@ impl<T: Item> SumTree<T> {
         Cursor::new(self, cx)
     }
 
-    /// Note: If the summary type requires a non `()` context, then the filter cursor
-    /// that is returned cannot be used with Rust's iterators.
     pub fn filter<'a, 'b, F, U>(
         &'a self,
         cx: <T::Summary as Summary>::Context<'b>,
@@ -913,7 +857,6 @@ impl<T: Item> SumTree<T> {
         }
     }
 
-    // appends the `large` tree to a `small` tree, assumes small.height() <= large.height()
     fn append_large(
         small: Self,
         large: &mut Self,
@@ -976,15 +919,6 @@ impl<T: Item> SumTree<T> {
         }
     }
 
-    // Merge two nodes into `large`.
-    //
-    // `large` will contain the contents of `small` followed by its own data.
-    // If the combined data exceed the node capacity, returns a new node that
-    // holds the first half of the merged items and `large` is left with the
-    // second half
-    //
-    // The nodes must be on the same height
-    // It only makes sense to call this when `small` is underflowing
     fn merge_into_right(
         small: Self,
         large: &mut Self,
@@ -1583,7 +1517,6 @@ mod tests {
 
     #[test]
     fn test_cursor() {
-        // Empty tree
         let tree = SumTree::<u8>::default();
         let mut cursor = tree.cursor::<IntegersSummary>(());
         assert_eq!(
@@ -1605,7 +1538,6 @@ mod tests {
         assert_eq!(cursor.next_item(), None);
         assert_eq!(cursor.start().sum, 0);
 
-        // Single-element tree
         let mut tree = SumTree::<u8>::default();
         tree.extend(vec![1], ());
         let mut cursor = tree.cursor::<IntegersSummary>(());
@@ -1649,7 +1581,6 @@ mod tests {
         assert_eq!(cursor.next_item(), None);
         assert_eq!(cursor.start().sum, 1);
 
-        // Multiple-element tree
         let mut tree = SumTree::default();
         tree.extend(vec![1, 2, 3, 4, 5, 6], ());
         let mut cursor = tree.cursor::<IntegersSummary>(());
@@ -1757,13 +1688,11 @@ mod tests {
         assert_eq!(cursor.next_item(), None);
         assert_eq!(cursor.start().sum, 21);
 
-        // Seeking can bias left or right
         cursor.seek(&Count(1), Bias::Left);
         assert_eq!(cursor.item(), Some(&1));
         cursor.seek(&Count(1), Bias::Right);
         assert_eq!(cursor.item(), Some(&2));
 
-        // Slicing without resetting starts from where the cursor is parked at.
         cursor.seek(&Count(1), Bias::Right);
         assert_eq!(cursor.slice(&Count(3), Bias::Right).items(()), vec![2, 3]);
         assert_eq!(cursor.slice(&Count(6), Bias::Left).items(()), vec![4, 5]);
@@ -1798,8 +1727,6 @@ mod tests {
             (0..100).collect::<Vec<_>>()
         );
 
-        // Ensure `from_iter` works correctly when the given iterator restarts
-        // after calling `next` if `None` was already returned.
         let mut ix = 0;
         let iterator = std::iter::from_fn(|| {
             ix = (ix + 1) % 2;

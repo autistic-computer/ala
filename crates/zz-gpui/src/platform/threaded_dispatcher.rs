@@ -14,17 +14,6 @@ use crate::{
 
 const MIN_THREADS: usize = 2;
 
-/// A multithreaded [`PlatformDispatcher`] for tests and benchmarks.
-///
-/// Background tasks run in parallel on a pool of worker threads and timers fire
-/// in real time on a dedicated timer thread, mirroring the production
-/// dispatchers (see `LinuxDispatcher`). Main-thread tasks are queued until the
-/// creating thread drains them via [`Self::run_until_idle`], since there is no
-/// platform run loop pumping them.
-///
-/// Unlike [`TestDispatcher`](crate::TestDispatcher), which runs everything on a
-/// single thread with a virtual clock, work dispatched through this dispatcher
-/// executes with production concurrency.
 pub struct ThreadedDispatcher {
     background_sender: PriorityQueueSender<RunnableVariant>,
     main_sender: PriorityQueueSender<RunnableVariant>,
@@ -34,8 +23,6 @@ pub struct ThreadedDispatcher {
     main_thread_id: thread::ThreadId,
 }
 
-/// Tracks how many background and timer runnables are queued or running so
-/// [`ThreadedDispatcher::run_until_idle`] knows when to stop waiting.
 #[derive(Default)]
 struct IdleTracker {
     inflight: Mutex<usize>,
@@ -55,15 +42,10 @@ impl IdleTracker {
         }
     }
 
-    /// Returns a guard that decrements the in-flight count when dropped, so
-    /// the count stays correct even if the runnable being executed panics.
     fn decrement_on_drop(&self) -> impl Drop + '_ {
         crate::util::defer(|| self.decrement())
     }
 
-    /// Notifies waiters while holding the in-flight lock. `run_until_idle`
-    /// re-checks its wake conditions under this lock before waiting, so the
-    /// notification can't slip between its check and its wait and be lost.
     fn notify_under_lock(&self) {
         let _inflight = self.inflight.lock();
         self.condvar.notify_all();
@@ -102,8 +84,6 @@ impl PartialOrd for TimerEntry {
 
 impl Ord for TimerEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Reversed so that the entry with the earliest due time (breaking ties
-        // by insertion order) is at the top of the max-heap.
         other
             .due
             .cmp(&self.due)
@@ -118,10 +98,6 @@ impl Default for ThreadedDispatcher {
 }
 
 impl ThreadedDispatcher {
-    /// Creates a dispatcher whose main thread is the calling thread.
-    ///
-    /// Worker and timer threads live for the lifetime of the process; the
-    /// dispatcher is expected to be created once and reused.
     pub fn new() -> Self {
         let (background_sender, background_receiver) = PriorityQueueReceiver::new();
         let (main_sender, main_receiver) = PriorityQueueReceiver::new();
@@ -175,11 +151,6 @@ impl ThreadedDispatcher {
                         let Some(entry) = state.heap.pop() else {
                             continue;
                         };
-                        // Count the firing timer as in-flight before releasing
-                        // the lock so it can spawn follow-up work that
-                        // `run_until_idle` will wait for. Lock order is always
-                        // timer state, then in-flight count; `run_until_idle`
-                        // never takes them in the opposite order.
                         idle.increment();
                         drop(state);
 
@@ -208,15 +179,6 @@ impl ThreadedDispatcher {
         }
     }
 
-    /// Runs queued main thread tasks and waits until no background or timer
-    /// work is queued, running, or already due.
-    ///
-    /// Timers that haven't reached their due time yet are *not* waited for:
-    /// the dispatcher runs in real time and cannot skip ahead like the
-    /// `TestDispatcher`'s virtual clock, so waiting on a future timer would
-    /// block for its full real duration. Tasks sleeping on such timers are
-    /// considered idle. Must be called on the thread that created this
-    /// dispatcher.
     pub fn run_until_idle(&self) {
         self.run_until_idle_with(|| self.drain_main_queue());
     }
@@ -231,11 +193,7 @@ impl ThreadedDispatcher {
                 continue;
             }
 
-            // Checked before taking the in-flight lock; the timer thread
-            // locks them in the opposite order, so nesting would deadlock.
             if self.has_due_timer() {
-                // Poll briefly: a firing timer leaves the heap just before it
-                // registers as in-flight.
                 let mut inflight = self.idle.inflight.lock();
                 self.idle
                     .condvar
@@ -244,43 +202,21 @@ impl ThreadedDispatcher {
             }
 
             let mut inflight = self.idle.inflight.lock();
-            // Re-checked under the lock that `dispatch_on_main_thread`
-            // notifies under, so the notification can't be lost.
             if self.main_queue_has_work() {
                 continue;
             }
             if *inflight == 0 {
-                // Main-thread sends happen before in-flight decrements, and
-                // decrements happen under this lock, so the check above
-                // observed all completed work.
                 return;
             }
-            // Woken when main-thread work arrives or the in-flight count
-            // reaches zero; both notify under this lock.
             self.idle.condvar.wait(&mut inflight);
         }
     }
 
-    /// Drives main-thread work until `ready` returns a value.
-    ///
-    /// Unlike [`Self::run_until_idle`], this waits across temporary quiescence.
-    /// This is required when completion can arrive from an external worker that
-    /// is not represented in the dispatcher's in-flight count.
-    ///
-    /// Readiness is checked before every main-thread runnable, so this returns
-    /// as soon as `ready` observes completion rather than after the queue
-    /// drains — deferred work that re-queues itself (idle sweeps, pollers)
-    /// must not extend a benchmark's measured interval past the completion it
-    /// awaits.
     #[cfg(test)]
     pub(crate) fn run_until<R>(&self, ready: impl FnMut() -> Option<R>) -> R {
         self.run_until_with_frames(ready, || false)
     }
 
-    /// Runs at most one queued main-thread task, returning whether one ran.
-    ///
-    /// Stepping tasks individually lets callers check completion between polls
-    /// even when work continually re-queues itself.
     fn run_one_main_task(&self) -> bool {
         assert!(
             self.is_main_thread(),
@@ -300,16 +236,10 @@ impl ThreadedDispatcher {
         }
     }
 
-    /// Runs up to the initial queue length of main-thread tasks.
-    ///
-    /// Returns whether any ran. This snapshots the count, not task identities:
-    /// newly dispatched higher-priority tasks can overtake the original tasks.
     pub fn run_ready_main_tasks(&self) -> bool {
         self.run_ready_main_tasks_with(|| true, || {})
     }
 
-    /// Runs a count-bounded ready turn, checking `should_continue` before every poll.
-    /// Calls `after_poll` after each runnable returns, outside the queue lock.
     pub(crate) fn run_ready_main_tasks_with(
         &self,
         mut should_continue: impl FnMut() -> bool,
@@ -346,8 +276,6 @@ impl ThreadedDispatcher {
                 return result;
             }
             let ran_task = self.run_one_main_task();
-            // A completion poll must not pull an unrelated animation frame
-            // into the measured operation.
             if let Some(result) = ready() {
                 return result;
             }
@@ -364,12 +292,6 @@ impl ThreadedDispatcher {
         }
     }
 
-    /// Cancels all pending timers so timers armed by one workload can't fire
-    /// during a later workload sharing this process-lifetime dispatcher.
-    ///
-    /// Dropping a timer runnable drops its completion sender, waking the task
-    /// awaiting the timer. Call [`Self::run_until_idle`] after this method to
-    /// drain any work that cancellation unblocks.
     pub fn cancel_pending_timers(&self) -> usize {
         let timers = {
             let mut state = self.timers.state.lock();
@@ -382,8 +304,6 @@ impl ThreadedDispatcher {
         canceled
     }
 
-    /// Describes the dispatcher's idle-tracking state, for diagnosing
-    /// workloads that fail to reach quiescence.
     pub fn debug_state(&self) -> String {
         let inflight = *self.idle.inflight.lock();
         let timers = self.timers.state.lock().heap.len();
@@ -394,9 +314,6 @@ impl ThreadedDispatcher {
         )
     }
 
-    /// Whether no main-thread work is queued, no background or timer
-    /// runnables are queued or running, and no armed timer is due. Timers
-    /// that aren't due yet are ignored, as in [`Self::run_until_idle`].
     #[cfg(any(test, feature = "bench-support"))]
     pub(crate) fn is_idle(&self) -> bool {
         !self.main_queue_has_work() && !self.has_due_timer() && *self.idle.inflight.lock() == 0
@@ -417,8 +334,6 @@ impl ThreadedDispatcher {
     fn drain_main_queue(&self) -> bool {
         let mut ran_any = false;
         loop {
-            // Lock only around the pop so runnables can re-entrantly dispatch
-            // more main-thread work through the sender while they run.
             let runnable = self.main_receiver.lock().try_pop();
             match runnable {
                 Ok(Some(runnable)) => {
@@ -449,14 +364,9 @@ impl PlatformDispatcher for ThreadedDispatcher {
 
     fn dispatch_on_main_thread(&self, runnable: RunnableVariant, priority: Priority) {
         if let Err(error) = self.main_sender.send(priority, runnable) {
-            // The main receiver lives as long as this dispatcher, so a failed
-            // send means we're mid-teardown. The runnable may wrap a !Send
-            // future, so forget it rather than dropping it on this thread
-            // (mirrors LinuxDispatcher).
             std::mem::forget(error);
             return;
         }
-        // Wake `run_until_idle` if it's waiting for main-thread work.
         self.idle.notify_under_lock();
     }
 
@@ -473,8 +383,6 @@ impl PlatformDispatcher for ThreadedDispatcher {
     }
 
     fn spawn_realtime(&self, f: Box<dyn FnOnce() + Send>) {
-        // This dispatcher does not need realtime scheduling priority; a plain
-        // thread keeps it portable.
         thread::Builder::new()
             .name("ThreadedDispatcherRealtime".to_owned())
             .spawn(f)
@@ -507,8 +415,6 @@ mod tests {
 
         let background = BackgroundExecutor::new(dispatcher.clone());
         let timer = background.timer(Duration::from_secs(60));
-        // The timer future's initial poll runs on a worker thread; wait for
-        // it so only the armed, not-yet-due timer remains.
         dispatcher.run_until_idle();
         assert!(
             dispatcher.is_idle(),
@@ -618,10 +524,6 @@ mod tests {
         let dispatcher = Arc::new(ThreadedDispatcher::new());
         let foreground = ForegroundExecutor::new(dispatcher.clone());
 
-        // Mirrors main-thread work that yields and immediately re-queues
-        // itself (e.g. an idle-time sweep): the main queue never drains until
-        // such work finishes every iteration, so readiness must be observed
-        // between runnables rather than only at quiescence.
         let iterations = Arc::new(AtomicUsize::new(0));
         foreground
             .spawn({
@@ -652,8 +554,6 @@ mod tests {
         );
     }
 
-    /// Completes after one re-schedule: the poll returns `Pending` and wakes
-    /// immediately, so the runnable re-enters the main queue.
     fn yield_once() -> impl Future<Output = ()> {
         let mut yielded = false;
         std::future::poll_fn(move |poll_context| {

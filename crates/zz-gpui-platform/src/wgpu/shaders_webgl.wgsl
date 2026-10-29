@@ -1,13 +1,5 @@
 @group(1) @binding(0) var t_instances: texture_2d<u32>;
 
-// Each texel of `t_instances` packs four 32-bit words of instance data. Most
-// records are read strictly front to back through a cursor that keeps the
-// most recently fetched texel and only touches the texture again when the next
-// word crosses a texel boundary. This fetches each texel exactly once per
-// record load instead of once per word. The `read_*` functions must therefore
-// consume their words in struct declaration order; skipping or re-reading words
-// would still return correct data (the cursor re-fetches whenever the texel
-// index changes) but would forfeit the single-fetch-per-texel guarantee.
 struct InstanceCursor {
     word_index: u32,
     texel_index: u32,
@@ -136,8 +128,6 @@ fn read_transformation(cursor: ptr<function, InstanceCursor>) -> TransformationM
 }
 
 fn load_quad(instance_id: u32) -> Quad {
-    // Keep this fixed-layout decoder explicit. Some WebGL shader compilers fail
-    // to optimize the cursor's branches and dynamic vector indexing for quads.
     let first_texel_index = instance_id * 11u;
     let width = textureDimensions(t_instances).x;
     let texel0 = fetch_instance_texel(first_texel_index, width);

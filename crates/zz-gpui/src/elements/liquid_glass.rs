@@ -10,12 +10,6 @@ use crate::{
     Styled, Window, div, point, size,
 };
 
-/// Glass that answers the pointer: it swells and lights up from where it is
-/// pressed, brightens under the pointer, and lenses in when it first
-/// appears. Every change rides a spring, so interrupted motion stays smooth.
-///
-/// Style it and give it children like a `div`; the glass takes the
-/// element's corner radii.
 pub fn liquid_glass(id: impl Into<ElementId>, material: GlassMaterial) -> LiquidGlass {
     let id = id.into();
     LiquidGlass {
@@ -41,7 +35,6 @@ pub fn liquid_glass(id: impl Into<ElementId>, material: GlassMaterial) -> Liquid
     }
 }
 
-/// See [`liquid_glass`].
 pub struct LiquidGlass {
     id: ElementId,
     content: Option<Stateful<Div>>,
@@ -65,90 +58,66 @@ pub struct LiquidGlass {
 }
 
 impl LiquidGlass {
-    /// The material while pressed. By default the resting material, lensing
-    /// a little harder and glowing from where the press landed.
     pub fn pressed_material(mut self, material: GlassMaterial) -> Self {
         self.pressed = Some(material);
         self
     }
 
-    /// The material under the pointer. By default the resting material with
-    /// a brighter glint.
     pub fn hovered_material(mut self, material: GlassMaterial) -> Self {
         self.hovered = Some(material);
         self
     }
 
-    /// How much a press swells the glass; 1 keeps its size.
     pub fn press_scale(mut self, scale: f32) -> Self {
         self.press_scale = scale;
         self
     }
 
-    /// How much hovering swells the glass; 1 keeps its size.
     pub fn hover_scale(mut self, scale: f32) -> Self {
         self.hover_scale = scale;
         self
     }
 
-    /// The spring every change follows.
     pub fn spring(mut self, spring: SpringConfig) -> Self {
         self.spring = spring;
         self
     }
 
-    /// Whether the glass lenses in from nothing when first painted, rather
-    /// than starting fully there.
     pub fn appear(mut self, appear: bool) -> Self {
         self.appear = appear;
         self
     }
 
-    /// Whether the glass is there. Hiding it lenses it away and fades its
-    /// content; showing it again lenses it back in.
     pub fn shown(mut self, shown: bool) -> Self {
         self.shown = shown;
         self
     }
 
-    /// Makes the glass follow its element on springs when layout moves or
-    /// resizes it, stretching along its motion like a drop, instead of
-    /// jumping there.
     pub fn morph(mut self, spring: SpringConfig) -> Self {
         self.morph = Some(spring);
         self
     }
 
-    /// What morphing glass turns into while it travels, as a tab bar's pill
-    /// lifts into a stronger lens when it slides to another tab.
     pub fn lift_material(mut self, material: GlassMaterial) -> Self {
         self.lift = Some(material);
         self
     }
 
-    /// How much morphing glass swells while it travels; 1 keeps its size.
     pub fn lift_scale(mut self, scale: f32) -> Self {
         self.lift_scale = scale;
         self
     }
 
-    /// How far a held press can pull the glass toward the pointer. The pull
-    /// rubber-bands, so it never quite reaches this, and the glass stretches
-    /// along it like gel; on release it springs back. Zero turns it off.
     pub fn drag_flex(mut self, flex: impl Into<Pixels>) -> Self {
         self.drag_flex = flex.into();
         self
     }
 
-    /// Swings the light toward the pointer while it hovers or presses, so
-    /// the glints follow it around the rim.
     pub fn light_follows_pointer(mut self, follows: bool) -> Self {
         self.light_follows_pointer = follows;
         self
     }
 
-    /// Shadows cast by the glass itself, following it as it swells, drags,
-    /// and morphs.
     pub fn glass_shadow(mut self, shadows: Vec<BoxShadow>) -> Self {
         self.shadows = shadows;
         self
@@ -189,7 +158,6 @@ impl IntoElement for LiquidGlass {
     }
 }
 
-/// A spring toward 0 or 1.
 #[derive(Clone, Copy, Default)]
 struct Toggle {
     spring: SpringState,
@@ -221,20 +189,15 @@ struct LiquidGlassState {
     press: Toggle,
     hover: Toggle,
     presence: Toggle,
-    /// Where the press landed, as a fraction of the glass's bounds.
     touch: Point<f32>,
-    /// Where morphing glass is on its way to the element's bounds.
     body: Option<LiquidRect>,
     lift: Toggle,
-    /// Where the press landed and where the pointer is now, in the window.
     press_origin: Point<Pixels>,
     pointer: Point<Pixels>,
-    /// How far a held press has pulled the glass, per axis.
     drag: [SpringState; 2],
     updated_at: Instant,
 }
 
-/// What a laid out [`LiquidGlass`] paints this frame.
 pub struct LiquidGlassFrame {
     state: Rc<RefCell<LiquidGlassState>>,
     hitbox: Hitbox,
@@ -242,7 +205,6 @@ pub struct LiquidGlassFrame {
     material: GlassMaterial,
     shadows: Vec<BoxShadow>,
     presence: f32,
-    /// Whether an enclosing group paints this glass as part of its body.
     grouped: bool,
 }
 
@@ -435,15 +397,12 @@ impl Element for LiquidGlass {
         let scale = (1. + (self.hover_scale - 1.) * hover + (self.press_scale - 1.) * press)
             * (1. + (self.lift_scale - 1.) * lift)
             * (0.92 + 0.08 * presence);
-        // A pulled drop stretches along the pull by about as far as it moved
-        // and thins across it, whatever its size.
         let (pull_x, pull_y) = (drag.x.abs(), drag.y.abs());
         let grown = size(
             body.size.width * scale + Pixels(1.2 * pull_x - 0.6 * pull_y),
             body.size.height * scale + Pixels(1.2 * pull_y - 0.6 * pull_x),
         );
         let center = body.center() + point(Pixels(drag.x), Pixels(drag.y));
-        // The same shape policy Style::paint gives the element's own fill.
         let requested = self.corner_radii.to_pixels(window.rem_size());
         let radii = match self.corner_radius_mode {
             CornerRadiusMode::Inherit => window.resolve_corner_radii(requested, bounds.size),
@@ -509,14 +468,12 @@ impl Element for LiquidGlass {
                 &frame.shadows,
             );
         }
-        // Gone glass paints nothing, so its content takes no input either.
         if self.shown || presence > 0.001 {
             window.with_element_opacity(Some(presence.clamp(0., 1.)), |window| {
                 content.paint(window, cx)
             });
         }
 
-        // Pointer changes redraw only the view this glass belongs to.
         let view = window.current_view();
         let down_state = frame.state.clone();
         let down_hitbox = frame.hitbox.clone();
@@ -566,12 +523,8 @@ impl Element for LiquidGlass {
     }
 }
 
-/// The glass shapes the [`liquid_glass`] children of a group registered while
-/// it prepainted them.
 pub type GlassGroupShapes = Rc<RefCell<Vec<GroupedGlass>>>;
 
-/// One child's shape in a [`GlassGroup`], how it is being pressed, and the
-/// shadows it casts.
 #[derive(Clone, Debug)]
 pub struct GroupedGlass {
     shape: GlassShape,
@@ -581,26 +534,12 @@ pub struct GroupedGlass {
     corner_smoothing: Option<f32>,
 }
 
-/// Turns angle `from` toward `to` by `phase`, the short way round.
 fn turn_toward(from: f32, to: f32, phase: f32) -> f32 {
     use std::f32::consts::{PI, TAU};
     let delta = (to - from + PI).rem_euclid(TAU) - PI;
     from + delta * phase
 }
 
-/// A container whose [`liquid_glass`] children, at any depth, are painted as
-/// one glass body: wherever two come closer than the material's merge
-/// radius they melt into each other, so a button swelling under a press
-/// bleeds into its neighbors. The group's material replaces the children's
-/// own; their press glow carries over.
-///
-/// Style it and give it children like a `div`. One body holds up to
-/// [`GLASS_MAX_SHAPES`](crate::GLASS_MAX_SHAPES) shapes; more are drawn as
-/// further bodies that do not merge with the first.
-///
-/// Children join while the group prepaints them, so a child inside a cached
-/// view that is not redrawn this frame is left out of the body; keep grouped
-/// glass in the group's own view.
 pub fn glass_group(id: impl Into<ElementId>, material: GlassMaterial) -> GlassGroup {
     let id = id.into();
     GlassGroup {
@@ -610,7 +549,6 @@ pub fn glass_group(id: impl Into<ElementId>, material: GlassMaterial) -> GlassGr
     }
 }
 
-/// See [`glass_group`].
 pub struct GlassGroup {
     id: ElementId,
     content: Option<Stateful<Div>>,
@@ -905,7 +843,6 @@ mod tests {
         assert!(cx.update(|window, _| window.painted_glasses().is_empty()));
     }
 
-    // Materials interpolate, so zz-gpui's own springs can carry one into another.
     #[test]
     fn materials_ride_springs() {
         use crate::{AnimationExt as _, SpringAnimation};

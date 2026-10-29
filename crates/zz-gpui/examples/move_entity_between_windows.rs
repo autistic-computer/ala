@@ -1,11 +1,3 @@
-//! An entity registers callbacks via the `_in` API family and then gets
-//! re-hosted in a new window via a click. The point of the example is to
-//! demonstrate that callbacks dispatched after the move correctly target the
-//! entity's *current* window rather than the window it was in at
-//! registration time.
-//!
-//! To run:  cargo run -p zz-gpui --example move_entity_between_windows
-
 #![cfg_attr(target_family = "wasm", no_main)]
 
 #[path = "example_support/fonts.rs"]

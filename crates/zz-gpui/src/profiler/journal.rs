@@ -1,17 +1,3 @@
-//! A journal of foreground work and the semantic boundaries between activity intervals.
-//!
-//! The foreground thread records task polls, action handlers, input dispatches,
-//! draws, and presentations as [`ForegroundEvent`]s in a bounded journal ring.
-//! Task polls shorter than [`TASK_POLL_FLOOR`] are folded into summaries, which
-//! bound the stream by the number of slow polls while preserving their exact
-//! count and total duration.
-//!
-//! Presentation and the foreground going idle are explicit [`IntervalBoundary`]
-//! entries in the same stream. Independent [`ForegroundJournalCollector`]s
-//! feed entries to [`IntervalSealer`], a pure state machine that groups all work
-//! preceding each boundary into a [`FrameSnapshot`]. The sealer does not infer
-//! boundaries from elapsed time or from incidental event kinds such as draws.
-
 use std::cell::{RefCell, UnsafeCell};
 use std::collections::{HashMap, VecDeque};
 use std::mem::MaybeUninit;
@@ -33,61 +19,27 @@ pub(crate) enum PowerState {
     Suspended,
 }
 
-/// Task polls shorter than this are folded into a [`PollSummary`] instead of
-/// being recorded individually. This keeps the stream bounded by the number
-/// of *slow* polls while preserving their exact count and total duration.
 pub const TASK_POLL_FLOOR: Duration = Duration::from_micros(100);
 
-/// A dirty frame that has not been presented by this deadline stops blocking
-/// foreground-idle boundaries, so a window that never presents (hidden or
-/// occluded windows receive no frame callbacks) cannot suppress boundaries
-/// indefinitely. Expiry only unblocks: the open interval still seals at a
-/// real presentation or idle boundary, keeping a starving hang and the frame
-/// it starved in one interval.
 pub const FRAME_DEADLINE: Duration = Duration::from_secs(1);
 
-// Backstop against pathological event storms within a single interval. At the
-// 100us floor, a fully hung second can produce at most ~10k recordable polls,
-// so this bound is only reachable when something is already deeply wrong.
 const MAX_INTERVAL_EVENTS: usize = 16 * 1024;
 
-// Allow 4MiB for the fixed ring allocation, including each slot's atomic
-// metadata. The poll floor and frame cadence bound the event rate to roughly
-// 10k per second in the worst case, so this holds several seconds of
-// worst-case traffic between consumer drains.
 const MAX_JOURNAL_ENTRIES: usize = (4 * 1024 * 1024) / core::mem::size_of::<JournalSlot>();
 
-// Absorbs brief collisions with a collector reading the exact slot being
-// wrapped. The foreground never waits for a reader; queued entries are retried
-// in order on the next publication.
 const MAX_PENDING_JOURNAL_ENTRIES: usize = 64;
 
-/// One entry in the foreground stream.
-///
-/// Events are recorded in completion order (ordered by their end time). An
-/// event that was in progress across a frame boundary (e.g. the task poll
-/// enclosing a draw) is recorded when it *ends*, with timestamps that may
-/// precede events recorded before it.
 #[derive(Debug, Copy, Clone)]
 pub enum ForegroundEvent {
-    /// A foreground task poll at least [`TASK_POLL_FLOOR`] long.
     TaskPoll(TaskTiming),
-    /// A completed action handler.
     Action(ActionTiming),
-    /// A dispatched platform input event.
     Input(InputTiming),
-    /// A completed window draw.
     Draw(FrameTiming),
-    /// Work spent submitting a frame to the platform.
     Present(PresentTiming),
-    /// Aggregate of task polls below [`TASK_POLL_FLOOR`], flushed before the
-    /// next individually retained event or interval boundary.
     SmallPolls(SmallPollFlush),
 }
 
 impl ForegroundEvent {
-    /// When the work described by this event began. For draws this is the
-    /// start of the draw itself, not the frame's first invalidation.
     pub fn start_time(&self) -> Instant {
         match self {
             Self::TaskPoll(timing) => timing.start,
@@ -99,7 +51,6 @@ impl ForegroundEvent {
         }
     }
 
-    /// When the work described by this event ended.
     pub fn end_time(&self) -> Instant {
         match self {
             Self::TaskPoll(timing) => timing.end.0,
@@ -111,34 +62,22 @@ impl ForegroundEvent {
         }
     }
 
-    /// How long the work described by this event took. For
-    /// [`Self::SmallPolls`] this is the span the summary covers, not time
-    /// spent polling; use the summary's `total` for occupancy.
     pub fn duration(&self) -> Duration {
         self.end_time().duration_since(self.start_time())
     }
 }
 
-/// Timing of one platform input dispatch on a window.
 #[derive(Debug, Copy, Clone)]
 pub struct InputTiming {
-    /// The platform input variant dispatched (see
-    /// [`crate::PlatformInput::kind_name`]).
     pub kind: &'static str,
-    /// When the input dispatch started.
     pub start: Instant,
-    /// When the input dispatch finished.
     pub end: Instant,
-    /// Whether handling the input invalidated a window.
     pub caused_invalidation: bool,
 }
 
-/// Exact count and total duration of task polls below [`TASK_POLL_FLOOR`].
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
 pub struct PollSummary {
-    /// Number of polls below the floor.
     pub count: u64,
-    /// Total duration of polls below the floor.
     pub total: Duration,
 }
 
@@ -149,28 +88,20 @@ impl PollSummary {
     }
 }
 
-/// A flushed [`PollSummary`] and the tightest span containing its folded polls.
 #[derive(Debug, Copy, Clone)]
 pub struct SmallPollFlush {
-    /// The folded polls.
     pub summary: PollSummary,
-    /// When the first folded poll began.
     pub since: Instant,
-    /// When the last folded poll ended.
     pub until: Instant,
 }
 
-/// A newly drawn frame and the platform submission that completed its interval.
 #[derive(Debug, Copy, Clone)]
 pub struct PresentedFrame {
-    /// The draw whose rendered scene was submitted.
     pub frame: FrameTiming,
-    /// Work spent submitting that scene to the platform.
     pub presentation: PresentTiming,
 }
 
 impl PresentedFrame {
-    /// Time from the frame's first invalidation through platform submission.
     pub fn dirty_to_present_duration(&self) -> Option<Duration> {
         self.frame
             .dirty_at
@@ -178,26 +109,14 @@ impl PresentedFrame {
     }
 }
 
-/// The semantic event that completed a foreground activity interval.
 #[derive(Debug, Copy, Clone)]
 pub enum IntervalBoundary {
-    /// A newly drawn frame was submitted to the platform.
     Presented(PresentedFrame),
-    /// The foreground returned to an idle platform loop with no unexpired
-    /// frame pending.
-    Idle {
-        /// When the foreground went idle.
-        ended_at: Instant,
-    },
-    /// A power notification interrupted the measurement interval.
-    PowerTransition {
-        /// When the foreground received the notification.
-        ended_at: Instant,
-    },
+    Idle { ended_at: Instant },
+    PowerTransition { ended_at: Instant },
 }
 
 impl IntervalBoundary {
-    /// When the interval ended.
     pub fn end_time(&self) -> Instant {
         match self {
             Self::Presented(presented) => presented.presentation.present_end,
@@ -205,7 +124,6 @@ impl IntervalBoundary {
         }
     }
 
-    /// The first invalidation of the frame satisfied by this boundary, if any.
     pub fn dirty_at(&self) -> Option<Instant> {
         match self {
             Self::Presented(presented) => presented.frame.dirty_at,
@@ -214,75 +132,41 @@ impl IntervalBoundary {
     }
 }
 
-/// A control-plane change to one window's pending-frame state.
 #[derive(Debug, Copy, Clone)]
 pub enum FrameStateChange {
-    /// The window has a frame waiting to be presented.
     Pending {
-        /// The window waiting for presentation.
         window_id: WindowId,
-        /// When this frame generation first became dirty.
         dirty_at: Instant,
     },
-    /// The window closed, so any pending frame no longer blocks idle
-    /// boundaries.
     Closed {
-        /// The window that closed.
         window_id: WindowId,
-        /// When the window closed.
         at: Instant,
     },
 }
 
-/// One item retained in the foreground journal.
 #[derive(Debug, Copy, Clone)]
 pub enum ForegroundJournalEntry {
-    /// A completed piece of foreground work.
     Event(ForegroundEvent),
-    /// A semantic interval boundary.
     Boundary(IntervalBoundary),
-    /// A change to pending-frame state. This is metadata, not foreground work.
     FrameState(FrameStateChange),
-    /// One or more logical entries were unavailable at this point in the
-    /// stream. Consumers must not infer interval boundaries across this gap.
-    Discontinuity {
-        /// Number of unavailable logical entries.
-        lost: u64,
-    },
+    Discontinuity { lost: u64 },
 }
 
-/// An immutable view of one sealed foreground interval, produced by
-/// [`IntervalSealer`].
 #[derive(Debug, Clone)]
 pub struct FrameSnapshot {
-    /// When the interval started (the previous seal, or the end of the idle
-    /// stretch preceding the interval's first event).
     pub interval_start: Instant,
-    /// The semantic event that completed the interval, including its metadata.
     pub boundary: IntervalBoundary,
-    /// Foreground work recorded during the interval, in completion order.
-    /// [`ForegroundEvent::SmallPolls`] entries are collected into
-    /// `small_polls` instead of appearing here.
     pub events: Vec<ForegroundEvent>,
-    /// Span-tagged aggregates of task polls below [`TASK_POLL_FLOOR`]. Spans
-    /// are retained so occupancy can apportion folded poll time to reporting
-    /// windows narrower than the interval.
     pub small_polls: Vec<SmallPollFlush>,
-    /// Events lost to the interval's event cap, plus ring losses reported
-    /// via [`IntervalSealer::note_lost`].
     pub dropped_events: u64,
-    /// Whether the journal had an unobserved gap during this interval.
     pub journal_discontinuous: bool,
 }
 
 impl FrameSnapshot {
-    /// When the interval ended.
     pub fn interval_end(&self) -> Instant {
         self.boundary.end_time()
     }
 
-    /// The combined count and total of all folded sub-floor polls in the
-    /// interval.
     pub fn small_poll_summary(&self) -> PollSummary {
         let mut summary = PollSummary::default();
         for flush in &self.small_polls {
@@ -291,21 +175,10 @@ impl FrameSnapshot {
         summary
     }
 
-    /// Total foreground time occupied within the interval: the union of the
-    /// recorded events' spans (clamped to the interval, so nested work like an
-    /// action inside an input dispatch is not double counted) plus the folded
-    /// small polls. Folded polls cannot be unioned with nested individually
-    /// timed work, so this remains a close approximation.
     pub fn occupancy(&self) -> Duration {
         self.occupancy_within(self.interval_start, self.interval_end())
     }
 
-    /// Like [`Self::occupancy`], but measured against an arbitrary window
-    /// (e.g. a reporting window anchored at a frame's first invalidation).
-    /// Event spans are clamped to the window. Folded polls carry no
-    /// individual timestamps, so each flush's total is apportioned by how
-    /// much of its span overlaps the window — assuming the folded time is
-    /// spread uniformly across the span.
     pub fn occupancy_within(&self, window_start: Instant, window_end: Instant) -> Duration {
         let mut spans: Vec<(Instant, Instant)> = self
             .events
@@ -338,8 +211,6 @@ impl FrameSnapshot {
             .map(|flush| {
                 let span = flush.until.duration_since(flush.since);
                 if span.is_zero() {
-                    // A point-like flush lies either inside or outside the
-                    // window.
                     if flush.since >= window_start && flush.since <= window_end {
                         flush.summary.total
                     } else {
@@ -356,7 +227,6 @@ impl FrameSnapshot {
         occupied + apportioned_small_polls
     }
 
-    /// The fraction of the interval the foreground spent working, in `0.0..=1.0`.
     pub fn busy_fraction(&self) -> f64 {
         let interval = self.interval_end().duration_since(self.interval_start);
         if interval.is_zero() {
@@ -391,8 +261,6 @@ impl ForegroundRunnableCounter {
     }
 }
 
-// Visibility and power changes clear `dirty_at`; `Window::refresh_visibility`
-// re-records the frame from the window's actual dirty state afterwards.
 struct WindowFrameState {
     visibility: WindowVisibility,
     dirty_at: Option<Instant>,
@@ -438,13 +306,6 @@ impl ForegroundJournalWriter {
         self.turn_depth += 1;
     }
 
-    // Idle boundaries require a retained event since the last boundary, not
-    // merely folded sub-floor polls. Sporadic wake-ups (timers, file
-    // watchers) leave the foreground idle after every tiny poll; a boundary
-    // for each would re-admit to the ring the very polls the fold keeps out
-    // of it, wrapping the ring within seconds. Folded-only work is discarded
-    // at true idle so unrelated wake-ups cannot accumulate toward a later
-    // frame budget. Polls remain folded while a frame or runnable is pending.
     fn end_turn(&mut self, ended_at: Instant) {
         let Some(turn_depth) = self.turn_depth.checked_sub(1) else {
             debug_assert!(false, "foreground turn must be begun before it ends");
@@ -497,8 +358,6 @@ impl ForegroundJournalWriter {
         }
     }
 
-    /// Whether work that started at `start` spans a sleep or a wake, and so
-    /// must not be measured as uninterrupted foreground work.
     fn power_interrupted_since(&self, start: Instant) -> bool {
         self.power == PowerState::Suspended || self.power_changed_at.is_some_and(|at| start <= at)
     }
@@ -610,9 +469,6 @@ pub(crate) fn foreground_runnable_counter() -> ForegroundRunnableCounter {
     FOREGROUND_RUNNABLES.with(Clone::clone)
 }
 
-/// Starts journaling on the calling thread. Called once by `App` construction
-/// on the main thread; every other thread's recording calls are no-ops.
-/// Idempotent so that multiple `App`s on one thread (tests) share one journal.
 pub(crate) fn install_foreground_journal() -> ForegroundJournal {
     let foreground_runnables = foreground_runnable_counter();
     FOREGROUND_JOURNAL.with(|journal| {
@@ -633,9 +489,6 @@ pub(crate) fn install_foreground_journal() -> ForegroundJournal {
     })
 }
 
-/// Restores the previous foreground journal on drop, so a test's writer
-/// (turn depth, pending frames, retained-since-boundary state) never leaks
-/// into a later test that happens to reuse the same test-harness thread.
 #[cfg(test)]
 pub(crate) struct TestForegroundJournalGuard {
     previous: Option<ForegroundJournalWriter>,
@@ -651,10 +504,6 @@ impl Drop for TestForegroundJournalGuard {
     }
 }
 
-/// Installs a fresh journal for the duration of a test, isolated from
-/// whatever a previous test left on this thread. Used by tests outside this
-/// module (e.g. `bench_context`) that need to observe journal entries
-/// without interference from the shared per-thread journal.
 #[cfg(test)]
 pub(crate) fn install_test_foreground_journal(
     capacity: usize,
@@ -690,7 +539,6 @@ pub(crate) fn observe_power(cx: &App) {
         record_power_transition(PowerState::Suspended);
     })
     .detach();
-    // Visibility notifications delivered during sleep may have been missed.
     cx.on_system_wake(|cx| {
         record_power_transition(PowerState::Awake);
         cx.spawn(async |cx| {
@@ -711,8 +559,6 @@ pub(crate) fn record_power_transition(state: PowerState) {
     with_journal(|journal| journal.power_transition(state, Instant::now()));
 }
 
-/// Whether work that started at `start` spans a sleep or a wake. Such work
-/// is dropped rather than measured.
 pub(crate) fn power_interrupted_since(start: Instant) -> bool {
     let mut interrupted = false;
     with_journal(|journal| interrupted = journal.power_interrupted_since(start));
@@ -723,8 +569,6 @@ pub(crate) fn record_window_visibility(id: WindowId, visibility: WindowVisibilit
     with_journal(|journal| journal.set_visibility(id, visibility, Instant::now()));
 }
 
-/// Whether a frame sample that started at `start` was measured while the
-/// window stayed visible and the system stayed awake.
 pub(crate) fn frame_sample_is_valid(id: WindowId, start: Instant) -> bool {
     let mut valid = true;
     with_journal(|journal| {
@@ -737,13 +581,6 @@ pub(crate) fn frame_sample_is_valid(id: WindowId, start: Instant) -> bool {
     valid
 }
 
-// TODO(gpui-profiler): the turn brackets in the dispatchers and
-// WindowProfiler are bare begin/end call pairs rather than uses of this
-// guard. A caught unwind between a pair leaves `turn_depth` (and potentially
-// the runnable counter) permanently unbalanced, which silently disables
-// idle boundaries for the rest of the process. Zed aborts on panics so
-// this is latent today, but gpui-as-a-library callers may catch unwinds;
-// route all bracketing through this guard.
 pub(crate) struct ForegroundTurnGuard;
 
 impl Drop for ForegroundTurnGuard {
@@ -816,8 +653,6 @@ struct JournalSlot {
     entry: UnsafeCell<MaybeUninit<ForegroundJournalEntry>>,
 }
 
-// `users` ensures the entry is only read while no writer owns the slot and is
-// only written while no readers own it.
 unsafe impl Sync for JournalSlot {}
 
 impl JournalSlot {
@@ -838,8 +673,6 @@ impl JournalSlot {
             return false;
         }
 
-        // SAFETY: setting SLOT_WRITER from zero gives this writer exclusive
-        // access to the slot until the Release store below.
         unsafe {
             (*self.entry.get()).write(entry);
         }
@@ -854,9 +687,6 @@ impl JournalSlot {
             return None;
         }
 
-        // SAFETY: a matching sequence means the slot was initialized for this
-        // logical entry, and `guard` prevents the writer from overwriting it
-        // until after the Copy.
         Some(unsafe { *(*self.entry.get()).assume_init_ref() })
     }
 
@@ -1016,12 +846,6 @@ impl JournalPublisher {
     }
 }
 
-/// A cloneable handle to one foreground journal stream.
-///
-/// Each collector has an independent cursor. Collectors briefly pin one slot
-/// at a time and never block recording; entries they could not observe are
-/// reported as discontinuities. Apps on the same foreground thread share the
-/// stream.
 #[derive(Clone)]
 pub struct ForegroundJournal {
     ring: Arc<JournalRing>,
@@ -1038,8 +862,6 @@ impl ForegroundJournal {
         )
     }
 
-    /// Creates an independent collector that observes entries offered after
-    /// this call.
     pub fn collector(&self) -> ForegroundJournalCollector {
         ForegroundJournalCollector {
             cursor: self.ring.offered.load(Ordering::Acquire),
@@ -1048,31 +870,18 @@ impl ForegroundJournal {
     }
 }
 
-/// Entries returned by one [`ForegroundJournalCollector::collect_unseen`] call.
 #[derive(Debug, Default)]
 pub struct DrainedEntries {
-    /// Journal entries recorded since the previous drain, in recording order,
-    /// including synthetic [`ForegroundJournalEntry::Discontinuity`] markers at
-    /// unavailable logical positions.
     pub entries: Vec<ForegroundJournalEntry>,
-    /// Entries unavailable to this collector because they were overwritten or
-    /// could not be published after the fixed pending queue filled. This is the
-    /// aggregate of the discontinuity markers in `entries`.
     pub lost: u64,
 }
 
-/// Reads the foreground stream, tracking a cursor so each call to
-/// [`Self::collect_unseen`] returns only entries recorded since the previous
-/// call. Independent collectors do not affect each other.
 pub struct ForegroundJournalCollector {
     cursor: u64,
     ring: Arc<JournalRing>,
 }
 
 impl ForegroundJournalCollector {
-    /// Returns entries recorded since the previous call (or since the
-    /// collector was created), reporting how many were unavailable before this
-    /// drain observed them.
     pub fn collect_unseen(&mut self) -> DrainedEntries {
         let end = self.ring.finalized.load(Ordering::Acquire);
         if self.cursor >= end {
@@ -1103,13 +912,6 @@ impl ForegroundJournalCollector {
     }
 }
 
-/// A pure state machine that groups foreground journal entries into
-/// [`FrameSnapshot`]s.
-///
-/// Feed it drained entries in recording order. Work is carried across calls
-/// until an explicit [`IntervalBoundary`] arrives. Idle time before an
-/// interval's first event is excluded without relying on an elapsed-time
-/// heuristic.
 #[derive(Debug)]
 pub struct IntervalSealer {
     interval_start: Instant,
@@ -1120,8 +922,6 @@ pub struct IntervalSealer {
 }
 
 impl IntervalSealer {
-    /// Creates a sealer whose first interval starts at `start` (typically
-    /// the moment the consumer's collector was created).
     pub fn new(start: Instant) -> Self {
         Self {
             interval_start: start,
@@ -1132,16 +932,11 @@ impl IntervalSealer {
         }
     }
 
-    /// Accounts for a loss supplied outside a collector drain. Collector losses
-    /// are already represented by ordered discontinuity entries.
     pub fn note_lost(&mut self, lost: u64) {
         self.dropped_events += lost;
         self.journal_discontinuous |= lost > 0;
     }
 
-    /// Processes a batch of drained entries, returning the snapshots completed
-    /// by explicit boundaries. Work without a following boundary is carried
-    /// over to subsequent calls.
     pub fn push_entries(
         &mut self,
         entries: impl IntoIterator<Item = ForegroundJournalEntry>,
@@ -1173,9 +968,6 @@ impl IntervalSealer {
                         snapshots.push(self.seal(boundary));
                     }
                 }
-                // Pending-frame state gates boundaries on the writer side;
-                // the entries remain in the stream for consumers that want
-                // dirty timing, but the sealer has no use for them.
                 ForegroundJournalEntry::FrameState(_) => {}
                 ForegroundJournalEntry::Discontinuity { lost } => self.note_lost(lost),
             }
@@ -1202,9 +994,6 @@ impl IntervalSealer {
         if self.small_polls.len() >= MAX_INTERVAL_EVENTS
             && let Some(last) = self.small_polls.last_mut()
         {
-            // Degrade gracefully at the cap: widen the last flush's span
-            // instead of dropping poll time, at the cost of coarser
-            // apportioning.
             last.summary.add(flush.summary);
             last.since = last.since.min(flush.since);
             last.until = last.until.max(flush.until);
@@ -1314,7 +1103,6 @@ mod tests {
         assert_eq!(writer.windows[&first].dirty_at, None);
         writer.record_frame_pending(first, start);
         assert!(!writer.has_unexpired_pending_frame(start));
-        // A repeated notification is not a transition.
         writer.power_transition(PowerState::Suspended, start + FRAME_DEADLINE);
         assert_eq!(writer.power_changed_at, Some(start));
         writer.power_transition(PowerState::Awake, start);
@@ -1550,9 +1338,6 @@ mod tests {
         assert!(has_boundary_at(&entries, presented_at));
     }
 
-    /// A frame that outlives [`FRAME_DEADLINE`] no longer seals an interval
-    /// of its own: the work that starved it and its eventual presentation
-    /// stay in one interval, preserving the dirty-to-present association.
     #[test]
     fn a_presentation_after_the_deadline_seals_the_whole_interval() {
         let start = Instant::now();
@@ -1578,9 +1363,6 @@ mod tests {
         assert_eq!(snapshot.events.len(), 2);
     }
 
-    /// Frame expiry unblocks idle boundaries on the writer side: retained
-    /// work after the deadline seals at its turn's end even though the window
-    /// never presented.
     #[test]
     fn an_expired_frame_no_longer_blocks_idle_boundaries() {
         let start = Instant::now();
@@ -1617,8 +1399,6 @@ mod tests {
         ));
     }
 
-    /// Closing a window clears its pending frame, so idle boundaries resume
-    /// without waiting for the deadline.
     #[test]
     fn closing_a_window_unblocks_idle_boundaries() {
         let start = Instant::now();
@@ -1642,8 +1422,6 @@ mod tests {
         ));
     }
 
-    /// One window presenting must not unblock idle boundaries while another
-    /// window's unexpired frame is still pending.
     #[test]
     fn presenting_one_window_does_not_clear_another_pending_window() {
         let start = Instant::now();
@@ -1760,9 +1538,6 @@ mod tests {
         ));
     }
 
-    /// Sporadic wake-ups (a tiny folded poll after which the foreground goes
-    /// idle, repeatedly) must write nothing to the ring and must not accumulate
-    /// toward a later retained interval.
     #[test]
     fn sparse_small_polls_are_discarded_when_the_foreground_returns_to_idle() {
         let start = Instant::now();
@@ -1779,8 +1554,6 @@ mod tests {
         let quiet = collector.collect_unseen().entries;
         assert!(quiet.is_empty());
 
-        // A later retained event seals normally without inheriting the earlier
-        // folded-only wake-ups.
         let retained = ForegroundEvent::TaskPoll(task_timing(
             start + Duration::from_secs(161),
             start + Duration::from_secs(161) + Duration::from_millis(1),
@@ -1821,9 +1594,6 @@ mod tests {
         assert_eq!(snapshots[1].dropped_events, 0);
     }
 
-    /// Ring losses must be able to surface even when every retained entry was
-    /// among the losses: a loss-only interval still seals at the next
-    /// boundary rather than sliding away as empty.
     #[test]
     fn losses_alone_seal_a_snapshot_at_the_next_boundary() {
         let start = Instant::now();
@@ -1891,8 +1661,6 @@ mod tests {
         let drained = collector.collect_unseen();
         assert_eq!(ours(&drained.entries), timestamps);
 
-        // The cursor advanced past everything: a second drain sees none of
-        // our entries again.
         let drained = collector.collect_unseen();
         assert!(ours(&drained.entries).is_empty());
     }

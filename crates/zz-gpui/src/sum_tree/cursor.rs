@@ -93,7 +93,6 @@ where
         }
     }
 
-    /// Item is None, when the list is empty, or this cursor is at the end of the list.
     #[track_caller]
     pub fn item(&self) -> Option<&'a T> {
         self.assert_did_seek();
@@ -400,7 +399,6 @@ where
     T: Item,
     D: Dimension<'a, T::Summary>,
 {
-    /// Returns whether we found the item you were seeking for.
     #[track_caller]
     pub fn seek<Target>(&mut self, pos: &Target, bias: Bias) -> bool
     where
@@ -410,11 +408,6 @@ where
         self.seek_internal(pos, bias, &mut ())
     }
 
-    /// Returns whether we found the item you were seeking for.
-    ///
-    /// # Panics
-    ///
-    /// If we did not seek before, use seek instead in that case.
     #[track_caller]
     pub fn seek_forward<Target>(&mut self, pos: &Target, bias: Bias) -> bool
     where
@@ -423,7 +416,6 @@ where
         self.seek_internal(pos, bias, &mut ())
     }
 
-    /// Advances the cursor and returns traversed items as a tree.
     #[track_caller]
     pub fn slice<Target>(&mut self, end: &Target, bias: Bias) -> SumTree<T>
     where
@@ -455,7 +447,6 @@ where
         summary.0
     }
 
-    /// Returns whether we found the item you were seeking for.
     #[track_caller]
     fn seek_internal(
         &mut self,

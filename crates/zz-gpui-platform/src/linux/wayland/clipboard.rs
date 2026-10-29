@@ -16,12 +16,10 @@ use crate::linux::{
 };
 use zz_gpui::{ClipboardEntry, ClipboardItem, Image, ImageFormat, hash};
 
-/// Text mime types that we'll offer to other programs.
 pub(crate) const TEXT_MIME_TYPES: [&str; 3] =
     ["text/plain;charset=utf-8", "UTF8_STRING", "text/plain"];
 pub(crate) const FILE_LIST_MIME_TYPE: &str = "text/uri-list";
 
-/// Text mime types that we'll accept from other programs.
 pub(crate) const ALLOWED_TEXT_MIME_TYPES: [&str; 2] = ["text/plain;charset=utf-8", "UTF8_STRING"];
 
 pub(crate) struct Clipboard {
@@ -29,11 +27,9 @@ pub(crate) struct Clipboard {
     loop_handle: LoopHandle<'static, WaylandClientStatePtr>,
     self_mime: String,
 
-    // Internal clipboard
     contents: Option<ClipboardItem>,
     primary_contents: Option<ClipboardItem>,
 
-    // External clipboard
     cached_read: Option<ClipboardItem>,
     current_offer: Option<DataOffer<WlDataOffer>>,
     cached_primary_read: Option<ClipboardItem>,
@@ -57,7 +53,6 @@ impl ReceiveData for ZwpPrimarySelectionOfferV1 {
 }
 
 #[derive(Clone, Debug)]
-/// Wrapper for `WlDataOffer` and `ZwpPrimarySelectionOfferV1`, used to help track mime types.
 pub(crate) struct DataOffer<T: ReceiveData> {
     pub inner: T,
     mime_types: Vec<String>,
@@ -113,9 +108,6 @@ impl<T: ReceiveData> DataOffer<T> {
             }
         };
 
-        // Normalize the text to unix line endings, otherwise
-        // copying from eg: firefox inserts a lot of blank
-        // lines, and that is super annoying.
         let result = text_content.replace("\r\n", "\n");
         Some(ClipboardItem::new_string(result))
     }

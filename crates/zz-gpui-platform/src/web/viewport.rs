@@ -1,9 +1,3 @@
-//! Browser viewport and safe-area frame snapshots in canvas coordinates.
-//!
-//! Browser geometry is sampled before rendering, never by geometry getters.
-//! Safe-area padding is resolved by CSS so display cutouts use the browser's
-//! own environment values rather than device-specific assumptions.
-
 use wasm_bindgen::JsCast;
 use zz_gpui::{Bounds, Edges, Pixels, WindowInsets, point, px, size};
 
@@ -33,8 +27,6 @@ impl WebViewport {
     }
 
     pub(crate) fn observe_safe_area(&self, observer: &web_sys::ResizeObserver) {
-        // Separate boxes detect redistribution between edges even when the
-        // total inset, and therefore a single combined probe's size, is unchanged.
         for probe in &self.safe_area_probes {
             observer.observe(probe);
         }
@@ -78,9 +70,6 @@ impl WebViewport {
             ),
             None => (0., 0., layout_width, layout_height),
         };
-        // VisualViewport offsets and getBoundingClientRect share layout CSS
-        // coordinates. Multiplying by the pinch scale here would incorrectly
-        // expand the visible rectangle back to its unzoomed size.
         let x = (left - canvas_bounds.left()).clamp(0., canvas_bounds.width());
         let y = (top - canvas_bounds.top()).clamp(0., canvas_bounds.height());
         let right = (left + width - canvas_bounds.left()).clamp(x, canvas_bounds.width());

@@ -165,9 +165,6 @@ impl GPUState {
 impl DirectWriteTextSystem {
     pub(crate) fn new(directx_devices: &DirectXDevices) -> Result<Self> {
         let factory: IDWriteFactory5 = unsafe { DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)? };
-        // The `IDWriteInMemoryFontFileLoader` here is supported starting from
-        // Windows 10 Creators Update, which consequently requires the entire
-        // `DirectWriteTextSystem` to run on `win10 1703`+.
         let in_memory_loader = unsafe { factory.CreateInMemoryFontFileLoader()? };
         unsafe { factory.RegisterFontFileLoader(&in_memory_loader)? };
         let builder = unsafe { factory.CreateFontSetBuilder()? };
@@ -328,7 +325,6 @@ impl DirectWriteState {
 
         let mut font_id = select_font(self, font);
         if font_id.is_none() {
-            // try updating system fonts and reselect
             let mut collection = None;
             let font_collection_updated = unsafe {
                 components
@@ -701,7 +697,6 @@ impl DirectWriteState {
         unsafe {
             font.font_face.GetRecommendedRenderingMode(
                 params.font_size.as_f32(),
-                // Using 96 as scale is applied by the transform
                 96.0,
                 96.0,
                 Some(&transform),
@@ -855,7 +850,6 @@ impl DirectWriteState {
             )?;
         }
 
-        // The output buffer expects RGBA data, so pad the alpha channel with zeros.
         for pixel_ix in (0..pixel_count).rev() {
             let src = pixel_ix * 3;
             let dst = pixel_ix * 4;
@@ -881,10 +875,6 @@ impl DirectWriteState {
         params: &RenderGlyphParams,
         glyph_bounds: Bounds<DevicePixels>,
     ) -> Result<Vec<u8>> {
-        // INVARIANT: the code below drives the *shared* D3D11 immediate context
-        // (`Map`/`Unmap`/`Draw`/`CopyResource`), which `DirectXRenderer` and `DirectXAtlas` also
-        // touch. An immediate `ID3D11DeviceContext` is not thread-safe, so this must only run on
-        // the main UI thread (which it always is; text rasterization never leaves that thread).
         let bitmap_size = glyph_bounds.size;
         let subpixel_shift = params
             .subpixel_variant
@@ -919,7 +909,6 @@ impl DirectWriteState {
             bidiLevel: 0,
         };
 
-        // todo: support formats other than COLR
         let color_enumerator = unsafe {
             components.factory.TranslateColorGlyphRun(
                 Vector2::new(baseline_origin_x, baseline_origin_y),
@@ -1200,11 +1189,8 @@ impl DirectWriteState {
             };
         }
 
-        // Release the mapping now that the rows have been copied out; leaving `staging_texture`
-        // mapped would leak the mapping and keep the resource pinned for later reuse.
         unsafe { device_context.Unmap(&staging_texture, 0) };
 
-        // Convert from premultiplied to straight alpha
         for chunk in rasterized.chunks_exact_mut(4) {
             let b = chunk[0] as f32;
             let g = chunk[1] as f32;
@@ -1292,7 +1278,6 @@ struct GlyphLayerTexture {
     run_color: Rgba,
     bounds: Bounds<i32>,
     texture_view: ID3D11ShaderResourceView,
-    // holding on to the texture to not RAII drop it
     _texture: ID3D11Texture2D,
 }
 
@@ -1421,12 +1406,11 @@ impl Iterator for ClusterAnalyzer<'_> {
 
     fn next(&mut self) -> Option<(usize, usize)> {
         if self.utf16_idx >= self.cluster_map.len() {
-            return None; // No more clusters
+            return None;
         }
         let start_utf16_idx = self.utf16_idx;
         let current_glyph = self.cluster_map[start_utf16_idx] as usize;
 
-        // Find the end of current cluster (where glyph index changes)
         let mut end_utf16_idx = start_utf16_idx + 1;
         while end_utf16_idx < self.cluster_map.len()
             && self.cluster_map[end_utf16_idx] as usize == current_glyph
@@ -1436,7 +1420,6 @@ impl Iterator for ClusterAnalyzer<'_> {
 
         let utf16_len = end_utf16_idx - start_utf16_idx;
 
-        // Calculate glyph count for this cluster
         let next_glyph = if end_utf16_idx < self.cluster_map.len() {
             self.cluster_map[end_utf16_idx] as usize
         } else {
@@ -1445,7 +1428,6 @@ impl Iterator for ClusterAnalyzer<'_> {
 
         let glyph_count = next_glyph - current_glyph;
 
-        // Update state for next call
         self.utf16_idx = end_utf16_idx;
         self.glyph_idx = next_glyph;
 
@@ -1510,8 +1492,6 @@ impl IDWriteTextRenderer_Impl for TextRenderer_Impl {
         let Some(font_face) = glyphrun.fontFace.as_ref() else {
             return Ok(());
         };
-        // This `cast()` action here should never fail since we are running on Win10+, and
-        // `IDWriteFontFace3` requires Win10
         let Ok(font_face) = &font_face.cast::<IDWriteFontFace3>() else {
             return Err(Error::new(
                 DWRITE_E_UNSUPPORTEDOPERATION,
@@ -1525,8 +1505,6 @@ impl IDWriteTextRenderer_Impl for TextRenderer_Impl {
             .font_info_cache
             .get(&font_face_key)
             .copied()
-            // in some circumstances, we might be getting served a FontFace that we did not create ourselves
-            // so create a new font from it and cache it accordingly. The usual culprit here seems to be Segoe UI Symbol
             .map_or_else(
                 || {
                     let font = font_face_to_font(font_face, &self.locale)
@@ -1656,14 +1634,6 @@ impl IDWriteTextRenderer_Impl for TextRenderer_Impl {
     }
 }
 
-/// Interprets an optional DirectWrite array pointer as a slice, treating a
-/// null pointer with a zero length as an empty slice. A null pointer with a
-/// nonzero length fails with `null_error_message`.
-///
-/// # Safety
-///
-/// When `ptr` is non-null, the caller must guarantee that it points to a valid
-/// array of at least `len` elements that outlives the returned slice.
 unsafe fn slice_from_nullable<'a, T>(
     ptr: *const T,
     len: usize,
@@ -1781,15 +1751,12 @@ fn font_face_to_font(font_face: &IDWriteFontFace3, locale: &HSTRING) -> Option<F
     })
 }
 
-// https://learn.microsoft.com/en-us/windows/win32/api/dwrite/ne-dwrite-dwrite_font_feature_tag
 fn apply_font_features(
     direct_write_features: &IDWriteTypography,
     features: &FontFeatures,
 ) -> Result<()> {
     let tag_values = features.tag_value_list();
 
-    // All of these features are enabled by default by DirectWrite.
-    // If you want to (and can) peek into the source of DirectWrite
     let mut feature_liga = make_direct_write_feature("liga", 1);
     let mut feature_clig = make_direct_write_feature("clig", 1);
     let mut feature_calt = make_direct_write_feature("calt", 1);
@@ -1896,8 +1863,6 @@ fn get_system_ui_font_name() -> SharedString {
         .log_err()
         .is_none()
         {
-            // https://learn.microsoft.com/en-us/windows/win32/uxguide/vis-fonts
-            // Segoe UI is the Windows font intended for user interface text strings.
             "Segoe UI".into()
         } else {
             let font_name = String::from_utf16_lossy(&info.lfFaceName);
@@ -1908,8 +1873,6 @@ fn get_system_ui_font_name() -> SharedString {
     }
 }
 
-// One would think that with newer DirectWrite method: IDWriteFontFace4::GetGlyphImageFormats
-// but that doesn't seem to work for some glyphs, say ❤
 fn is_color_glyph(
     font_face: &IDWriteFontFace3,
     glyph_id: GlyphId,
@@ -1984,7 +1947,6 @@ mod tests {
         assert_eq!(next, Some((1, 1)));
         let next = analyzer.next();
         assert_eq!(next, None);
-        // 👨‍👩‍👧‍👦👩‍💻
         let cluster_map = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4, 4];
         let mut analyzer = ClusterAnalyzer::new(&cluster_map, 5);
         let next = analyzer.next();
@@ -1993,7 +1955,6 @@ mod tests {
         assert_eq!(next, Some((5, 1)));
         let next = analyzer.next();
         assert_eq!(next, None);
-        // 👩‍💻
         let cluster_map = [0, 0, 0, 0, 0];
         let mut analyzer = ClusterAnalyzer::new(&cluster_map, 1);
         let next = analyzer.next();
@@ -2046,10 +2007,6 @@ mod tests {
             .map(|(params, bounds)| text_system.rasterize_glyph(params, *bounds))
             .collect::<Result<_>>()?;
 
-        // Churn the texture heap with further rasterization passes. If the color
-        // compositing leaks leftover texture data (the render target is not cleared),
-        // the second batch can pick up different contents and differ from the first.
-        // With an explicit clear both batches are deterministic and identical.
         for _ in 0..3 {
             for (params, bounds) in &params_list {
                 text_system.rasterize_glyph(params, *bounds)?;
@@ -2074,9 +2031,6 @@ mod tests {
         let gpu_state = GPUState::new(&devices)?;
 
         const SIZE: u32 = 32;
-        // Seed the render target with solid red so that any texel which the
-        // compositing pass fails to clear/overwrite remains identifiable after
-        // the readback.
         let poison = {
             let mut v = vec![0u8; (SIZE * SIZE * 4) as usize];
             for pixel in v.chunks_exact_mut(4) {
@@ -2127,8 +2081,6 @@ mod tests {
             rtv.unwrap()
         };
 
-        // A single opaque layer in the top-left corner; the bottom-right corner
-        // of the texture is covered by no layer at all.
         let layer_alpha = vec![255u8; 4 * 4];
         let layer = GlyphLayerTexture::new(
             &gpu_state,

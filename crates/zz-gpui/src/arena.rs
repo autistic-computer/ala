@@ -29,7 +29,6 @@ impl Drop for Chunk {
     fn drop(&mut self) {
         unsafe {
             let chunk_size = self.end.offset_from_unsigned(self.start);
-            // SAFETY: This succeeded during allocation.
             let layout = alloc::Layout::from_size_align_unchecked(chunk_size, 1);
             alloc::dealloc(self.start, layout);
         }
@@ -38,7 +37,6 @@ impl Drop for Chunk {
 
 impl Chunk {
     fn new(chunk_size: NonZeroUsize) -> Self {
-        // this only fails if chunk_size is unreasonably huge
         let layout = alloc::Layout::from_size_align(chunk_size.get(), 1).unwrap();
         let start = unsafe { alloc::alloc(layout) };
         if start.is_null() {
@@ -53,13 +51,6 @@ impl Chunk {
     }
 
     fn allocate(&mut self, layout: alloc::Layout) -> Option<NonNull<u8>> {
-        // Compute the allocation bounds in integer address space so that the
-        // bounds check happens before any pointer offsetting. Offsetting a
-        // pointer past the end of its allocation is undefined behavior even if
-        // the result is never dereferenced (as happens on the chunk-spill
-        // path), so `ptr::add` cannot be used until we know the result stays
-        // in bounds. `checked_add` also handles the documented case where
-        // `align_offset` returns `usize::MAX`.
         let base = self.offset.addr();
         let aligned_addr = base.checked_add(self.offset.align_offset(layout.align()))?;
         let next_addr = aligned_addr.checked_add(layout.size())?;
@@ -110,19 +101,10 @@ impl Arena {
         self.chunks.len() * self.chunk_size.get()
     }
 
-    /// Marks the start of a scope (e.g. a window draw) whose allocations must stay
-    /// live until the scope ends, even if `clear` is called by a nested scope in
-    /// the meantime.
     pub fn begin_scope(&mut self) {
         self.scope_depth += 1;
     }
 
-    /// Ends the innermost scope started with `begin_scope`.
-    ///
-    /// Panics if no scope is active: an unbalanced `end_scope` would let `clear`
-    /// run while an enclosing scope still references arena memory, which is
-    /// exactly the use-after-free this bookkeeping exists to prevent, so failing
-    /// loudly here is preferable.
     pub fn end_scope(&mut self) {
         self.scope_depth = self
             .scope_depth
@@ -130,12 +112,6 @@ impl Arena {
             .expect("Arena::end_scope called without a matching begin_scope");
     }
 
-    /// Drops all allocations and resets the arena, unless a scope is still active.
-    ///
-    /// When a draw triggers a nested draw (e.g. re-entrant window procedure
-    /// invocations on Windows, or opening a window from within a draw), the nested
-    /// draw's clear must not free memory the outer draw still references, so it is
-    /// deferred: the outer draw's own clear will drop both draws' allocations.
     pub fn clear(&mut self) {
         if self.scope_depth == 0 {
             self.force_clear();
@@ -284,7 +260,6 @@ mod tests {
         assert_eq!(*c, 7);
         assert_eq!(*d, 8);
 
-        // Ensure drop gets called.
         let dropped = Rc::new(Cell::new(false));
         struct DropGuard(Rc<Cell<bool>>);
         impl Drop for DropGuard {
@@ -352,7 +327,6 @@ mod tests {
         let drops = Rc::new(Cell::new(0));
         let mut arena = Arena::new(1024);
 
-        // Outer draw starts and allocates.
         arena.begin_scope();
         let outer = arena.alloc(|| 42u64);
         arena.alloc({
@@ -360,7 +334,6 @@ mod tests {
             || DropCounter(drops)
         });
 
-        // Nested draw runs to completion and requests a clear.
         arena.begin_scope();
         let inner = arena.alloc(|| 7u64);
         arena.alloc({
@@ -370,12 +343,10 @@ mod tests {
         arena.end_scope();
         arena.clear();
 
-        // The clear must be deferred: the outer draw's allocations are still live.
         assert_eq!(*outer, 42);
         assert_eq!(*inner, 7);
         assert_eq!(drops.get(), 0);
 
-        // Once the outer draw finishes, its clear drops both draws' allocations.
         arena.end_scope();
         arena.clear();
         assert_eq!(drops.get(), 2);

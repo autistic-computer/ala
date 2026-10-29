@@ -26,7 +26,6 @@ use std::{
     time::Duration,
 };
 
-/// TestPlatform implements the Platform trait for use in tests.
 pub(crate) struct TestPlatform {
     background_executor: BackgroundExecutor,
     foreground_executor: ForegroundExecutor,
@@ -57,10 +56,8 @@ pub(crate) struct TestPlatform {
 }
 
 #[derive(Clone)]
-/// A fake screen capture source, used for testing.
 pub struct TestScreenCaptureSource {}
 
-/// A fake screen capture stream, used for testing.
 pub struct TestScreenCaptureStream {}
 
 impl ScreenCaptureSource for TestScreenCaptureSource {
@@ -256,8 +253,6 @@ impl TestPlatform {
         *self.screen_capture_sources.borrow_mut() = sources;
     }
 
-    /// Queues the prompt so a test can later inspect or answer it through
-    /// [`Self::pending_prompt`] and [`Self::simulate_prompt_answer`].
     #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn prompt(
         &self,
@@ -279,9 +274,6 @@ impl TestPlatform {
         rx
     }
 
-    /// Benchmarks have no API to answer a prompt, so this doesn't retain it
-    /// for later inspection; dropping the sender immediately cancels the
-    /// returned receiver instead of leaving it pending indefinitely.
     #[cfg(not(any(test, feature = "test-support")))]
     pub(crate) fn prompt(
         &self,
@@ -441,9 +433,7 @@ impl Platform for TestPlatform {
         }
     }
 
-    fn activate(&self, _ignoring_other_apps: bool) {
-        //
-    }
+    fn activate(&self, _ignoring_other_apps: bool) {}
 
     fn hide(&self) {
         unimplemented!()
@@ -521,8 +511,6 @@ impl Platform for TestPlatform {
         unimplemented!()
     }
 
-    /// Queues the prompt so a test can later answer it through
-    /// [`Self::simulate_path_prompt_response`].
     #[cfg(any(test, feature = "test-support"))]
     fn prompt_for_paths(
         &self,
@@ -533,10 +521,6 @@ impl Platform for TestPlatform {
         rx
     }
 
-    /// Benchmarks have no API to answer a path prompt, so this doesn't
-    /// retain it for later inspection; dropping the sender immediately
-    /// cancels the returned receiver instead of leaving it pending
-    /// indefinitely.
     #[cfg(not(any(test, feature = "test-support")))]
     fn prompt_for_paths(
         &self,
@@ -545,8 +529,6 @@ impl Platform for TestPlatform {
         oneshot::channel().1
     }
 
-    /// Queues the prompt so a test can later answer it through
-    /// [`Self::simulate_new_path_selection`].
     #[cfg(any(test, feature = "test-support"))]
     fn prompt_for_new_path(
         &self,
@@ -561,10 +543,6 @@ impl Platform for TestPlatform {
         rx
     }
 
-    /// Benchmarks have no API to answer a new-path prompt, so this doesn't
-    /// retain it for later inspection; dropping the sender immediately
-    /// cancels the returned receiver instead of leaving it pending
-    /// indefinitely.
     #[cfg(not(any(test, feature = "test-support")))]
     fn prompt_for_new_path(
         &self,
@@ -722,7 +700,6 @@ impl Platform for TestPlatform {
 }
 
 impl TestScreenCaptureSource {
-    /// Create a fake screen capture source, for testing.
     #[cfg(any(test, feature = "test-support"))]
     pub fn new() -> Self {
         Self {}

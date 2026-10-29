@@ -5,22 +5,14 @@ use crate::{Hsla, Pixels, Rems, Rgba};
 const CRITICAL_DAMPING_TOLERANCE: f32 = 1e-4;
 const DEFAULT_SPRING_EPSILON: f32 = 0.001;
 
-/// The physical parameters of a damped harmonic oscillator.
-///
-/// `stiffness` and `mass` must be finite and positive. `damping` must be finite
-/// and non-negative.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SpringConfig {
-    /// The spring stiffness, conventionally written as $k$.
     pub stiffness: f32,
-    /// The viscous damping coefficient, conventionally written as $c$.
     pub damping: f32,
-    /// The moving mass, conventionally written as $m$.
     pub mass: f32,
 }
 
 impl SpringConfig {
-    /// Creates a spring from its physical parameters.
     pub const fn new(stiffness: f32, damping: f32, mass: f32) -> Self {
         Self {
             stiffness,
@@ -29,18 +21,12 @@ impl SpringConfig {
         }
     }
 
-    /// Returns the natural angular frequency and damping ratio $(\omega_0, \zeta)$.
     pub fn canonical(&self) -> (f32, f32) {
         let natural_frequency = (self.stiffness / self.mass).sqrt();
         let damping_ratio = self.damping / (2.0 * (self.stiffness * self.mass).sqrt());
         (natural_frequency, damping_ratio)
     }
 
-    /// Advances a spring toward a target that remains fixed for `delta_time`.
-    ///
-    /// This analytic step is independent of frame rate and preserves velocity,
-    /// allowing an interrupted spring to be retargeted without restarting it.
-    /// `delta_time` is wall time; it runs at [`crate::animation_speed`].
     pub fn step(&self, state: SpringState, target: f32, delta_time: f32) -> SpringState {
         let propagator = self.propagator(delta_time * crate::animation_speed());
         let displacement = state.position - target;
@@ -51,10 +37,6 @@ impl SpringConfig {
         }
     }
 
-    /// Advances a spring toward a target moving at a constant velocity.
-    ///
-    /// A first-order hold avoids the frame-rate-dependent lag introduced by
-    /// treating a dragged target as stationary between frames.
     pub fn step_ramp(
         &self,
         state: SpringState,
@@ -80,11 +62,6 @@ impl SpringConfig {
         }
     }
 
-    /// Returns the exact state-transition matrix for a constant target.
-    ///
-    /// Materializing this matrix is useful when many springs share the same
-    /// configuration and frame delta. A matrix must not be reused when the
-    /// frame delta changes.
     pub fn propagator(&self, delta_time: f32) -> [[f32; 2]; 2] {
         let (natural_frequency, damping_ratio) = self.canonical();
 
@@ -140,10 +117,6 @@ impl SpringConfig {
         }
     }
 
-    /// Tests both displacement and velocity against a positional tolerance.
-    ///
-    /// Velocity is compared with `epsilon * natural_frequency`, giving it the
-    /// corresponding animated-units-per-second scale.
     pub fn is_settled(&self, state: SpringState, target: f32, epsilon: f32) -> bool {
         let (natural_frequency, _) = self.canonical();
         epsilon.is_finite()
@@ -152,10 +125,6 @@ impl SpringConfig {
             && state.velocity.abs() <= epsilon * natural_frequency
     }
 
-    /// Returns a conservative time after which the spring remains settled.
-    ///
-    /// An undamped spring has no finite settling time and returns
-    /// [`Duration::MAX`].
     pub fn settle_time(&self, state: SpringState, target: f32, epsilon: f32) -> Duration {
         let displacement = state.position - target;
         if displacement == 0.0 && state.velocity == 0.0 {
@@ -248,28 +217,17 @@ impl SpringConfig {
     }
 }
 
-/// The instantaneous position and velocity of a spring.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SpringState {
-    /// The current value in the animated unit.
     pub position: f32,
-    /// The current value's change per second.
     pub velocity: f32,
 }
 
-/// A value that can be targeted by a one-dimensional spring.
-///
-/// Implementations may project the spring coordinate into a richer output,
-/// allowing a discrete state or a path through a multidimensional value to be
-/// driven by one spring.
 pub trait SpringTarget: 'static {
-    /// The value supplied to the spring animator.
     type Output;
 
-    /// Returns the target in the spring's coordinate space.
     fn target(&self) -> f32;
 
-    /// Projects a spring coordinate into the animated output.
     fn resolve(&self, value: f32) -> Self::Output;
 }
 
@@ -321,34 +279,23 @@ impl SpringTarget for bool {
     }
 }
 
-/// A potentially overshooting coordinate within an animation.
-///
-/// Phases are not restricted to 0..1. Multi-stage animations can assign each
-/// stage its own coordinate and interpolate over ranges such as 1..=2.
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
-pub struct AnimationPhase(
-    /// The unbounded phase coordinate.
-    pub f32,
-);
+pub struct AnimationPhase(pub f32);
 
 impl AnimationPhase {
-    /// Restricts this phase to the bounds of a range.
     pub fn clamp(self, range: RangeInclusive<f32>) -> Self {
         let (first, second) = range.into_inner();
         Self(self.0.clamp(first.min(second), first.max(second)))
     }
 
-    /// Interpolates between values using 0 and 1 as their phase coordinates.
     pub fn interpolate<T: Interpolate>(self, from: T, to: T) -> T {
         T::interpolate(from, to, self.0)
     }
 
-    /// Interpolates between values without extrapolating beyond 0 and 1.
     pub fn interpolate_clamped<T: Interpolate>(self, from: T, to: T) -> T {
         T::interpolate(from, to, self.0.clamp(0.0, 1.0))
     }
 
-    /// Interpolates between values assigned to arbitrary phase coordinates.
     pub fn interpolate_between<T: Interpolate>(
         self,
         range: RangeInclusive<f32>,
@@ -364,7 +311,6 @@ impl AnimationPhase {
         T::interpolate(from, to, phase)
     }
 
-    /// Interpolates over arbitrary phase coordinates without extrapolating.
     pub fn interpolate_between_clamped<T: Interpolate>(
         self,
         range: RangeInclusive<f32>,
@@ -405,9 +351,7 @@ impl SpringTarget for AnimationPhase {
     }
 }
 
-/// A value that supports linear interpolation and extrapolation.
 pub trait Interpolate: Sized {
-    /// Resolves the value at `phase`, where 0 is `from` and 1 is `to`.
     fn interpolate(from: Self, to: Self, phase: f32) -> Self;
 }
 
@@ -452,23 +396,16 @@ impl Interpolate for Hsla {
     }
 }
 
-/// Controls how a spring advances and resolves its presentation value.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SpringPlayback {
-    /// Advances toward the latest target, preserving velocity across retargets.
     #[default]
     Running,
-    /// Holds the current position and velocity until playback resumes.
     Paused,
-    /// Holds the current position and discards velocity.
     Stopped,
-    /// Snaps to the latest target and discards velocity.
     Completed,
-    /// Returns to the initial value and discards velocity.
     Cancelled,
 }
 
-/// A stateful spring animation targeting a value or projected path.
 #[derive(Clone, Debug)]
 pub struct SpringAnimation<T = ()> {
     pub(crate) config: SpringConfig,
@@ -479,7 +416,6 @@ pub struct SpringAnimation<T = ()> {
 }
 
 impl SpringAnimation<()> {
-    /// Creates a spring animation builder.
     pub fn new(config: SpringConfig) -> Self {
         Self {
             config,
@@ -490,7 +426,6 @@ impl SpringAnimation<()> {
         }
     }
 
-    /// Sets the value or path targeted by this spring.
     pub fn to<T: SpringTarget>(self, target: T) -> SpringAnimation<T> {
         let SpringAnimation {
             config,
@@ -510,13 +445,11 @@ impl SpringAnimation<()> {
 }
 
 impl<T> SpringAnimation<T> {
-    /// Sets the settling tolerance in the target's scalar coordinate space.
     pub fn with_epsilon(mut self, epsilon: f32) -> Self {
         self.epsilon = epsilon;
         self
     }
 
-    /// Sets how the spring advances or resolves its current value.
     pub fn playback(mut self, playback: SpringPlayback) -> Self {
         self.playback = playback;
         self
@@ -524,18 +457,12 @@ impl<T> SpringAnimation<T> {
 }
 
 impl<T: SpringTarget> SpringAnimation<T> {
-    /// Sets the coordinate used when this element has no prior spring state.
     pub fn from(mut self, initial: T) -> Self {
         self.initial = Some(initial.target());
         self
     }
 }
 
-/// Adapts a spring starting at zero with no velocity to GPUI's duration-based easing API.
-///
-/// The returned easing can overshoot the normalized 0..1 output range. Retargeting
-/// this duration-based form restarts the spring; use [`SpringConfig::step`] when
-/// preserving velocity matters.
 pub fn sampled_easing(config: SpringConfig, epsilon: f32) -> (Duration, impl Fn(f32) -> f32) {
     let initial_state = SpringState {
         position: 0.0,

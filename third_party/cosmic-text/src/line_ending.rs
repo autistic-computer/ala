@@ -1,23 +1,16 @@
 use core::ops::Range;
 
-/// Line ending
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum LineEnding {
-    /// Use `\n` for line ending (POSIX-style)
     #[default]
     Lf,
-    /// Use `\r\n` for line ending (Windows-style)
     CrLf,
-    /// Use `\r` for line ending (many legacy systems)
     Cr,
-    /// Use `\n\r` for line ending (some legacy systems)
     LfCr,
-    /// No line ending
     None,
 }
 
 impl LineEnding {
-    /// Get the line ending as a str
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Lf => "\n",
@@ -29,7 +22,6 @@ impl LineEnding {
     }
 }
 
-/// Iterator over lines terminated by [`LineEnding`]
 #[derive(Debug)]
 pub struct LineIter<'a> {
     string: &'a str,
@@ -38,7 +30,6 @@ pub struct LineIter<'a> {
 }
 
 impl<'a> LineIter<'a> {
-    /// Create an iterator of lines in a string slice
     pub const fn new(string: &'a str) -> Self {
         Self {
             string,
@@ -66,7 +57,6 @@ impl Iterator for LineIter<'_> {
                 } else if after.starts_with('\r') {
                     LineEnding::Cr
                 } else {
-                    //TODO: this should not be possible
                     LineEnding::None
                 };
                 self.start += ending.as_str().len();
@@ -83,8 +73,6 @@ impl Iterator for LineIter<'_> {
         }
     }
 }
-
-//TODO: DoubleEndedIterator
 
 #[test]
 fn test_line_iter() {

@@ -21,17 +21,14 @@ pub struct SyntaxSystem {
 }
 
 impl SyntaxSystem {
-    /// Create a new [`SyntaxSystem`]
     pub fn new() -> Self {
         Self {
-            //TODO: store newlines in buffer
             syntax_set: SyntaxSet::load_defaults_nonewlines(),
             theme_set: ThemeSet::load_defaults(),
         }
     }
 }
 
-/// A wrapper of [`Editor`] with syntax highlighting provided by [`SyntaxSystem`]
 #[derive(Debug)]
 pub struct SyntaxEditor<'syntax_system, 'buffer> {
     editor: Editor<'buffer>,
@@ -43,11 +40,6 @@ pub struct SyntaxEditor<'syntax_system, 'buffer> {
 }
 
 impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
-    /// Create a new [`SyntaxEditor`] with the provided [`Buffer`], [`SyntaxSystem`], and theme name.
-    ///
-    /// A good default theme name is "base16-eighties.dark".
-    ///
-    /// Returns None if theme not found
     pub fn new(
         buffer: impl Into<BufferRef<'buffer>>,
         syntax_system: &'syntax_system SyntaxSystem,
@@ -68,7 +60,6 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
         })
     }
 
-    /// Modifies the theme of the [`SyntaxEditor`], returning false if the theme is missing
     pub fn update_theme(&mut self, theme_name: &str) -> bool {
         if let Some(theme) = self.syntax_system.theme_set.themes.get(theme_name) {
             if self.theme != theme {
@@ -76,7 +67,6 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
                 self.highlighter = Highlighter::new(theme);
                 self.syntax_cache.clear();
 
-                // Reset attrs to match default foreground and no highlighting
                 self.with_buffer_mut(|buffer| {
                     for line in buffer.lines.iter_mut() {
                         let mut attrs = line.attrs_list().defaults();
@@ -99,11 +89,6 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
         }
     }
 
-    /// Load text from a file, and also set syntax to the best option
-    ///
-    /// ## Errors
-    ///
-    /// Returns an [`io::Error`] if reading the file fails
     #[cfg(feature = "std")]
     pub fn load_text<P: AsRef<Path>>(
         &mut self,
@@ -113,7 +98,6 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
     ) -> io::Result<()> {
         let path = path.as_ref();
 
-        // Set attrs to match default foreground
         if let Some(foreground) = self.theme.settings.foreground {
             attrs = attrs.color(Color::rgba(
                 foreground.r,
@@ -123,12 +107,10 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
             ));
         }
 
-        // Clear buffer first (allows sane handling of non-existant files)
         self.editor.with_buffer_mut(|buffer| {
             buffer.set_text("", &attrs, Shaping::Advanced, None);
         });
 
-        // Update syntax based on file name
         self.syntax = match self.syntax_system.syntax_set.find_syntax_for_file(path) {
             Ok(Some(some)) => some,
             Ok(None) => {
@@ -141,10 +123,8 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
             }
         };
 
-        // Clear syntax cache
         self.syntax_cache.clear();
 
-        // Set text
         let text = fs::read_to_string(path)?;
         self.editor.with_buffer_mut(|buffer| {
             buffer.set_text(&text, &attrs, Shaping::Advanced, None);
@@ -153,7 +133,6 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
         Ok(())
     }
 
-    /// Set syntax highlighting by file extension
     pub fn syntax_by_extension(&mut self, extension: &str) {
         self.syntax = match self
             .syntax_system
@@ -170,7 +149,6 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
         self.syntax_cache.clear();
     }
 
-    /// Get the default background color
     pub fn background_color(&self) -> Color {
         if let Some(background) = self.theme.settings.background {
             Color::rgba(background.r, background.g, background.b, background.a)
@@ -179,7 +157,6 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
         }
     }
 
-    /// Get the default foreground (text) color
     pub fn foreground_color(&self) -> Color {
         if let Some(foreground) = self.theme.settings.foreground {
             Color::rgba(foreground.r, foreground.g, foreground.b, foreground.a)
@@ -188,7 +165,6 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
         }
     }
 
-    /// Get the default cursor color
     pub fn cursor_color(&self) -> Color {
         if let Some(some) = self.theme.settings.caret {
             Color::rgba(some.r, some.g, some.b, some.a)
@@ -197,7 +173,6 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
         }
     }
 
-    /// Get the default selection color
     pub fn selection_color(&self) -> Color {
         if let Some(some) = self.theme.settings.selection {
             Color::rgba(some.r, some.g, some.b, some.a)
@@ -212,14 +187,10 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
         }
     }
 
-    /// Get the current syntect theme
     pub fn theme(&self) -> &SyntaxTheme {
         self.theme
     }
 
-    /// Draw the editor
-    ///
-    /// Automatically resolves any pending dirty state before drawing.
     #[cfg(feature = "swash")]
     pub fn draw<F>(
         &mut self,
@@ -240,10 +211,6 @@ impl<'syntax_system, 'buffer> SyntaxEditor<'syntax_system, 'buffer> {
         );
     }
 
-    /// Render the editor using the provided renderer.
-    ///
-    /// The caller is responsible for calling [`Edit::shape_as_needed`] first
-    /// to ensure layout is up to date.
     pub fn render<R: Renderer>(&self, renderer: &mut R) {
         let size = self.with_buffer(|buffer| buffer.size());
         if let Some(width) = size.0 {
@@ -314,16 +281,13 @@ impl<'buffer> Edit<'buffer> for SyntaxEditor<'_, 'buffer> {
             let mut total_height = 0.0;
             let mut highlighted = 0;
             for line_i in 0..buffer.lines.len() {
-                // Break out if we have reached the end of scroll and are past the cursor
                 if total_height > scroll_end && line_i > cursor.line {
                     break;
                 }
 
                 let line = &mut buffer.lines[line_i];
                 if line.metadata().is_some() && line_i < self.syntax_cache.len() {
-                    //TODO: duplicated code!
                     if line_i >= scroll.line && total_height < scroll_end {
-                        // Perform shaping and layout of this line in order to count if we have reached scroll
                         match buffer.line_layout(font_system, line_i) {
                             Some(layout_lines) => {
                                 for layout_line in layout_lines.iter() {
@@ -331,9 +295,7 @@ impl<'buffer> Edit<'buffer> for SyntaxEditor<'_, 'buffer> {
                                         layout_line.line_height_opt.unwrap_or(metrics.line_height);
                                 }
                             }
-                            None => {
-                                //TODO: should this be possible?
-                            }
+                            None => {}
                         }
                     }
                     continue;
@@ -359,17 +321,16 @@ impl<'buffer> Edit<'buffer> for SyntaxEditor<'_, 'buffer> {
 
                 let attrs = line.attrs_list().defaults();
                 let mut attrs_list = AttrsList::new(&attrs);
-                let original_attrs = attrs.clone(); // Store a clone for comparison
+                let original_attrs = attrs.clone();
                 for (style, _, range) in ranges {
                     let span_attrs = attrs
-                        .clone() // Clone attrs for modification
+                        .clone()
                         .color(Color::rgba(
                             style.foreground.r,
                             style.foreground.g,
                             style.foreground.b,
                             style.foreground.a,
                         ))
-                        //TODO: background
                         .style(if style.font_style.contains(FontStyle::ITALIC) {
                             Style::Italic
                         } else {
@@ -390,10 +351,8 @@ impl<'buffer> Edit<'buffer> for SyntaxEditor<'_, 'buffer> {
                     }
                 }
 
-                // Update line attributes. This operation only resets if the line changes
                 line.set_attrs_list(attrs_list);
 
-                // Perform shaping and layout of this line in order to count if we have reached scroll
                 if line_i >= scroll.line && total_height < scroll_end {
                     match buffer.line_layout(font_system, line_i) {
                         Some(layout_lines) => {
@@ -402,9 +361,7 @@ impl<'buffer> Edit<'buffer> for SyntaxEditor<'_, 'buffer> {
                                     layout_line.line_height_opt.unwrap_or(metrics.line_height);
                             }
                         }
-                        None => {
-                            //TODO: should this be possible?
-                        }
+                        None => {}
                     }
                 }
 
@@ -474,11 +431,6 @@ impl<'buffer> Edit<'buffer> for SyntaxEditor<'_, 'buffer> {
 }
 
 impl BorrowedWithFontSystem<'_, SyntaxEditor<'_, '_>> {
-    /// Load text from a file, and also set syntax to the best option
-    ///
-    /// ## Errors
-    ///
-    /// Returns an [`io::Error`] if reading the file fails
     #[cfg(feature = "std")]
     pub fn load_text<P: AsRef<Path>>(&mut self, path: P, attrs: crate::Attrs) -> io::Result<()> {
         self.inner.load_text(self.font_system, path, attrs)

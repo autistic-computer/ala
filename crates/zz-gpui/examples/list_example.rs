@@ -117,7 +117,6 @@ impl Render for BottomListDemo {
                         })
                         .flex_1(),
                     )
-                    // Scrollbar track
                     .child(
                         div()
                             .w(px(SCROLLBAR_WIDTH))
@@ -126,7 +125,6 @@ impl Render for BottomListDemo {
                             .bg(rgb(0xE0E0E0))
                             .relative()
                             .child(
-                                // Thumb — position is unclamped to expose the bug
                                 div()
                                     .absolute()
                                     .top(thumb_top)

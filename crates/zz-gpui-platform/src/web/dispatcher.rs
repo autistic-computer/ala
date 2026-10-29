@@ -45,7 +45,6 @@ enum MainThreadItem {
         timeout: Option<Duration>,
     },
     Function(Box<dyn FnOnce() + Send>),
-    // TODO-Wasm: Shouldn't these run on their own dedicated thread?
     RealtimeFunction(Box<dyn FnOnce() + Send>),
 }
 
@@ -70,21 +69,17 @@ impl MainThreadMailbox {
             log::error!("MainThreadMailbox::send failed: receiver disconnected");
         }
 
-        // TODO-Wasm: Verify this lock-free protocol
         let view = self.signal_view();
         js_sys::Atomics::store(&view, 0, 1).ok();
         js_sys::Atomics::notify(&view, 0).ok();
     }
 
     fn drain(&self, window: &web_sys::Window) {
-        // Only the main thread accesses this receiver; never park if that changes.
         let mut receiver = self
             .receiver
             .try_lock()
             .expect("main-thread mailbox receiver must not be locked");
         loop {
-            // We need these `spin` variants because we can't acquire a lock on the main thread.
-            // TODO-WASM: Should we do something different?
             match receiver.spin_try_pop() {
                 Ok(Some(item)) => execute_on_main_thread(window, item),
                 Ok(None) => break,
@@ -111,9 +106,6 @@ impl MainThreadMailbox {
             loop {
                 js_sys::Atomics::store(&view, 0, 0).expect("Atomics.store failed");
 
-                // Items posted between the previous drain and the store above
-                // set the signal we just cleared, so their notify is lost.
-                // Drain again after re-arming to avoid missing them.
                 mailbox.drain(&window);
 
                 let result = match js_sys::Atomics::wait_async(&view, 0, 0) {
@@ -129,9 +121,6 @@ impl MainThreadMailbox {
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
 
-                // `async: false` means the signal changed between the store and
-                // the wait ("not-equal"): work has already arrived, so skip
-                // waiting and drain immediately.
                 if is_async {
                     let promise: js_sys::Promise =
                         js_sys::Reflect::get(&result, &JsValue::from_str("value"))
@@ -185,7 +174,6 @@ impl WebDispatcher {
                 .hardware_concurrency()
                 .max(MIN_BACKGROUND_THREADS as f64) as usize;
 
-            // TODO-Wasm: Is it bad to have web workers blocking for a long time like this?
             (0..thread_count)
                 .map(|i| {
                     let mut receiver = background_receiver.clone();
@@ -362,29 +350,16 @@ fn execute_on_main_thread(window: &web_sys::Window, item: MainThreadItem) {
 }
 
 thread_local! {
-    /// The deadline of the idle callback currently running; read by
-    /// [`PlatformDispatcher::idle_time_remaining`] from inside the runnable.
     static IDLE_DEADLINE: RefCell<Option<web_sys::IdleDeadline>> = const { RefCell::new(None) };
-    /// Whether `requestIdleCallback` exists (it is absent on Safari), probed
-    /// on first use.
     static IDLE_CALLBACK_SUPPORTED: Cell<Option<bool>> = const { Cell::new(None) };
 }
 
-/// Registers one `requestIdleCallback` per runnable, mirroring how
-/// `dispatch_after` maps each timer to its own platform alarm. The browser
-/// already provides the queue semantics a central pump would rebuild: idle
-/// callbacks run in registration order, an idle period drains as many as its
-/// deadline allows, and a callback whose `timeout` expires is posted as an
-/// ordinary task instead.
 fn schedule_idle_runnable(
     window: &web_sys::Window,
     runnable: RunnableVariant,
     timeout: Option<Duration>,
 ) {
     if !idle_callback_supported(window) {
-        // Safari: run idle work as ordinary macrotasks. With no metered
-        // deadline, `idle_time_remaining` stays `None` and idle tasks bound
-        // their own slices.
         schedule_runnable(window, runnable, Priority::Low);
         return;
     }
@@ -430,7 +405,6 @@ fn schedule_runnable(window: &web_sys::Window, runnable: RunnableVariant, priori
             window.queue_microtask(callback);
         }
         _ => {
-            // TODO-Wasm: this ought to enqueue so we can dequeue with proper priority
             window
                 .set_timeout_with_callback_and_timeout_and_arguments_0(callback, 0)
                 .ok();

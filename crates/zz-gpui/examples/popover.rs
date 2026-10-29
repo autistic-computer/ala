@@ -9,7 +9,6 @@ use zz_gpui::{
 };
 use zz_gpui_platform::application;
 
-/// An example show use deferred to create a floating layers.
 struct HelloWorld {
     open: bool,
     secondary_open: bool,
@@ -59,7 +58,6 @@ impl HelloWorld {
             }))
             .when(self.secondary_open, |this| {
                 this.child(
-                    // Now GPUI supports nested deferred!
                     deferred(
                         anchored()
                             .anchor(Anchor::TopLeft)
@@ -143,8 +141,6 @@ impl Render for HelloWorld {
                                                             },
                                                         ))
                                                     })
-                                                    // Here we need render popover after the content
-                                                    // to ensure it will be on top layer.
                                                     .child(
                                                         self.render_secondary_popover(window, cx),
                                                     ),

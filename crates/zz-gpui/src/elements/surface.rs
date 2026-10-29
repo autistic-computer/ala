@@ -6,10 +6,8 @@ use crate::{
 #[cfg(target_os = "macos")]
 use core_video::pixel_buffer::CVPixelBuffer;
 
-/// A source of a surface's content.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SurfaceSource {
-    /// A macOS image buffer from CoreVideo
     #[cfg(target_os = "macos")]
     Surface(CVPixelBuffer),
 }
@@ -21,7 +19,6 @@ impl From<CVPixelBuffer> for SurfaceSource {
     }
 }
 
-/// A surface element.
 pub struct Surface {
     source: SurfaceSource,
     object_fit: ObjectFit,
@@ -29,7 +26,6 @@ pub struct Surface {
     style: StyleRefinement,
 }
 
-/// Create a new surface element.
 #[cfg(target_os = "macos")]
 pub fn surface(source: impl Into<SurfaceSource>) -> Surface {
     Surface {
@@ -41,13 +37,11 @@ pub fn surface(source: impl Into<SurfaceSource>) -> Surface {
 }
 
 impl Surface {
-    /// Set the object fit for the image.
     pub fn object_fit(mut self, object_fit: ObjectFit) -> Self {
         self.object_fit = object_fit;
         self
     }
 
-    /// Sets the corner radii used to clip the surface.
     pub fn corner_radii(mut self, corner_radii: impl Into<Corners<Pixels>>) -> Self {
         self.corner_radii = corner_radii.into();
         self

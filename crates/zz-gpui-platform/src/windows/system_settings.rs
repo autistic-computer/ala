@@ -9,8 +9,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use zz_gpui::util::ResultExt;
 
-/// Windows settings pulled from SystemParametersInfo
-/// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-systemparametersinfow
 #[derive(Default, Debug, Clone)]
 pub(crate) struct WindowsSystemSettings {
     pub(crate) mouse_wheel_settings: MouseWheelSettings,
@@ -18,9 +16,7 @@ pub(crate) struct WindowsSystemSettings {
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct MouseWheelSettings {
-    /// SEE: SPI_GETWHEELSCROLLCHARS
     pub(crate) wheel_scroll_chars: Cell<u32>,
-    /// SEE: SPI_GETWHEELSCROLLLINES
     pub(crate) wheel_scroll_lines: Cell<u32>,
 }
 

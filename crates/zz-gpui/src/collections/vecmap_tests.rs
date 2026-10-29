@@ -1,8 +1,3 @@
-//! Tests for the VecMap collection.
-//!
-//! This is in a sibling module so that the tests are guaranteed to only cover
-//! states that can be created by the public API.
-
 use crate::collections::vecmap::*;
 
 #[test]
@@ -90,12 +85,9 @@ fn test_multiple_entries_independent() {
     map.entry(2).or_insert(20);
     map.entry(3).or_insert(30);
     assert_eq!(map.iter().count(), 3);
-    // Re-inserting does not duplicate keys
     map.entry(1).or_insert(99);
     assert_eq!(map.iter().count(), 3);
 }
-
-// entry_ref tests
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -146,7 +138,6 @@ fn test_entry_ref_key_not_cloned_when_occupied() {
     map.entry_ref(&key).or_insert(1);
     let clones_after_insert = clone_count.get();
 
-    // Looking up an existing key must not clone it.
     map.entry_ref(&key).or_insert(99);
     assert_eq!(clone_count.get(), clones_after_insert);
 }

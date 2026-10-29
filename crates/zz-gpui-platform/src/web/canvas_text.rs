@@ -30,7 +30,6 @@ impl TextCanvas {
         let canvas = OffscreenCanvas::new(1, 1)
             .map_err(|error| anyhow!("creating text OffscreenCanvas: {error:?}"))?;
         let options = js_sys::Object::new();
-        // Every rasterized glyph is read back for upload into GPUI's atlas.
         let assigned = js_sys::Reflect::set(
             &options,
             &JsValue::from_str("willReadFrequently"),
@@ -49,14 +48,11 @@ impl TextCanvas {
 
     fn configure(&self, css_font: &str) -> Result<()> {
         ensure!(!css_font.trim().is_empty(), "Canvas text font is empty");
-        // An invalid CSS font assignment is ignored by Canvas. Reset first so
-        // it cannot accidentally inherit the preceding request's font.
         self.context.set_font("10px sans-serif");
         self.context.set_font(css_font);
         self.context.set_text_align("left");
         self.context.set_text_baseline("alphabetic");
         self.context.set_fill_style_str("white");
-        // web-sys does not expose direction on the offscreen 2D context.
         let assigned = js_sys::Reflect::set(
             self.context.as_ref(),
             &JsValue::from_str("direction"),
@@ -148,7 +144,6 @@ pub(crate) fn rasterize(
         .context("Canvas text raster byte count overflow")?;
 
     with_canvas(|canvas| {
-        // Shrink before growing so intermediate canvas sizes obey the pixel cap.
         if height < canvas.canvas.height() {
             canvas.canvas.set_height(height);
         }

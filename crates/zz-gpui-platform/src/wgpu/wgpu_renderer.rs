@@ -27,23 +27,16 @@ const INSTANCE_TEXTURE_TEXEL_SIZE: u64 = 16;
 
 const PATH_TEXTURE_GRANULARITY: u32 = 256;
 
-/// Shader variant for backends with storage buffer support: the shared shader
-/// logic plus the storage-buffer instance transport.
 const STORAGE_BUFFER_SHADERS: &str = concat!(
     include_str!("shaders.wgsl"),
     include_str!("shaders_storage.wgsl"),
 );
 
-/// Shader variant for WebGL2, which has no storage buffers: the shared shader
-/// logic plus the texture-based instance transport.
 const WEBGL_SHADERS: &str = concat!(
     include_str!("shaders.wgsl"),
     include_str!("shaders_webgl.wgsl"),
 );
 
-/// Subpixel text rendering requires dual-source blending, which WebGL2 lacks, so
-/// this variant only ever runs with the storage-buffer transport. The `enable`
-/// directive must precede all declarations.
 const SUBPIXEL_SHADERS: &str = concat!(
     "enable dual_source_blending;\n",
     include_str!("shaders.wgsl"),
@@ -110,8 +103,6 @@ fn least_common_multiple(left: u64, right: u64) -> u64 {
 struct GlobalParams {
     viewport_size: [f32; 2],
     premultiplied_alpha: u32,
-    // Scene-wide rounded clip (Scene::window_corner_mask); zero size disables
-    // it. The smoothing rides in what was alignment padding.
     window_mask_smoothing: f32,
     window_mask_origin: [f32; 2],
     window_mask_size: [f32; 2],
@@ -145,15 +136,11 @@ impl From<Bounds<ScaledPixels>> for PodBounds {
 struct SurfaceParams {
     bounds: PodBounds,
     content_mask: PodBounds,
-    // WGSL field order: top_left, top_right, bottom_right, bottom_left.
     corner_radii: [f32; 4],
     corner_smoothing: f32,
-    // The WGSL struct rounds up to its 8-byte alignment.
     pad: f32,
 }
 
-/// The vertex half of every shader layer pipeline; the fragment half is the
-/// layer's [`CustomShader`].
 const SHADER_LAYER_VERTEX: &str = r#"
 struct ShaderLayerParams {
     bounds: vec4<f32>,
@@ -220,12 +207,6 @@ struct PathRasterizationVertex {
 pub struct WgpuSurfaceConfig {
     pub size: Size<DevicePixels>,
     pub transparent: bool,
-    /// Preferred presentation mode. When `Some`, the renderer will use this
-    /// mode if supported by the surface, falling back to `Fifo`.
-    /// When `None`, defaults to `Fifo` (VSync).
-    ///
-    /// Mobile platforms may prefer `Mailbox` (triple-buffering) to avoid
-    /// blocking in `get_current_texture()` during lifecycle transitions.
     pub preferred_present_mode: Option<wgpu::PresentMode>,
 }
 
@@ -242,13 +223,8 @@ struct WgpuPipelines {
     surfaces: wgpu::RenderPipeline,
 }
 
-/// One frame allocation of instance data, ready to bind.
 struct InstanceBinding {
     bind_group: wgpu::BindGroup,
-    /// Index of the allocation's first instance within the bound data. The
-    /// bind group covers the whole instance buffer or texture and the shader
-    /// indexes it absolutely, so draws offset their instance (or vertex)
-    /// ranges by this value.
     first_instance: u32,
 }
 
@@ -267,13 +243,10 @@ struct WgpuBindGroupLayouts {
     texture: wgpu::BindGroupLayout,
 }
 
-/// Shared GPU context reference, used to coordinate device recovery across multiple windows.
 pub type GpuContext = Rc<RefCell<Option<WgpuContext>>>;
 
 enum InstanceData {
     Storage(wgpu::Buffer),
-    // WebGL2 has no storage buffers. A uint texture keeps the records available to both shader
-    // stages while preserving integer and floating-point bit patterns exactly.
     Texture {
         texture: wgpu::Texture,
         view: wgpu::TextureView,
@@ -282,7 +255,6 @@ enum InstanceData {
     },
 }
 
-/// GPU resources that must be dropped together during device recovery.
 struct WgpuResources {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
@@ -296,8 +268,6 @@ struct WgpuResources {
     instance_data: InstanceData,
     instance_bind_group: wgpu::BindGroup,
     staging_belt: wgpu::util::StagingBelt,
-    /// Copies this frame's instance data out of the staging belt. Submitted
-    /// ahead of the frame's draws.
     upload_encoder: Option<wgpu::CommandEncoder>,
     path_intermediate_texture: Option<wgpu::Texture>,
     path_intermediate_view: Option<wgpu::TextureView>,
@@ -305,7 +275,6 @@ struct WgpuResources {
     path_msaa_view: Option<wgpu::TextureView>,
     path_bounds: Option<Bounds<DevicePixels>>,
     shader_layers: ShaderLayerResources,
-    /// Created when a scene first paints glass.
     glass: Option<GlassResources>,
 }
 
@@ -483,27 +452,20 @@ struct WgpuRendererCore {
     clip_window_shadows: bool,
 }
 
-/// GPU resources of a windowed renderer. A surface is only ever configured against the
-/// device that owns `core`, so it cannot outlive it: there is no surface-only state.
 enum RendererState {
-    /// Frames can be drawn.
     Ready {
         surface: wgpu::Surface<'static>,
         core: WgpuRendererCore,
     },
-    /// The native surface is gone (Android `TerminateWindow`, browser context loss) but
-    /// the device, pipelines, and atlas remain so `replace_surface` can resume without
-    /// re-uploading cached textures.
-    Unconfigured { core: WgpuRendererCore },
-    /// Released by `destroy`, or dropped for a device recovery that has not succeeded yet.
+    Unconfigured {
+        core: WgpuRendererCore,
+    },
     Released,
 }
 
 pub struct WgpuRenderer {
-    /// Shared GPU context for device recovery coordination (unused on WASM).
     #[allow(dead_code)]
     context: Option<GpuContext>,
-    /// Compositor GPU hint for adapter selection (unused on WASM).
     #[allow(dead_code)]
     compositor_gpu: Option<CompositorGpuHint>,
     state: RendererState,
@@ -536,15 +498,6 @@ impl WgpuRenderer {
         }
     }
 
-    /// Creates a new WgpuRenderer from raw window handles.
-    ///
-    /// The `gpu_context` is a shared reference that coordinates GPU context across
-    /// multiple windows. The first window to create a renderer will initialize the
-    /// context; subsequent windows will share it.
-    ///
-    /// # Safety
-    /// The caller must ensure that the window handle remains valid for the lifetime
-    /// of the returned renderer.
     #[cfg(not(target_family = "wasm"))]
     pub fn new<W>(
         gpu_context: GpuContext,
@@ -686,11 +639,6 @@ impl WgpuRenderer {
             );
         }
 
-        // Glass reads back what the frame holds so far by copying out of it.
-        // wgpu reports only RENDER_ATTACHMENT for a browser canvas, but WebGPU
-        // canvases accept any usage. The surface asks for copies only once a
-        // frame paints glass: copyable frames lose display optimizations
-        // (framebufferOnly on Metal, compression on some Vulkan drivers).
         let backdrop_sampling = surface_caps.usages.contains(wgpu::TextureUsages::COPY_SRC)
             || context.adapter.get_info().backend == wgpu::Backend::BrowserWebGpu;
         let surface_config = wgpu::SurfaceConfiguration {
@@ -707,8 +655,6 @@ impl WgpuRenderer {
             color_space: wgpu::SurfaceColorSpace::Auto,
             view_formats: vec![],
         };
-        // Configure the surface immediately. The adapter selection process already validated
-        // that this adapter can successfully configure this surface.
         surface.configure(&context.device, &surface_config);
 
         let core = WgpuRendererCore::new(context, atlas.clone(), surface_format, alpha_mode);
@@ -869,14 +815,6 @@ impl WgpuRendererCore {
         dual_source_blending: bool,
         uses_webgl_instance_data: bool,
     ) -> WgpuPipelines {
-        // Diagnostic guard: verify the device actually has
-        // DUAL_SOURCE_BLENDING. We have a crash report (ZED-5G1) where a
-        // feature mismatch caused a wgpu-hal abort, but we haven't
-        // identified the code path that produces the mismatch. This
-        // guard prevents the crash and logs more evidence.
-        // Remove this check once:
-        // a) We find and fix the root cause, or
-        // b) There are no reports of this warning appearing for some time.
         let device_has_feature = device
             .features()
             .contains(wgpu::Features::DUAL_SOURCE_BLENDING);
@@ -1203,8 +1141,6 @@ impl WgpuRendererCore {
 }
 
 impl WgpuRenderer {
-    /// Records the new drawable size and reconfigures the surface when one is present.
-    /// The size is kept even without GPU resources so that recovery restores it.
     pub fn update_drawable_size(&mut self, size: Size<DevicePixels>) {
         let width = size.width.0 as u32;
         let height = size.height.0 as u32;
@@ -1230,7 +1166,6 @@ impl WgpuRenderer {
         };
         let resources = &mut core.resources;
 
-        // Wait for any in-flight GPU work to complete before destroying textures
         if let Err(e) = resources.device.poll(wgpu::PollType::Wait {
             submission_index: None,
             timeout: None,
@@ -1238,7 +1173,6 @@ impl WgpuRenderer {
             warn!("Failed to poll device during resize: {e:?}");
         }
 
-        // Destroy old textures before allocating new ones to avoid GPU memory spikes
         if let Some(ref texture) = resources.path_intermediate_texture {
             texture.destroy();
         }
@@ -1246,9 +1180,6 @@ impl WgpuRenderer {
             texture.destroy();
         }
 
-        // Invalidate intermediate textures - the next frame that draws paths
-        // recreates them at the new size, so windows without paths never
-        // allocate them.
         resources.invalidate_intermediate_textures();
 
         if let RendererState::Ready { surface, core } = &self.state {
@@ -1315,7 +1246,6 @@ impl WgpuRenderer {
         })
     }
 
-    /// Whether frames can be read back mid-frame, which glass needs.
     pub fn supports_backdrop_sampling(&self) -> bool {
         self.backdrop_sampling
     }
@@ -1324,18 +1254,12 @@ impl WgpuRenderer {
         self.core().is_some_and(|core| core.dual_source_blending)
     }
 
-    /// Clips drop shadows to the scene-wide window mask. Wayland compositors
-    /// cannot blur a transparent CSD shadow margin without also exposing the
-    /// effect in its corner wedges, so an ext-background-effect client can use
-    /// this to present a clean shadowless rounded window instead.
     pub fn set_clip_window_shadows(&mut self, clip: bool) {
         if let Some(core) = self.core_mut() {
             core.clip_window_shadows = clip;
         }
     }
 
-    /// Returns `None` once GPU resources have been released by `destroy` or a pending
-    /// device recovery.
     pub fn gpu_specs(&self) -> Option<GpuSpecs> {
         let adapter_info = &self.core()?.adapter_info;
         Some(GpuSpecs {
@@ -1362,10 +1286,6 @@ impl WgpuRenderer {
             return false;
         }
 
-        // Bail out early if the surface has been unconfigured (e.g. during
-        // Android background/rotation transitions).  Attempting to acquire
-        // a texture from an unconfigured surface can block indefinitely on
-        // some drivers (Adreno).
         let RendererState::Ready { surface, core } = &mut self.state else {
             return false;
         };
@@ -1380,7 +1300,6 @@ impl WgpuRenderer {
                 self.failed_frame_count
             );
 
-            // TBD. Does retrying more actually help?
             if self.failed_frame_count > 10 {
                 panic!("Too many consecutive GPU errors. Last error: {error}");
             } else if self.failed_frame_count > 5 {
@@ -1408,7 +1327,6 @@ impl WgpuRenderer {
         let frame = match surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
             wgpu::CurrentSurfaceTexture::Suboptimal(frame) => {
-                // Textures must be destroyed before the surface can be reconfigured.
                 drop(frame);
                 surface.configure(&core.resources.device, &self.surface_config);
                 return false;
@@ -1426,8 +1344,6 @@ impl WgpuRenderer {
             }
         };
 
-        // The acquired texture is the authority on frame dimensions; the surface
-        // configuration is only a request.
         let size = Size {
             width: DevicePixels(frame.texture.width() as i32),
             height: DevicePixels(frame.texture.height() as i32),
@@ -1446,8 +1362,6 @@ impl WgpuRenderer {
             wgpu::Color::TRANSPARENT,
         ) {
             log::error!("{error:#}");
-            // Dropping an acquired image does not release native Vulkan
-            // swapchain images. Reconfigure after all texture views are gone.
             drop(frame_view);
             drop(frame);
             surface.configure(&core.resources.device, &self.surface_config);
@@ -1797,7 +1711,6 @@ impl WgpuRendererCore {
 
         self.record_frame(scene, target, target_view, size, clear_color)
             .inspect_err(|_| {
-                // Queue writes are staged before encoding; flush them even if the frame fails.
                 self.resources.queue.submit(std::iter::empty());
             })
     }
@@ -2421,8 +2334,6 @@ impl WgpuRendererCore {
             return Ok(());
         }
         let resources = self.resources();
-        // The atlas has released this texture; the batch belongs to a stale
-        // paint that will be replaced once its view re-renders.
         let Some(texture) = resources.atlas_texture_bind_groups.get(&texture_id) else {
             return Ok(());
         };
@@ -2534,9 +2445,6 @@ impl WgpuRendererCore {
             pass.set_pipeline(&resources.pipelines.path_rasterization);
             pass.set_bind_group(0, &resources.path_globals_bind_group, &[]);
             pass.set_bind_group(1, &vertex_binding.bind_group, &[]);
-            // The path rasterization shader loads records by vertex index
-            // rather than instance index, so the allocation's base shifts the
-            // vertex range here.
             pass.draw(
                 vertex_binding.first_instance
                     ..vertex_binding.first_instance + vertices.len() as u32,
@@ -2557,10 +2465,6 @@ impl WgpuRendererCore {
         Ok(binding)
     }
 
-    /// Places each part (its bytes and record stride) after `instance_offset`
-    /// and uploads them together. Every allocation starts on a whole record so
-    /// the shader can index the shared buffer or texture absolutely, and ends
-    /// on the transport's alignment so its padding cannot overlap the next.
     fn write_instance_bindings<const N: usize>(
         &mut self,
         instance_offset: &mut u64,
@@ -2651,9 +2555,6 @@ impl WgpuRendererCore {
             let x = (texel_offset % u64::from(*width)) as u32;
             let y = (texel_offset / u64::from(*width)) as u32;
             if y >= *height {
-                // The capacity check in write_instance_binding should make this
-                // unreachable. Truncating silently would leave stale bytes in the
-                // texture and draw garbage for the remaining instances.
                 debug_assert!(
                     false,
                     "instance texture write out of bounds: row {y} >= height {}",
@@ -2738,9 +2639,6 @@ impl WgpuRendererCore {
             "instance data grown from {} to {capacity}",
             self.instance_data_capacity
         );
-        // Bind groups created earlier in the frame keep the previous buffer or
-        // texture alive, so allocations written before the grow remain valid;
-        // only subsequent writes land in the new allocation.
         let uses_webgl_instance_data = self.uses_webgl_instance_data;
         let resources = self.resources_mut();
         if uses_webgl_instance_data {
@@ -2770,13 +2668,6 @@ impl WgpuRendererCore {
 }
 
 impl WgpuRenderer {
-    /// Mark the surface as unconfigured so rendering is skipped until a new
-    /// surface is provided via [`replace_surface`](Self::replace_surface).
-    ///
-    /// This does **not** drop the renderer — the device, queue, atlas, and
-    /// pipelines stay alive.  Use this when the native window is destroyed
-    /// (e.g. Android `TerminateWindow`) but you intend to re-create the
-    /// surface later without losing cached atlas textures.
     pub fn unconfigure_surface(&mut self) {
         self.state = match std::mem::replace(&mut self.state, RendererState::Released) {
             RendererState::Ready { core, surface } => {
@@ -2785,20 +2676,11 @@ impl WgpuRenderer {
             }
             state @ (RendererState::Unconfigured { .. } | RendererState::Released) => state,
         };
-        // Drop intermediate textures since they reference the old surface size.
         if let Some(core) = self.core_mut() {
             core.resources.invalidate_intermediate_textures();
         }
     }
 
-    /// Replace the wgpu surface with a new one (e.g. after Android destroys
-    /// and recreates the native window).  Keeps the device, queue, atlas, and
-    /// all pipelines intact so cached `AtlasTextureId`s remain valid.
-    ///
-    /// The `instance` **must** be the same [`wgpu::Instance`] that was used to
-    /// create the adapter and device (i.e. from the [`WgpuContext`]).  Using a
-    /// different instance will cause a "Device does not exist" panic because
-    /// the wgpu device is bound to its originating instance.
     #[cfg(not(target_family = "wasm"))]
     pub fn replace_surface<W: HasWindowHandle>(
         &mut self,
@@ -2849,29 +2731,17 @@ impl WgpuRenderer {
     }
 
     pub fn destroy(&mut self) {
-        // Release surface-bound GPU resources eagerly so the underlying native
-        // window can be destroyed before the renderer itself is dropped.
         self.state = RendererState::Released;
     }
 
-    /// Returns true if the GPU device was lost and recovery is needed.
     pub fn device_lost(&self) -> bool {
         self.device_errors.device_lost()
     }
 
-    /// Returns true if a redraw is needed because GPU state was cleared.
-    /// Calling this method clears the flag.
     pub fn needs_redraw(&mut self) -> bool {
         std::mem::take(&mut self.needs_redraw)
     }
 
-    /// Recovers from a lost GPU device by recreating the renderer with a new context.
-    ///
-    /// Call this after detecting `device_lost()` returns true.
-    ///
-    /// This method coordinates recovery across multiple windows:
-    /// - The first window to call this will recreate the shared context
-    /// - Subsequent windows will adopt the already-recovered context
     #[cfg(not(target_family = "wasm"))]
     pub fn recover<W>(&mut self, window: &W) -> anyhow::Result<()>
     where
@@ -2879,7 +2749,6 @@ impl WgpuRenderer {
     {
         let gpu_context = self.context.as_ref().expect("recover requires gpu_context");
 
-        // Check if another window already recovered the context
         let needs_new_context = gpu_context
             .borrow()
             .as_ref()
@@ -2892,14 +2761,9 @@ impl WgpuRenderer {
         let surface = if needs_new_context {
             log::warn!("GPU device lost, recreating context...");
 
-            // Drop old resources to release Arc<Device>/Arc<Queue> and GPU resources
             self.state = RendererState::Released;
             *gpu_context.borrow_mut() = None;
 
-            // Wait briefly for the GPU driver to stabilize, then try to
-            // recreate the context without software renderers. If this fails
-            // the caller should request another frame and retry — the real GPU
-            // may need more time to come back (e.g. after suspend/resume).
             std::thread::sleep(std::time::Duration::from_millis(350));
 
             let (new_context, surface) = create_context_and_surface(
@@ -3073,8 +2937,6 @@ impl WgpuHeadlessRenderer {
         Ok(())
     }
 
-    /// Copies the current render target back to the CPU. Dimensions come from the
-    /// target texture itself, so the copy can never disagree with what was rendered.
     fn read_image(&mut self) -> anyhow::Result<image::RgbaImage> {
         let target = self
             .render_target
@@ -3233,7 +3095,6 @@ fn begin_pass<'encoder>(
     })
 }
 
-/// The whole device pixels `bounds` covers, clipped to the viewport.
 fn shader_layer_region(
     bounds: Bounds<ScaledPixels>,
     viewport_size: Size<DevicePixels>,
@@ -3254,8 +3115,6 @@ fn shader_layer_region(
     })
 }
 
-/// Check a custom shader against the interface [`CustomShader`] documents,
-/// returning its fragment entry point and the size of its uniform block.
 fn shader_layer_interface(module: &naga::Module) -> Result<(String, u64)> {
     let mut layouter = naga::proc::Layouter::default();
     layouter.update(module.to_ctx())?;
@@ -3461,7 +3320,6 @@ fn create_surface(
     unsafe {
         instance
             .create_surface_unsafe(wgpu::SurfaceTargetUnsafe::RawHandle {
-                // Fall back to the display handle already provided via InstanceDescriptor::display.
                 raw_display_handle: None,
                 raw_window_handle,
             })
@@ -3562,8 +3420,6 @@ mod tests {
         }
     }
 
-    /// Channels are compared with a small tolerance so the assertions hold across
-    /// drivers without pinning exact rasterizer output.
     #[cfg(target_os = "linux")]
     fn assert_pixel(image: &image::RgbaImage, x: u32, y: u32, expected: [u8; 4]) {
         let actual = image.get_pixel(x, y).0;
@@ -3851,7 +3707,6 @@ mod tests {
         scene.insert_primitive(solid_quad(2.0, 2.0, 4.0, 3.0, zz_gpui::red()));
         scene.finish();
 
-        // 13 px rows are 52 bytes, forcing readback to strip copy-row padding.
         let image = renderer.render_scene_to_image(&scene, device_size(13, 7))?;
         assert_eq!(image.dimensions(), (13, 7));
         assert_pixel(&image, 0, 0, BLACK);
@@ -3916,7 +3771,6 @@ mod tests {
             );
         }
 
-        // Rejection must leave the renderer usable.
         let image = renderer.render_scene_to_image(&Scene::default(), device_size(4, 4))?;
         assert_eq!(image.dimensions(), (4, 4));
         Ok(())
@@ -4607,8 +4461,6 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             }
         }
 
-        /// One frame of a page swipe on a 1179x2556 phone: two terminal pages
-        /// of 45x60 glyphs side by side, offset by the swipe.
         fn swipe_frame(frame: usize, tile: &AtlasTile, changing: bool) -> Scene {
             let (width, height) = (1179.0, 2556.0);
             let offset = (frame % 60) as f32 / 60.0 * width;
@@ -4638,9 +4490,6 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 .ok_or_else(|| anyhow::anyhow!("no glyph tile"))
         }
 
-        /// Quads come first in the instance buffer, so the underline and the
-        /// glyph sit behind a varying number of quads and must be found by
-        /// their first instance, including in the buffer a grow replaced.
         #[test]
         fn each_primitive_kind_draws_its_own_instances() -> anyhow::Result<()> {
             let mut renderer = WgpuHeadlessRenderer::new()?;

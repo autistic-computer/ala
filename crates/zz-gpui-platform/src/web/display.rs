@@ -8,10 +8,6 @@ pub struct WebDisplay {
     browser_window: web_sys::Window,
 }
 
-// Safety: `web_sys::Window` is only accessed from the main thread. Displays
-// are handed out as `Rc<dyn PlatformDisplay>` and read by GPUI on the
-// foreground thread; background worker threads (when the `multithreaded`
-// feature is enabled) never touch them.
 unsafe impl Send for WebDisplay {}
 unsafe impl Sync for WebDisplay {}
 

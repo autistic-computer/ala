@@ -48,8 +48,6 @@ pub fn bench(args: TokenStream, function: TokenStream) -> TokenStream {
         }
     }
 
-    // The frame budget math lives in `BenchReport` so `bench_context` is the
-    // single source of truth; `default()` supplies the default frame rate.
     let report_expr = match fps {
         Some(fps) => quote! { zz_gpui::BenchReport::with_fps(#fps) },
         None => quote! { zz_gpui::BenchReport::default() },

@@ -15,9 +15,7 @@ use std::{
     time::Instant,
 };
 
-/// A helper trait for building complex objects with imperative conditionals in a fluent style.
 pub trait FluentBuilder {
-    /// Imperatively modify self with the given closure.
     fn map<U>(self, f: impl FnOnce(Self) -> U) -> U
     where
         Self: Sized,
@@ -25,7 +23,6 @@ pub trait FluentBuilder {
         f(self)
     }
 
-    /// Conditionally modify self with the given closure.
     fn when(self, condition: bool, then: impl FnOnce(Self) -> Self) -> Self
     where
         Self: Sized,
@@ -33,7 +30,6 @@ pub trait FluentBuilder {
         self.map(|this| if condition { then(this) } else { this })
     }
 
-    /// Conditionally modify self with the given closure.
     fn when_else(
         self,
         condition: bool,
@@ -46,7 +42,6 @@ pub trait FluentBuilder {
         self.map(|this| if condition { then(this) } else { else_fn(this) })
     }
 
-    /// Conditionally unwrap and modify self with the given closure, if the given option is Some.
     fn when_some<T>(self, option: Option<T>, then: impl FnOnce(Self, T) -> Self) -> Self
     where
         Self: Sized,
@@ -59,7 +54,6 @@ pub trait FluentBuilder {
             }
         })
     }
-    /// Conditionally unwrap and modify self with the given closure, if the given option is None.
     fn when_none<T>(self, option: &Option<T>, then: impl FnOnce(Self) -> Self) -> Self
     where
         Self: Sized,
@@ -68,10 +62,7 @@ pub trait FluentBuilder {
     }
 }
 
-/// Extensions for Future types that provide additional combinators and utilities.
 pub trait FutureExt {
-    /// Requires a Future to complete before the specified duration has elapsed.
-    /// Similar to tokio::timeout.
     fn with_timeout(self, timeout: Duration, executor: &BackgroundExecutor) -> WithTimeout<Self>
     where
         Self: Sized;
@@ -99,7 +90,6 @@ pub struct WithTimeout<T> {
 
 #[derive(Debug, thiserror::Error)]
 #[error("Timed out before future resolved")]
-/// Error returned by with_timeout when the timeout duration elapsed before the future resolved
 pub struct Timeout;
 
 impl<T: Future> Future for WithTimeout<T> {
@@ -118,8 +108,6 @@ impl<T: Future> Future for WithTimeout<T> {
     }
 }
 
-/// Increment the given atomic counter if it is not zero.
-/// Return the new value of the counter.
 pub(crate) fn atomic_incr_if_not_zero(counter: &AtomicUsize) -> usize {
     let mut loaded = counter.load(SeqCst);
     loop {
@@ -133,7 +121,6 @@ pub(crate) fn atomic_incr_if_not_zero(counter: &AtomicUsize) -> usize {
     }
 }
 
-/// Rounds to the nearest integer with 0.5 ties toward zero.
 #[inline]
 pub(crate) fn round_half_toward_zero(value: f32) -> f32 {
     (value.abs() - 0.5).ceil().copysign(value)
@@ -176,7 +163,6 @@ mod tests {
 
     #[test]
     fn test_round_half_toward_zero() {
-        // Midpoint ties go toward zero
         assert_eq!(round_half_toward_zero(0.5), 0.0);
         assert_eq!(round_half_toward_zero(1.5), 1.0);
         assert_eq!(round_half_toward_zero(2.5), 2.0);
@@ -184,13 +170,11 @@ mod tests {
         assert_eq!(round_half_toward_zero(-1.5), -1.0);
         assert_eq!(round_half_toward_zero(-2.5), -2.0);
 
-        // Non-midpoint values round to nearest
         assert_eq!(round_half_toward_zero(1.5001), 2.0);
         assert_eq!(round_half_toward_zero(1.4999), 1.0);
         assert_eq!(round_half_toward_zero(-1.5001), -2.0);
         assert_eq!(round_half_toward_zero(-1.4999), -1.0);
 
-        // Integers are unchanged
         assert_eq!(round_half_toward_zero(0.0), 0.0);
         assert_eq!(round_half_toward_zero(3.0), 3.0);
         assert_eq!(round_half_toward_zero(-3.0), -3.0);
@@ -198,27 +182,22 @@ mod tests {
 
     #[test]
     fn test_device_pixel_helpers() {
-        // Snap uses half-toward-zero: 1.0 * 1.5 = 1.5 ties toward 1.0.
         assert_eq!(round_to_device_pixel(1.0, 1.5), 1.0);
-        // Below the tie rounds down, above rounds up.
         assert_eq!(round_to_device_pixel(0.3, 2.0), 1.0);
         assert_eq!(round_to_device_pixel(1.4, 1.0), 1.0);
         assert_eq!(round_to_device_pixel(1.6, 1.0), 2.0);
 
-        // Stroke uses snap, but clamps non-zero input up to at least 1dp.
         assert_eq!(round_stroke_to_device_pixel(0.0, 1.0), 0.0);
         assert_eq!(round_stroke_to_device_pixel(0.4, 1.0), 1.0);
         assert_eq!(round_stroke_to_device_pixel(0.5, 1.0), 1.0);
         assert_eq!(round_stroke_to_device_pixel(1.0, 1.5), 1.0);
         assert_eq!(round_stroke_to_device_pixel(1.6, 1.0), 2.0);
 
-        // Cover's near edge floors, far edge ceils. Together they form a strict superset.
         assert_eq!(floor_to_device_pixel(0.3, 2.0), 0.0);
         assert_eq!(ceil_to_device_pixel(0.3, 2.0), 1.0);
         assert_eq!(floor_to_device_pixel(2.1, 1.0), 2.0);
         assert_eq!(ceil_to_device_pixel(2.1, 1.0), 3.0);
 
-        // Integer device-pixel inputs are stable under all three.
         assert_eq!(round_to_device_pixel(2.0, 2.0), 4.0);
         assert_eq!(floor_to_device_pixel(2.0, 2.0), 4.0);
         assert_eq!(ceil_to_device_pixel(2.0, 2.0), 4.0);
@@ -341,8 +320,6 @@ pub fn get_powershell() -> Option<String> {
     }
 
     fn find_pwsh_in_scoop() -> Option<PathBuf> {
-        // Scoop can be installed to a custom location; $SCOOP points at the
-        // scoop root in that case and defaults to %USERPROFILE%\scoop otherwise.
         let scoop_dir = std::env::var_os("SCOOP").map(PathBuf::from).or_else(|| {
             std::env::var_os("USERPROFILE").map(|home| PathBuf::from(home).join("scoop"))
         })?;
@@ -446,10 +423,6 @@ pub fn some_or_debug_panic<T>(option: Option<T>) -> Option<T> {
     option
 }
 
-/// Expands to an immediately-invoked function expression. Good for using the ? operator
-/// in functions which do not return an Option or Result.
-///
-/// Accepts a normal block, an async block, or an async move block.
 #[macro_export]
 macro_rules! maybe {
     ($block:block) => {
@@ -466,13 +439,9 @@ pub trait ResultExt<E> {
     type Ok;
 
     fn log_err(self) -> Option<Self::Ok>;
-    /// Like [`ResultExt::log_err`], but uses `{:?}` formatting so `anyhow::Error` values emit their
-    /// full backtrace. Reach for this only when a backtrace is genuinely wanted — most call sites
-    /// should stick with `log_err` / `warn_on_err`, whose output is a single chained error message.
     fn log_err_with_backtrace(self) -> Option<Self::Ok>
     where
         E: std::fmt::Debug;
-    /// Assert that this result should never be an error in development or tests.
     fn debug_assert_ok(self, reason: &str) -> Self;
     fn warn_on_err(self) -> Option<Self::Ok>;
     fn log_with_level(self, level: log::Level) -> Option<Self::Ok>;
@@ -552,8 +521,6 @@ fn log_error_with_caller(
     let file = caller.file();
     #[cfg(windows)]
     let file = caller.file().replace('\\', "/");
-    // In this codebase all crates reside in a `crates` directory,
-    // so discard the prefix up to that segment to find the crate name
     let file = file.split_once("crates/");
     let target = file.as_ref().and_then(|(_, s)| s.split_once("/src/"));
 
@@ -587,8 +554,6 @@ pub fn log_err<E: std::fmt::Display>(error: &E) {
     );
 }
 
-// Forces `{:?}` formatting through a `Display`-bounded logging helper so `anyhow::Error` emits a
-// backtrace instead of the single-line chained message produced by its `Display`/`{:#}` forms.
 struct DebugAsDisplay<'a, E>(&'a E);
 
 impl<E: std::fmt::Debug> std::fmt::Display for DebugAsDisplay<'_, E> {
@@ -614,8 +579,6 @@ pub trait TryFutureExt {
         Self: Sized;
 }
 
-/// `{:?}`-formatting companion to [`TryFutureExt`]; emits a backtrace for `anyhow::Error`. Prefer
-/// [`TryFutureExt`] unless a backtrace is genuinely wanted.
 pub trait TryFutureExtBacktrace {
     fn log_err_with_backtrace(self) -> LogErrorWithBacktraceFuture<Self>
     where
@@ -771,7 +734,6 @@ where
 pub struct Deferred<F: FnOnce()>(Option<F>);
 
 impl<F: FnOnce()> Deferred<F> {
-    /// Drop without running the deferred function.
     pub fn abort(mut self) {
         self.0.take();
     }
@@ -785,7 +747,6 @@ impl<F: FnOnce()> Drop for Deferred<F> {
     }
 }
 
-/// Run the given function when the returned value is dropped (unless it's cancelled).
 #[must_use]
 pub fn defer<F: FnOnce()>(f: F) -> Deferred<F> {
     Deferred(Some(f))
@@ -810,7 +771,6 @@ pub struct TypeIdHasher {
 impl std::hash::Hasher for TypeIdHasher {
     #[inline]
     fn write(&mut self, bytes: &[u8]) {
-        // TypeId should only hash its first 8 bytes
         if let Some(bytes) = bytes.get(..8) {
             bytes
                 .as_array()
@@ -838,7 +798,6 @@ fn type_id_hasher() {
         type_id.hash(&mut hasher);
         assert_ne!(hasher.finish(), 0);
     }
-    // Pick a variety of types, just to demonstrate it’s all sane. Normal, zero-sized, unsized, &c.
     verify_hashing_with(TypeId::of::<usize>());
     verify_hashing_with(TypeId::of::<()>());
     verify_hashing_with(TypeId::of::<str>());
@@ -857,12 +816,6 @@ where
         items.sort_by(compare);
         return;
     }
-    // When limit is near to items.len() it may be more efficient to sort the whole list and
-    // truncate, rather than always doing selection first as is done below. It's hard to analyze
-    // where the threshold for this should be since the quickselect style algorithm used by
-    // `select_nth_unstable_by` makes the prefix partially sorted, and so its work is not wasted -
-    // the expected number of comparisons needed by `sort_by` is less than it is for some arbitrary
-    // unsorted input.
     items.select_nth_unstable_by(limit, compare);
     items.truncate(limit);
     items.sort_by(compare);

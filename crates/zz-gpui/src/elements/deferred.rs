@@ -3,7 +3,6 @@ use crate::{
     Pixels, Window,
 };
 
-/// Builds a `Deferred` element, which delays the layout and paint of its child.
 pub fn deferred(child: impl IntoElement) -> Deferred {
     Deferred {
         child: Some(child.into_any_element()),
@@ -11,17 +10,12 @@ pub fn deferred(child: impl IntoElement) -> Deferred {
     }
 }
 
-/// An element which delays the painting of its child until after all of
-/// its ancestors, while keeping its layout as part of the current element tree.
 pub struct Deferred {
     child: Option<AnyElement>,
     priority: usize,
 }
 
 impl Deferred {
-    /// Sets the `priority` value of the `deferred` element, which
-    /// determines the drawing order relative to other deferred elements,
-    /// with higher values being drawn on top.
     pub fn with_priority(mut self, priority: usize) -> Self {
         self.priority = priority;
         self
@@ -87,8 +81,6 @@ impl IntoElement for Deferred {
 }
 
 impl Deferred {
-    /// Sets a priority for the element. A higher priority conceptually means painting the element
-    /// on top of deferred draws with a lower priority (i.e. closer to the viewer).
     pub fn priority(mut self, priority: usize) -> Self {
         self.priority = priority;
         self
@@ -102,9 +94,6 @@ mod tests {
         prelude::*, px, size,
     };
 
-    /// A stand-in for a dock panel hosting a popover (deferred draw) whose
-    /// content opens another popover (a deferred draw created while
-    /// prepainting the first one's content).
     struct PanelView;
 
     impl Render for PanelView {
@@ -145,13 +134,6 @@ mod tests {
         }
     }
 
-    /// Regression test for a crash with nested deferred draws (e.g. a popover
-    /// menu inside a popover hosted by a cached dock panel). Prepaint indices
-    /// recorded during the deferred draw rounds must index the same
-    /// `deferred_draws` vector that `reuse_prepaint` slices on the next frame;
-    /// previously they were measured against a transient per-round vector, so
-    /// reusing the panel's subtree grafted the wrong deferred draws and
-    /// panicked in the dispatch tree.
     #[zz_gpui::test]
     fn test_nested_deferred_draws_with_reused_views(cx: &mut TestAppContext) {
         let window = cx.open_window(size(px(800.), px(600.)), |_, cx| {
@@ -172,18 +154,12 @@ mod tests {
             .expect("NESTED_MENU debug bounds not found");
         assert_eq!(menu_bounds.size, size(px(50.), px(50.)));
 
-        // Re-render only the root view; the panel is cached, so its subtree -
-        // including both deferred draw records - is reused from the previous
-        // frame.
         window.update(cx, |_, _, cx| cx.notify()).unwrap();
         cx.run_until_parked();
 
-        // Reuse the subtree a second time, exercising ranges that were
-        // themselves recorded during a reused frame.
         window.update(cx, |_, _, cx| cx.notify()).unwrap();
         cx.run_until_parked();
 
-        // Re-render the panel itself again to prove the popovers still draw.
         window
             .update(cx, |root, _, cx| {
                 root.panel.update(cx, |_, cx| cx.notify());

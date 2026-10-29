@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 pub(crate) struct CachedLoad<T> {
     state: Rc<RefCell<CachedLoadState<T>>>,
-    // Keep the owner outside the state so publishing a result cannot cancel its own task.
     _task: Task<()>,
 }
 
@@ -66,14 +65,10 @@ impl<T: Clone + Send + 'static> CachedLoad<T> {
     }
 }
 
-/// An enum representing
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Resource {
-    /// This resource is at a given URI
     Uri(SharedUri),
-    /// This resource is at a given path in the file system
     Path(Arc<Path>),
-    /// This resource is embedded in the application binary
     Embedded(SharedString),
 }
 
@@ -95,22 +90,17 @@ impl From<Arc<Path>> for Resource {
     }
 }
 
-/// A trait for asynchronous asset loading.
 pub trait Asset: 'static {
-    /// The source of the asset.
     type Source: Clone + Hash + Send;
 
-    /// The loaded asset
     type Output: Clone + Send;
 
-    /// Load the asset asynchronously
     fn load(
         source: Self::Source,
         cx: &mut App,
     ) -> impl Future<Output = Self::Output> + Send + 'static;
 }
 
-/// An asset Loader which logs the [`Err`] variant of a [`Result`] during loading
 pub enum AssetLogger<T> {
     #[doc(hidden)]
     _Phantom(PhantomData<T>, &'static dyn crate::seal::Sealed),
@@ -135,7 +125,6 @@ where
     }
 }
 
-/// Use a quick, non-cryptographically secure hash function to get an identifier from data
 pub fn hash<T: Hash>(data: &T) -> u64 {
     crate::collections::FxBuildHasher.hash_one(data)
 }

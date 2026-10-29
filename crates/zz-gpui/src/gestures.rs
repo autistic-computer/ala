@@ -1,15 +1,3 @@
-//! Touch gesture recognition vocabulary.
-//!
-//! GPUI recognizes gestures from raw [`TouchEvent`](crate::TouchEvent)s in a
-//! single, portable arena in zz-gpui core: recognizers compete for in-flight
-//! touches, winners claim them, and losers are cancelled. Recognized gestures
-//! are surfaced through *existing* semantic events wherever possible, a tap
-//! becomes [`ClickEvent::Touch`](crate::ClickEvent), a pan becomes
-//! [`ScrollWheelEvent`](crate::ScrollWheelEvent)s carrying a
-//! [`TouchPhase`](crate::TouchPhase), and a pinch becomes
-//! [`PinchEvent`](crate::PinchEvent)s — so components written against
-//! `on_click` and scroll containers work untouched on mobile.
-
 use std::collections::VecDeque;
 use std::mem;
 use std::time::Duration;
@@ -44,7 +32,6 @@ fn movements_oppose(left: Point<Pixels>, right: Point<Pixels>) -> bool {
     f32::from(left.x) * f32::from(right.x) + f32::from(left.y) * f32::from(right.y) < 0.
 }
 
-/// Tracks the dominant axis across the events in a scroll gesture.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct OngoingScroll {
     last_event: Option<Instant>,
@@ -56,10 +43,6 @@ pub struct OngoingScroll {
 }
 
 impl OngoingScroll {
-    /// Filters the given delta to the dominant axis of the current scroll gesture.
-    ///
-    /// Gestures are delimited by their touch phase when available, with a timeout
-    /// fallback for platforms that only emit [`TouchPhase::Moved`].
     pub fn filter(&mut self, delta: &mut Point<Pixels>, touch_phase: TouchPhase) {
         self.filter_at(delta, touch_phase, Instant::now())
     }
@@ -166,14 +149,6 @@ const COAST_GAP: Duration = Duration::from_millis(100);
 const MAX_BOUNCE_STEP: Duration = Duration::from_millis(33);
 const MIN_BOUNCE_STEP: Duration = Duration::from_millis(4);
 
-/// Overscroll state for one scroll axis under [`Overscroll::Bounce`]: how
-/// far a held gesture has stretched past the content edge, and the spring
-/// that brings the content back once the gesture lets go or a fling runs
-/// into the edge.
-///
-/// Scroll offsets follow GPUI's convention: `0` at the start of the content
-/// and negative further in. The container keeps its stored offset inside its
-/// range and draws [`Self::displacement`] on top of it.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RubberBand {
     phase: BandPhase,
@@ -224,12 +199,6 @@ fn unrubber_band(displacement: f32, extent: f32) -> f32 {
 }
 
 impl RubberBand {
-    /// Applies one scroll step to `offset`, which stays inside
-    /// `min..=max`, and returns the new offset. While the gesture is held,
-    /// travel past the range stretches the band instead; a release springs
-    /// it back, and post-release momentum that reaches the edge bounces off
-    /// it. Steps outside a phased gesture, like mouse wheel ticks, clamp.
-    /// `extent` is the viewport length along this axis.
     pub fn scroll(
         &mut self,
         offset: Pixels,
@@ -323,8 +292,6 @@ impl RubberBand {
         px(next)
     }
 
-    /// How far past its range the content should be drawn, given the
-    /// viewport length along this axis.
     pub fn displacement(&mut self, extent: Pixels) -> Pixels {
         self.displacement_at(extent, Instant::now())
     }
@@ -339,50 +306,30 @@ impl RubberBand {
         px(rubber_band(self.stretch, f32::from(extent)))
     }
 
-    /// Whether the band is springing back and needs another frame.
     pub fn is_animating(&self) -> bool {
         self.spring.is_some()
     }
 
-    /// Whether the content is drawn past its range, or about to be.
     pub fn is_stretched(&self) -> bool {
         self.spring.is_some() || self.stretch != 0.
     }
 }
 
-/// Feel constants consumed by gesture recognizers. Provided on a best-effort
-/// basis, depending on each platform's support, defaulting to GPUI's own
-/// (iOS flavored) values
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GestureTuning {
-    /// Distance a touch may travel before it stops being a potential tap and
-    /// becomes a pan/drag.
     pub touch_slop: Pixels,
-    /// Maximum interval between taps for them to accumulate a tap count.
     pub multi_tap_interval: Duration,
-    /// Maximum distance between taps for them to accumulate a tap count.
     pub multi_tap_slop: Pixels,
-    /// How long a touch must remain within [`Self::touch_slop`] to be
-    /// recognized as a long press.
     pub long_press_duration: Duration,
-    /// How scroll momentum decelerates after a fling.
     pub scroll_physics: ScrollPhysics,
-    /// Minimum release velocity, in pixels per second, required to start
-    /// scroll momentum.
     pub min_fling_velocity: f32,
-    /// What scroll containers do when a touch or trackpad scroll runs past
-    /// their content.
     pub overscroll: Overscroll,
 }
 
-/// Boundary behavior of scroll containers under touch and trackpad scrolls.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Overscroll {
-    /// Stop at the content edge.
     #[default]
     Clamp,
-    /// Stretch past the edge with growing resistance and spring back once
-    /// the gesture lets go, the `UIScrollView` model.
     Bounce,
 }
 
@@ -400,50 +347,19 @@ impl Default for GestureTuning {
     }
 }
 
-/// How free scrolling decelerates after a fling.
-///
-/// This models deceleration only. Boundary behavior — bouncing, edge glow,
-/// clamping — is the scroll container's policy: the container is the one that
-/// knows its extents.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ScrollPhysics {
-    /// Exponential velocity decay, the `UIScrollView` model:
-    /// `velocity(t) = v₀ · decay_per_msᵐˢ`.
-    Exponential {
-        /// Per-millisecond velocity decay factor. `UIScrollView`'s normal
-        /// deceleration rate is `0.998`.
-        decay_per_ms: f32,
-    },
-    /// The friction spline of Android's `OverScroller`: fling duration and
-    /// distance follow a logarithmic deceleration law, and progress along
-    /// the fling follows a cubic-Bezier ease-out curve. Transcribed from
-    /// AOSP's `SplineOverScroller` (Apache-2.0).
-    FrictionSpline {
-        /// The scroll friction coefficient;
-        /// `ViewConfiguration.getScrollFriction()` is `0.015` on Android.
-        friction: f32,
-        /// Pixels per physical inch of the display, in the coordinate space
-        /// the fling runs in. Android folds display density into its
-        /// deceleration coefficient, so the same finger speed flings
-        /// further in pixels on a denser screen.
-        pixels_per_inch: f32,
-    },
+    Exponential { decay_per_ms: f32 },
+    FrictionSpline { friction: f32, pixels_per_inch: f32 },
 }
 
 impl ScrollPhysics {
-    /// iOS scroll feel: `UIScrollView`'s normal deceleration rate.
     pub fn ios() -> Self {
         Self::Exponential {
             decay_per_ms: 0.998,
         }
     }
 
-    /// Android scroll feel: `OverScroller` with stock friction, at Android's
-    /// nominal density of 160 density-independent pixels per inch — the
-    /// right pairing when fling distances are in logical pixels. Platforms
-    /// that fling in physical pixels, or know the display's true density in
-    /// their logical space, should construct
-    /// [`ScrollPhysics::FrictionSpline`] directly.
     pub fn android() -> Self {
         Self::FrictionSpline {
             friction: 0.015,
@@ -451,8 +367,6 @@ impl ScrollPhysics {
         }
     }
 
-    /// How long a fling released at `speed` pixels per second coasts before
-    /// it stops.
     fn fling_duration(self, speed: f32) -> Duration {
         match self {
             Self::Exponential { decay_per_ms } => {
@@ -476,9 +390,6 @@ impl ScrollPhysics {
         }
     }
 
-    /// Distance traveled `elapsed` into a fling released at `speed` pixels
-    /// per second, in pixels along the fling direction. Evaluated in closed
-    /// form so the trajectory is independent of tick timing.
     fn fling_distance(self, speed: f32, elapsed: Duration) -> f32 {
         let duration = self.fling_duration(speed);
         if duration.is_zero() {
@@ -487,8 +398,6 @@ impl ScrollPhysics {
         let elapsed = elapsed.min(duration);
         match self {
             Self::Exponential { decay_per_ms } => {
-                // ∫₀ᵗ v₀·kᵐˢ dms, with speed converted to pixels per
-                // millisecond.
                 let milliseconds = elapsed.as_secs_f32() * 1000.;
                 (speed / 1000.) * (decay_per_ms.powf(milliseconds) - 1.) / decay_per_ms.ln()
             }
@@ -508,10 +417,6 @@ impl ScrollPhysics {
     }
 }
 
-/// The fling model of Android's `OverScroller.SplineOverScroller`,
-/// transcribed from AOSP (Apache-2.0). `SPLINE_TIME`, which AOSP uses for
-/// programmatic scroll animations rather than flings, is intentionally not
-/// transcribed.
 mod friction_spline {
     use std::sync::LazyLock;
 
@@ -522,15 +427,10 @@ mod friction_spline {
     const P1: f32 = START_TENSION * INFLEXION;
     const P2: f32 = 1.0 - END_TENSION * (1.0 - INFLEXION);
 
-    /// Android's `DECELERATION_RATE`: `ln(0.78) / ln(0.9)`.
     pub(super) fn deceleration_rate() -> f64 {
         0.78f64.ln() / 0.9f64.ln()
     }
 
-    /// `SPLINE_POSITION` from AOSP's static initializer: fractional fling
-    /// distance sampled at 100 evenly spaced fractions of the fling
-    /// duration, from a cubic Bezier with control points shaped by
-    /// `INFLEXION` and the start/end tensions.
     static SPLINE_POSITION: LazyLock<[f32; NB_SAMPLES + 1]> = LazyLock::new(|| {
         let mut spline_position = [0f32; NB_SAMPLES + 1];
         let mut x_min = 0f32;
@@ -556,23 +456,16 @@ mod friction_spline {
         spline_position
     });
 
-    /// `SensorManager.GRAVITY_EARTH · 39.37 in/m · ppi · 0.84`, AOSP's
-    /// `mPhysicalCoeff`: gravity expressed in pixels, times an empirical
-    /// "look and feel" tuning factor.
     pub(super) fn physical_coefficient(pixels_per_inch: f32) -> f64 {
         9.80665 * 39.37 * pixels_per_inch as f64 * 0.84
     }
 
-    /// AOSP's `getSplineDeceleration`.
     pub(super) fn deceleration(speed: f32, friction: f32, pixels_per_inch: f32) -> f64 {
         (INFLEXION as f64 * speed as f64
             / (friction as f64 * physical_coefficient(pixels_per_inch)))
         .ln()
     }
 
-    /// Fraction of the total fling distance covered at fraction `time` of
-    /// the fling duration: table lookup plus linear interpolation, as in
-    /// `SplineOverScroller.update`.
     pub(super) fn distance_coefficient(time: f32) -> f32 {
         if time >= 1. {
             return 1.;
@@ -602,26 +495,15 @@ mod friction_spline {
     }
 }
 
-/// The set of gesture kinds that participate in recognition.
-///
-/// Used by [`PlatformGestures::native_recognizers`] to declare which gestures
-/// the platform recognizes natively rather than leaving to zz-gpui core's
-/// portable recognizers.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct GestureKinds {
-    /// Tap (and multi-tap), surfaced as [`ClickEvent::Touch`](crate::ClickEvent).
     pub tap: bool,
-    /// Long press, surfaced as [`LongPressEvent`].
     pub long_press: bool,
-    /// Pan/scroll (including fling momentum), surfaced as
-    /// [`ScrollWheelEvent`](crate::ScrollWheelEvent)s.
     pub pan: bool,
-    /// Pinch to zoom, surfaced as [`PinchEvent`](crate::PinchEvent)s.
     pub pinch: bool,
 }
 
 impl GestureKinds {
-    /// No gestures; zz-gpui core's portable recognizers handle everything.
     pub const NONE: Self = Self {
         tap: false,
         long_press: false,
@@ -629,7 +511,6 @@ impl GestureKinds {
         pinch: false,
     };
 
-    /// All gesture kinds.
     pub const ALL: Self = Self {
         tap: true,
         long_press: true,
@@ -638,15 +519,10 @@ impl GestureKinds {
     };
 }
 
-/// A direct touch drag claimed by an element before touch input becomes a tap,
-/// long press, or scrolling gesture.
 #[derive(Clone, Debug)]
 pub struct TouchDragEvent {
-    /// The phase of the touch drag.
     pub phase: TouchPhase,
-    /// The position where the touch started.
     pub start_position: Point<Pixels>,
-    /// The touch's current position.
     pub position: Point<Pixels>,
 }
 
@@ -659,14 +535,10 @@ impl InputEvent for TouchDragEvent {
 impl GestureEvent for TouchDragEvent {}
 impl MouseEvent for TouchDragEvent {}
 
-/// A phased long-press gesture recognized from a touch.
 #[derive(Clone, Debug)]
 pub struct LongPressEvent {
-    /// The phase of the long press.
     pub phase: TouchPhase,
-    /// The position where the touch started.
     pub start_position: Point<Pixels>,
-    /// The touch's current position.
     pub position: Point<Pixels>,
 }
 
@@ -689,62 +561,30 @@ impl InputEvent for LongPressEvent {
 impl GestureEvent for LongPressEvent {}
 impl MouseEvent for LongPressEvent {}
 
-/// Platform gesture recognition services.
-///
-/// If your mobile platform supports native gesture recognition, use this
-/// to share it with GPUI.
 pub trait PlatformGestures {
-    /// Feel constants for the portable recognizers on this platform.
     fn tuning(&self) -> GestureTuning {
         GestureTuning::default()
     }
 
-    /// The gesture kinds this platform recognizes natively.
     fn native_recognizers(&self) -> GestureKinds {
         GestureKinds::NONE
     }
 }
 
-/// A no-op [`PlatformGestures`] implementation: no native recognizers and
-/// default tuning. Suitable for desktop platforms and tests.
 pub struct NullPlatformGestures;
 
 impl PlatformGestures for NullPlatformGestures {}
 
-/// Ceiling on recognized fling velocity, in pixels per second (matches
-/// Flutter's `kMaxFlingVelocity`).
 const MAX_FLING_VELOCITY: f32 = 8000.;
 
-/// Momentum below this speed, in pixels per second, is imperceptible. The
-/// exponential model, which never mathematically stops, treats reaching this
-/// speed as the end of the fling. (The friction spline has a finite duration
-/// of its own.)
 const MOMENTUM_STOP_VELOCITY: f32 = 10.;
 
-/// How far back the release-velocity estimate looks. Samples older than this
-/// reflect an earlier part of the gesture, not the speed at release.
 const VELOCITY_WINDOW: Duration = Duration::from_millis(100);
 
-/// A pause between samples longer than this means the finger stopped:
-/// anything before the pause describes an earlier motion, not the release
-/// (Flutter's `kAssumePointerMoveStoppedMilliseconds`). Touch hardware
-/// reports movement every 8–16ms while the finger is in motion.
 const VELOCITY_ASSUME_STOPPED_GAP: Duration = Duration::from_millis(40);
 
 const VELOCITY_MAX_SAMPLES: usize = 20;
 
-/// The portable recognizer behind raw touch input: it watches the
-/// [`TouchEvent`] stream for one touch at a time and resolves it into either
-/// a tap or a pan, following the competition model described in the module
-/// docs. Pans continue into post-release momentum when the touch lifts at
-/// speed; the window drives that phase through [`Self::tick_momentum`].
-///
-/// Taps are currently surfaced as synthesized mouse presses rather than
-/// [`ClickEvent::Touch`](crate::ClickEvent), which keeps every existing
-/// mouse-driven behavior (click listeners, caret placement, double-tap
-/// selection) working before elements grow a direct tap-delivery path.
-/// Pinch recognition is not implemented yet, and additional touches are ignored
-/// while one is being recognized.
 pub(crate) struct TouchGestureRecognizer {
     tuning: GestureTuning,
     state: TouchGestureState,
@@ -752,14 +592,9 @@ pub(crate) struct TouchGestureRecognizer {
     last_tap: Option<CompletedTap>,
 }
 
-/// A semantic event recognized from raw touches, ready to dispatch through
-/// the window's existing input paths.
 #[derive(Debug)]
 pub(crate) enum RecognizedTouchGesture {
-    /// One step of a pan (or of its post-release momentum), delivered to
-    /// scroll listeners at the pan's starting position.
     Scroll(ScrollWheelEvent),
-    /// A recognized tap, delivered as a synthesized mouse press and release.
     Tap {
         down: MouseDownEvent,
         up: MouseUpEvent,
@@ -770,16 +605,12 @@ pub(crate) enum RecognizedTouchGesture {
 
 enum TouchGestureState {
     Idle,
-    /// The touch is still within `touch_slop` of where it started: it can
-    /// still resolve into either a tap or a pan.
     Pending {
         touch: ActiveTouch,
         deadline: Instant,
         long_press_offered: bool,
         touch_drag_offered: bool,
     },
-    /// The touch exceeded `touch_slop`: it is a pan until it ends, and its
-    /// movement flows out as scroll events.
     Panning {
         touch: ActiveTouch,
         axis: Axis,
@@ -792,15 +623,8 @@ enum TouchGestureState {
 struct ActiveTouch {
     id: TouchId,
     start_position: Point<Pixels>,
-    /// The latest raw position reported for this touch.
     last_position: Point<Pixels>,
-    /// The position pan output has scrolled to so far. While panning this
-    /// may run ahead of the raw touch by the event's predicted position;
-    /// the release event targets the raw position again, so the total
-    /// scrolled distance always converges to the finger's actual travel.
     emitted_position: Point<Pixels>,
-    /// Retained across stationary samples so prediction corrections cannot
-    /// reverse a pan when integer browser coordinates repeat.
     last_movement: Point<Pixels>,
     velocity_tracker: VelocityTracker,
 }
@@ -811,24 +635,13 @@ struct CompletedTap {
     count: usize,
 }
 
-/// One fling in progress. The trajectory is a closed-form curve of elapsed
-/// time — each tick evaluates it and emits the increment — so the fling is
-/// exactly frame-rate independent: a stalled frame simply resumes further
-/// along the same curve.
 struct Momentum {
-    /// Where the pan started; synthesized scroll events keep hit-testing
-    /// there so momentum stays with the container the gesture began on.
     position: Point<Pixels>,
-    /// Unit vector of the release velocity.
     direction: Point<f32>,
-    /// Release speed in pixels per second.
     speed: f32,
     started_at: Instant,
     duration: Duration,
-    /// Distance already emitted along `direction`, in pixels.
     emitted_distance: f32,
-    /// Set by [`TouchGestureRecognizer::end_momentum`]: the next tick closes
-    /// the scroll stream without moving it further.
     ended: bool,
 }
 
@@ -879,11 +692,6 @@ impl TouchGestureRecognizer {
                         velocity_tracker,
                     };
                     if caught_fling {
-                        // A touch that catches a fling is a drag from the
-                        // first pixel: waiting out the slop would freeze the
-                        // content mid-scroll and then jump. It can also never
-                        // be a tap; releasing it just leaves the content
-                        // stopped, as on Android and iOS.
                         recognized.push(RecognizedTouchGesture::Scroll(scroll_event(
                             touch.start_position,
                             Point::default(),
@@ -911,9 +719,6 @@ impl TouchGestureRecognizer {
                     touch.last_position = event.position;
                     let accumulated = event.position - touch.start_position;
                     if accumulated.magnitude() > f64::from(self.tuning.touch_slop) {
-                        // Carry the full movement so far into the first scroll
-                        // step: the content catches up to the finger instead
-                        // of losing the slop distance.
                         let mut target = event.predicted_position.unwrap_or(event.position);
                         let axis = dominant_axis(accumulated);
                         let mut delta = target - touch.start_position;
@@ -962,9 +767,6 @@ impl TouchGestureRecognizer {
                     let mut target = event.predicted_position.unwrap_or(event.position);
                     let mut delta = target - touch.emitted_position;
                     lock_delta_to_axis(&mut delta, axis);
-                    // Prediction error must not reverse content while the raw
-                    // touch still advances. Fall back to the raw position so a
-                    // real finger reversal remains responsive.
                     if movements_oppose(delta, touch.last_movement) {
                         target = event.position;
                         delta = target - touch.emitted_position;
@@ -1043,12 +845,6 @@ impl TouchGestureRecognizer {
                     )));
                 }
                 TouchGestureState::Panning { touch, axis } if touch.id == event.id => {
-                    // The release deliberately contributes no velocity
-                    // sample: it usually repeats the last movement's position
-                    // with a later timestamp, which would dilute the
-                    // estimate. But a release long after the last movement
-                    // means the finger had already stopped, so nothing
-                    // flings.
                     let finger_stopped =
                         touch
                             .velocity_tracker
@@ -1075,13 +871,6 @@ impl TouchGestureRecognizer {
                         if !duration.is_zero() {
                             let total_distance =
                                 self.tuning.scroll_physics.fling_distance(speed, duration);
-                            // Prediction may have left the content ahead of
-                            // the raw release position. Emitting that
-                            // correction here would visibly snap the content
-                            // backwards just as the fling launches, so fold
-                            // it into the fling instead: start the curve
-                            // already advanced by the overshoot, keeping the
-                            // total travel exact while staying monotonic.
                             let overshoot = -(f32::from(release_delta.x) * direction.x
                                 + f32::from(release_delta.y) * direction.y);
                             let emitted_distance = if overshoot > 0. && overshoot < total_distance {
@@ -1246,15 +1035,10 @@ impl TouchGestureRecognizer {
         self.momentum.is_some()
     }
 
-    /// Advances post-fling momentum by one frame, returning the scroll step
-    /// to dispatch, or `None` when no momentum is in progress. The final step
-    /// carries [`TouchPhase::Ended`] to close the synthetic scroll stream.
     pub(crate) fn tick_momentum(&mut self) -> Option<RecognizedTouchGesture> {
         self.tick_momentum_at(Instant::now())
     }
 
-    /// Ends the fling in progress, if any. Its next tick closes the scroll
-    /// stream with a zero-delta [`TouchPhase::Ended`].
     pub(crate) fn end_momentum(&mut self) {
         if let Some(momentum) = self.momentum.as_mut() {
             momentum.ended = true;
@@ -1277,8 +1061,6 @@ impl TouchGestureRecognizer {
             .tuning
             .scroll_physics
             .fling_distance(momentum.speed, elapsed);
-        // Prediction overshoot can start momentum ahead of its curve. Hold
-        // that position until the curve catches up instead of stepping back.
         let step = (distance - momentum.emitted_distance).max(0.);
         momentum.emitted_distance = momentum.emitted_distance.max(distance);
         let delta = point(
@@ -1316,7 +1098,6 @@ fn scroll_event(
     }
 }
 
-/// Estimates the velocity a touch had at its newest sample.
 #[derive(Default)]
 struct VelocityTracker {
     samples: VecDeque<(Instant, Point<Pixels>)>,
@@ -1334,14 +1115,6 @@ impl VelocityTracker {
         self.samples.back().map(|(time, _)| *time)
     }
 
-    /// The velocity at the newest sample, in pixels per second.
-    ///
-    /// Fits a second-degree polynomial by least squares over the trailing
-    /// [`VELOCITY_WINDOW`] and takes its derivative at the newest sample,
-    /// like Flutter's `VelocityTracker` and Android's `lsq2` strategy. An
-    /// endpoint difference over the same window would report the window's
-    /// *average* speed, which for a flick — still accelerating at lift-off —
-    /// is roughly half the speed the finger actually had at release.
     fn velocity(&self) -> Point<f32> {
         let Some((newest_time, _)) = self.samples.back() else {
             return Point::default();
@@ -1400,10 +1173,6 @@ fn release_velocity(endpoint: f32, fitted: Option<f64>) -> f32 {
     endpoint.signum() * fitted.abs().max(endpoint.abs())
 }
 
-/// Least-squares fit of `value = a0 + a1·t + a2·t²` returning `a1`: the
-/// fitted curve's velocity at `t = 0`, which callers place at the newest
-/// sample. `None` when the samples are too degenerate to fit (all
-/// simultaneous, for example).
 fn quadratic_velocity_at_newest(times: &[f64], values: &[f64]) -> Option<f64> {
     let count = times.len() as f64;
     let (mut sum_t1, mut sum_t2, mut sum_t3, mut sum_t4) = (0., 0., 0., 0.);
@@ -1418,8 +1187,6 @@ fn quadratic_velocity_at_newest(times: &[f64], values: &[f64]) -> Option<f64> {
         sum_vt += value * time;
         sum_vt2 += value * time_squared;
     }
-    // Cramer's rule on the 3×3 normal equations, solved for the linear
-    // coefficient only.
     let determinant = count * (sum_t2 * sum_t4 - sum_t3 * sum_t3)
         - sum_t1 * (sum_t1 * sum_t4 - sum_t3 * sum_t2)
         + sum_t2 * (sum_t1 * sum_t3 - sum_t2 * sum_t2);
@@ -1811,7 +1578,6 @@ mod tests {
 
         recognizer.handle_event_at(&touch_event(touch, TouchPhase::Started, 100., 100.), now);
 
-        // The first pan step scrolls to the predicted position, not the raw one.
         let mut moved = touch_event(touch, TouchPhase::Moved, 100., 120.);
         moved.predicted_position = Some(point(px(106.), px(128.)));
         let recognized = recognizer.handle_event_at(&moved, now + Duration::from_millis(16));
@@ -1820,8 +1586,6 @@ mod tests {
         };
         assert_eq!(scroll.delta.pixel_delta(px(16.)), point(px(0.), px(28.)));
 
-        // The next step is measured from where the previous prediction left
-        // the content, so an overshoot is paid back here.
         let mut moved = touch_event(touch, TouchPhase::Moved, 100., 130.);
         moved.predicted_position = Some(point(px(104.), px(134.)));
         let recognized = recognizer.handle_event_at(&moved, now + Duration::from_millis(32));
@@ -1830,9 +1594,6 @@ mod tests {
         };
         assert_eq!(scroll.delta.pixel_delta(px(16.)), point(px(0.), px(6.)));
 
-        // A release without a fling (the finger stopped long before lifting)
-        // targets the raw position: the total scrolled distance equals the
-        // finger's actual travel despite the predictions.
         let recognized = recognizer.handle_event_at(
             &touch_event(touch, TouchPhase::Ended, 100., 130.),
             now + Duration::from_millis(120),
@@ -1938,8 +1699,6 @@ mod tests {
                     recognizer.handle_event_at(&moved, now + Duration::from_millis(step * 16));
                 drain(&recognized, use_prediction);
             }
-            // The release leaves the emitted position 25px ahead of the raw
-            // one; with prediction the correction must not scroll backwards.
             let recognized = recognizer.handle_event_at(
                 &touch_event(TouchId(1), TouchPhase::Ended, 100., 300.),
                 now + Duration::from_millis(90),
@@ -1960,8 +1719,6 @@ mod tests {
                 total_without_prediction = total;
             }
         }
-        // Folding the overshoot into the fling redistributes the travel but
-        // must not change where the content comes to rest.
         assert!(
             (total_with_prediction - total_without_prediction).abs() < 0.01,
             "totals diverged: {total_with_prediction} vs {total_without_prediction}"
@@ -1999,7 +1756,6 @@ mod tests {
             delta.y < px(0.),
             "momentum should continue upward, got {delta:?}"
         );
-        // The least-squares fit may leave float residue on the motionless axis.
         assert!(
             delta.x.abs() < px(0.001),
             "expected no x motion, got {delta:?}"
@@ -2194,7 +1950,6 @@ mod tests {
             now + Duration::from_millis(200),
         );
 
-        // A movement well within the slop scrolls immediately.
         let recognized = recognizer.handle_event_at(
             &touch_event(TouchId(2), TouchPhase::Moved, 100., 197.),
             now + Duration::from_millis(216),
@@ -2205,7 +1960,6 @@ mod tests {
         assert_eq!(scroll.touch_phase, TouchPhase::Moved);
         assert_eq!(scroll.delta.pixel_delta(px(16.)), point(px(0.), px(-3.)));
 
-        // Releasing the catch is not a tap.
         let recognized = recognizer.handle_event_at(
             &touch_event(TouchId(2), TouchPhase::Ended, 100., 197.),
             now + Duration::from_millis(232),
@@ -2321,7 +2075,6 @@ mod tests {
         );
         assert!(recognized.is_empty());
 
-        // The first touch still resolves normally.
         let recognized = recognizer.handle_event_at(
             &touch_event(TouchId(1), TouchPhase::Moved, 100., 150.),
             now + Duration::from_millis(32),
@@ -2335,16 +2088,11 @@ mod tests {
     #[test]
     fn spline_position_table_matches_the_bezier_curve() {
         let samples = friction_spline::spline_position_samples();
-        // AOSP's initializer solves sample 0 numerically like every other
-        // sample, so it lands within solver tolerance of zero, not at zero.
         assert!(samples[0].abs() < 1e-4);
         assert_eq!(samples[100], 1.);
         for window in samples.windows(2) {
             assert!(window[0] < window[1], "table must be strictly increasing");
         }
-        // Each table entry must lie on the defining parametric Bezier: for
-        // sample i there must be a curve parameter whose time component is
-        // i/100 and whose position component is the stored value.
         for (i, &stored_position) in samples.iter().enumerate().take(100) {
             let alpha = i as f32 / 100.;
             let (mut lower, mut upper) = (0f32, 1f32);
@@ -2393,8 +2141,6 @@ mod tests {
 
     #[test]
     fn momentum_is_frame_rate_independent() {
-        // The same fling ticked at 60Hz and as one huge stalled frame must
-        // cover identical ground.
         let total_distance_with_tick_length = |tick: Duration| -> f32 {
             let mut recognizer = TouchGestureRecognizer::new(GestureTuning {
                 scroll_physics: ScrollPhysics::android(),
@@ -2448,9 +2194,6 @@ mod tests {
 
     #[test]
     fn flick_velocity_reflects_release_speed_not_window_average() {
-        // A uniformly accelerating flick: position grows quadratically, so
-        // the speed at the newest sample (2·k·t) is twice the window
-        // average (k·t). The estimator must report the former.
         let mut velocity_tracker = VelocityTracker::default();
         let start = Instant::now();
         for step in 0..=6 {
@@ -2472,9 +2215,6 @@ mod tests {
 
     #[test]
     fn samples_before_a_pause_do_not_contribute_velocity() {
-        // Fast motion, then a hold longer than the stopped-finger gap, then
-        // a slow nudge: only the motion after the pause describes the
-        // release.
         let mut velocity_tracker = VelocityTracker::default();
         let start = Instant::now();
         velocity_tracker.push(start, point(px(0.), px(0.)));

@@ -6,7 +6,6 @@ use crate::sum_tree::SumTree;
 
 use crate::{FocusHandle, FocusId};
 
-/// Represents a collection of focus handles using the tab-index APIs.
 #[derive(Debug)]
 pub(crate) struct TabStopMap {
     current_path: TabStopPath,
@@ -38,14 +37,9 @@ struct TabStopPath(smallvec::SmallVec<[TabIndex; 6]>);
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct TabStopNode {
-    /// Path to access the node in the tree
-    /// The final node in the list is a leaf node corresponding to an actual focus handle,
-    /// all other nodes are group nodes
     path: TabStopPath,
-    /// index into the backing array of nodes. Corresponds to insertion order
     node_insertion_index: usize,
 
-    /// Whether this node is a tab stop
     tab_stop: bool,
 }
 
@@ -361,9 +355,7 @@ mod tests {
             expected.iter().map(|handle| handle.id).collect::<Vec<_>>()
         );
 
-        // Select first tab index if no handle is currently focused.
         assert_eq!(tab_index_map.next(None), Some(expected[0].clone()));
-        // Select last tab index if no handle is currently focused.
         assert_eq!(tab_index_map.prev(None), expected.last().cloned(),);
 
         assert_eq!(
@@ -387,7 +379,6 @@ mod tests {
             Some(expected[0].clone())
         );
 
-        // prev
         assert_eq!(tab_index_map.prev(None), Some(expected[4].clone()));
         assert_eq!(
             tab_index_map.prev(Some(&expected[0].id)),
@@ -416,7 +407,6 @@ mod tests {
         let focus_map = Arc::new(FocusMap::default());
         let mut tab_index_map = TabStopMap::default();
 
-        // Check that we can query next from a non-stop tab
         let tab_non_stop_1 = FocusHandle::new(&focus_map).tab_stop(false).tab_index(1);
         let tab_stop_2 = FocusHandle::new(&focus_map).tab_stop(true).tab_index(2);
         tab_index_map.insert(&tab_non_stop_1);
@@ -424,7 +414,6 @@ mod tests {
         let result = tab_index_map.next(Some(&tab_non_stop_1.id)).unwrap();
         assert_eq!(result.id, tab_stop_2.id);
 
-        // Check that we skip over non-stop tabs
         let tab_stop_0 = FocusHandle::new(&focus_map).tab_stop(true).tab_index(0);
         let tab_non_stop_0 = FocusHandle::new(&focus_map).tab_stop(false).tab_index(0);
         tab_index_map.insert(&tab_stop_0);
@@ -495,11 +484,9 @@ mod tests {
         fn assert(self) {
             let mut expected = self.expected.iter().map(|(_, id)| *id).collect_vec();
 
-            // Check next order
             let forward_found = self.traverse_tab_map(|tab_map, prev| tab_map.next(prev));
             assert_eq!(forward_found, expected);
 
-            // Test overflow. Last to first
             assert_eq!(
                 self.tab_map
                     .next(forward_found.last())
@@ -507,12 +494,10 @@ mod tests {
                 expected.first().cloned()
             );
 
-            // Check previous order
             let reversed_found = self.traverse_tab_map(|tab_map, prev| tab_map.prev(prev));
             expected.reverse();
             assert_eq!(reversed_found, expected);
 
-            // Test overflow. First to last
             assert_eq!(
                 self.tab_map
                     .prev(reversed_found.last())

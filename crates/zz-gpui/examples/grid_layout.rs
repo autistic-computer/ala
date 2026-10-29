@@ -9,11 +9,6 @@ use zz_gpui::{
 };
 use zz_gpui_platform::application;
 
-// https://en.wikipedia.org/wiki/Holy_grail_(web_design)
-//
-// Resize the window: the layout is chosen by `container_query` based on the
-// measured size of the container, collapsing to a single stacked column when
-// it becomes too narrow for the three-column grid.
 struct HolyGrailExample {}
 
 impl Render for HolyGrailExample {

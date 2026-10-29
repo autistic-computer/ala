@@ -1,5 +1,3 @@
-// --- subpixel sprites --- //
-
 struct SubpixelSprite {
     order: u32,
     pad: u32,
@@ -46,15 +44,12 @@ fn fs_subpixel_sprite(input: SubpixelSpriteOutput) -> SubpixelSpriteFragmentOutp
     }
     let alpha_corrected = apply_contrast_and_gamma_correction3(sample, input.color.rgb, gamma_params.subpixel_enhanced_contrast, gamma_params.gamma_ratios);
 
-    // Alpha clip after using the derivatives.
     if (any(input.clip_distances < vec4<f32>(0.0))) {
         return SubpixelSpriteFragmentOutput(vec4<f32>(0.0), vec4<f32>(0.0));
     }
 
     var out = SubpixelSpriteFragmentOutput();
     out.foreground = vec4<f32>(input.color.rgb, 1.0);
-    // Scaling the per-channel coverage by the window mask blends the glyph
-    // toward the destination, clipping it like every other primitive.
     out.alpha = vec4<f32>(
         input.color.a * alpha_corrected * window_mask_alpha(input.position.xy), 1.0);
     return out;

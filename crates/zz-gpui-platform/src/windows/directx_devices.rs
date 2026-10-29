@@ -25,7 +25,6 @@ pub(crate) fn try_to_recover_from_device_lost<T>(mut f: impl FnMut() -> Result<T
     (0..5)
         .map(|i| {
             if i > 0 {
-                // Add a small delay before retrying
                 std::thread::sleep(std::time::Duration::from_millis(100 + i * 10));
             }
             f()
@@ -120,8 +119,6 @@ fn get_adapter(
                 .to_string();
             log::info!("Using GPU: {}", gpu_name);
         }
-        // Check to see whether the adapter supports Direct3D 11 and create
-        // the device if it does.
         let mut context: Option<ID3D11DeviceContext> = None;
         let mut feature_level = D3D_FEATURE_LEVEL::default();
         if let Some(device) = get_device(
@@ -158,7 +155,6 @@ fn get_device(
             D3D_DRIVER_TYPE_UNKNOWN,
             HMODULE::default(),
             device_flags,
-            // 4x MSAA is required for Direct3D Feature Level 10.1 or better
             Some(&[
                 D3D_FEATURE_LEVEL_11_1,
                 D3D_FEATURE_LEVEL_11_0,

@@ -54,7 +54,6 @@ use crate::macos::open_type::apply_features_and_fallbacks;
 #[allow(non_upper_case_globals)]
 const kCGImageAlphaOnly: u32 = 7;
 
-/// macOS text system using CoreText for font shaping.
 pub struct MacTextSystem(RwLock<MacTextSystemState>);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -76,7 +75,6 @@ struct MacTextSystemState {
 }
 
 impl MacTextSystem {
-    /// Create a new MacTextSystem.
     pub fn new() -> Self {
         Self(RwLock::new(MacTextSystemState {
             memory_source: MemSource::empty(),
@@ -105,11 +103,6 @@ impl PlatformTextSystem for MacTextSystem {
     fn all_font_names(&self) -> Vec<String> {
         let mut names = Vec::new();
         let collection = core_text::font_collection::create_for_all_families();
-        // NOTE: We intentionally avoid using `collection.get_descriptors()` here because
-        // it has a memory leak bug in core-text v21.0.0. The upstream code uses
-        // `wrap_under_get_rule` but `CTFontCollectionCreateMatchingFontDescriptors`
-        // follows the Create Rule (caller owns the result), so it should use
-        // `wrap_under_create_rule`. We call the function directly with correct memory management.
         unsafe extern "C" {
             fn CTFontCollectionCreateMatchingFontDescriptors(
                 collection: CTFontCollectionRef,
@@ -219,9 +212,6 @@ impl PlatformTextSystem for MacTextSystem {
     }
 
     fn glyph_dilation_for_color(&self, color: Hsla) -> u8 {
-        // When font smoothing is enabled, CoreGraphics thickens glyph strokes by an amount that
-        // depends on the foreground color's luminance. We replicate the logic used by CoreGraphics
-        // to select between the different levels of dilation.
         if !font_smoothing_allowed_by_user() {
             return 0;
         }
@@ -250,7 +240,6 @@ fn font_smoothing_allowed_by_user() -> bool {
         let Some(number) = value.downcast_into::<CFNumber>() else {
             return true;
         };
-        // Only an explicit value of `0` means that font smoothing is disabled.
         number.to_i64() != Some(0)
     })
 }
@@ -294,25 +283,12 @@ impl MacTextSystemState {
             let mut font = font.load()?;
 
             apply_features_and_fallbacks(&mut font, features, fallbacks)?;
-            // This block contains a precautionary fix to guard against loading fonts
-            // that might cause panics due to `.unwrap()`s up the chain.
             {
-                // We use the 'm' character for text measurements in various spots
-                // (e.g., the editor). However, at time of writing some of those usages
-                // will panic if the font has no 'm' glyph.
-                //
-                // Therefore, we check up front that the font has the necessary glyph.
                 let has_m_glyph = font.glyph_for_char('m').is_some();
 
-                // HACK: The 'Segoe Fluent Icons' font does not have an 'm' glyph,
-                // but we need to be able to load it for rendering Windows icons in
-                // the Storybook (on macOS).
                 let is_segoe_fluent_icons = font.full_name() == "Segoe Fluent Icons";
 
                 if !has_m_glyph && !is_segoe_fluent_icons {
-                    // I spent far too long trying to track down why a font missing the 'm'
-                    // character wasn't loading. This log statement will hopefully save
-                    // someone else from suffering the same fate.
                     log::warn!(
                         "font '{}' has no 'm' character and was not loaded",
                         font.full_name()
@@ -321,9 +297,6 @@ impl MacTextSystemState {
                 }
             }
 
-            // We've seen a number of panics in production caused by calling font.properties()
-            // which unwraps a downcast to CFNumber. This is an attempt to avoid the panic,
-            // and to try and identify the incalcitrant font.
             let traits = font.native_font().all_traits();
             if unsafe {
                 !(traits
@@ -359,11 +332,6 @@ impl MacTextSystemState {
                 );
                 continue;
             };
-            // Dedup is scoped to this single `load_family` call (issue #55472).
-            // The same family can be reloaded later under a different `FontKey`
-            // (different features/fallbacks); a global check against
-            // `font_ids_by_postscript_name` would skip every already-registered
-            // font and leave the second call's `font_ids` empty.
             if !postscript_names_seen.insert(postscript_name.clone()) {
                 log::warn!(
                     "skipping duplicate font {:?} with PostScript name {:?} \
@@ -432,7 +400,6 @@ impl MacTextSystemState {
             font_kit::canvas::RasterizationOptions::GrayscaleAa,
         )?);
 
-        // Expand the bounds by 1 pixel on each side to give CG room for anti-aliasing.
         let mut bounds = bounds.dilate(DevicePixels(1));
         if params.synthetic_bold {
             let line_width = synthetic_bold_device_line_width(params.font_size);
@@ -440,8 +407,6 @@ impl MacTextSystemState {
             bounds = bounds.dilate(DevicePixels(padding));
         }
         if params.synthetic_italic {
-            // A symmetric pad keeps the sheared outline inside the atlas tile regardless of
-            // whether a glyph extends above or below the baseline.
             let padding = (bounds.size.height.0 as f32 * 0.267_949).ceil() as i32;
             bounds.origin.x -= DevicePixels(padding);
             bounds.size.width += DevicePixels(padding.saturating_mul(2));
@@ -457,7 +422,6 @@ impl MacTextSystemState {
         if glyph_bounds.size.width.0 == 0 || glyph_bounds.size.height.0 == 0 {
             anyhow::bail!("glyph bounds are empty");
         } else {
-            // Add an extra pixel when the subpixel variant isn't zero to make room for anti-aliasing.
             let mut bitmap_size = glyph_bounds.size;
             if params.subpixel_variant.x > 0 {
                 bitmap_size.width += DevicePixels(1);
@@ -493,8 +457,6 @@ impl MacTextSystemState {
                 );
             }
 
-            // Move the origin to bottom left and account for scaling, this
-            // makes drawing text consistent with the font-kit's raster_bounds.
             cx.translate(
                 -glyph_bounds.origin.x.0 as CGFloat,
                 (glyph_bounds.origin.y.0 + glyph_bounds.size.height.0) as CGFloat,
@@ -550,7 +512,6 @@ impl MacTextSystemState {
                 );
 
             if params.is_emoji {
-                // Convert from RGBA with premultiplied alpha to BGRA with straight alpha.
                 for pixel in bytes.chunks_exact_mut(4) {
                     swap_rgba_pa_to_bgra(pixel);
                 }
@@ -560,8 +521,6 @@ impl MacTextSystemState {
         }
     }
 
-    /// CoreText keeps its shaping caches on the font object, so a font made
-    /// afresh for every line rebuilt them for every line.
     fn sized_font(&mut self, font_id: FontId, font_size: Pixels) -> CTFont {
         const MAX_SIZED_FONTS: usize = 1024;
         let key = (font_id, f32::from(font_size).to_bits());
@@ -579,7 +538,6 @@ impl MacTextSystemState {
     }
 
     fn layout_line(&mut self, text: &str, font_size: Pixels, font_runs: &[FontRun]) -> LineLayout {
-        // Construct the attributed string, converting UTF8 ranges to UTF16 ranges.
         let mut string = CFMutableAttributedString::new();
         let mut max_ascent = 0.0f32;
         let mut max_descent = 0.0f32;
@@ -591,8 +549,7 @@ impl MacTextSystemState {
                 let text_run;
                 (text_run, text) = text.split_at(run.len);
 
-                let utf16_start = string.char_len(); // insert at end of string
-                // note: replace_str may silently ignore codepoints it dislikes (e.g., BOM at start of string)
+                let utf16_start = string.char_len();
                 string.replace_str(&CFString::new(text_run), CFRange::init(utf16_start, 0));
                 let utf16_end = string.char_len();
 
@@ -617,7 +574,6 @@ impl MacTextSystemState {
                 break_ligature = !break_ligature;
             }
         }
-        // Retrieve the glyphs from the shaped line, converting UTF16 offsets to UTF8 offsets.
         let line = CTLine::new_with_attributed_string(string.as_concrete_TypeRef());
         let glyph_runs = line.glyph_runs();
         let mut runs = <Vec<ShapedRun>>::with_capacity(glyph_runs.len() as usize);
@@ -651,7 +607,6 @@ impl MacTextSystemState {
             {
                 let glyph_utf16_ix = usize::try_from(glyph_utf16_ix).unwrap();
                 if ix_converter.utf16_ix > glyph_utf16_ix {
-                    // We cannot reuse current index converter, as it can only seek forward. Restart the search.
                     ix_converter = StringIndexConverter::new(text);
                 }
                 ix_converter.advance_to_utf16_ix(glyph_utf16_ix);
@@ -687,9 +642,7 @@ fn synthetic_bold_user_space_line_width(font_size: Pixels, scale_factor: f32) ->
 #[derive(Debug, Clone)]
 struct StringIndexConverter<'a> {
     text: &'a str,
-    /// Index in UTF-8 bytes
     utf8_ix: usize,
-    /// Index in UTF-16 code units
     utf16_ix: usize,
 }
 
@@ -742,27 +695,6 @@ fn bounds_from_rect_i(rect: RectI) -> Bounds<DevicePixels> {
     }
 }
 
-// impl From<Vector2I> for Size<DevicePixels> {
-//     fn from(value: Vector2I) -> Self {
-//         size(value.x().into(), value.y().into())
-//     }
-// }
-
-// impl From<RectI> for Bounds<i32> {
-//     fn from(rect: RectI) -> Self {
-//         Bounds {
-//             origin: point(rect.origin_x(), rect.origin_y()),
-//             size: size(rect.width(), rect.height()),
-//         }
-//     }
-// }
-
-// impl From<Point<u32>> for Vector2I {
-//     fn from(size: Point<u32>) -> Self {
-//         Vector2I::new(size.x as i32, size.y as i32)
-//     }
-// }
-
 fn size_from_vector2f(vec: Vector2F) -> Size<f32> {
     size(vec.x(), vec.y())
 }
@@ -779,8 +711,6 @@ fn fontkit_style(style: FontStyle) -> FontkitStyle {
     }
 }
 
-// Some fonts may have no attributes despite `core_text` requiring them (and panicking).
-// This is the same version as `core_text` has without `expect` calls.
 mod lenient_font_attributes {
     use core_foundation::{
         base::{CFRetain, CFType, TCFType},
@@ -877,9 +807,8 @@ mod tests {
         assert_eq!(layout.len, line.len());
         assert_eq!(layout.runs.len(), 1);
         assert_eq!(layout.runs[0].glyphs.len(), 2);
-        assert_eq!(layout.runs[0].glyphs[0].id, GlyphId(68u32)); // a
-        // There's no glyph for \u{feff}
-        assert_eq!(layout.runs[0].glyphs[1].id, GlyphId(69u32)); // b
+        assert_eq!(layout.runs[0].glyphs[0].id, GlyphId(68u32));
+        assert_eq!(layout.runs[0].glyphs[1].id, GlyphId(69u32));
 
         let line = "\u{feff}ab";
         let font_runs = &[
@@ -896,9 +825,8 @@ mod tests {
         assert_eq!(layout.len, line.len());
         assert_eq!(layout.runs.len(), 1);
         assert_eq!(layout.runs[0].glyphs.len(), 2);
-        // There's no glyph for \u{feff}
-        assert_eq!(layout.runs[0].glyphs[0].id, GlyphId(68u32)); // a
-        assert_eq!(layout.runs[0].glyphs[1].id, GlyphId(69u32)); // b
+        assert_eq!(layout.runs[0].glyphs[0].id, GlyphId(68u32));
+        assert_eq!(layout.runs[0].glyphs[1].id, GlyphId(69u32));
     }
 
     #[test]
@@ -907,10 +835,7 @@ mod tests {
         let font_id = fonts.font_id(&font("Helvetica")).unwrap();
 
         let text = "hello world";
-        let font_runs = &[
-            FontRun { font_id, len: 5 }, // "hello"
-            FontRun { font_id, len: 6 }, // " world"
-        ];
+        let font_runs = &[FontRun { font_id, len: 5 }, FontRun { font_id, len: 6 }];
 
         let layout = fonts.layout_line(text, px(16.), font_runs);
         assert_eq!(layout.len, text.len());
@@ -926,11 +851,9 @@ mod tests {
             }
         }
 
-        // Test with different font runs - should not insert ZWNJ
         let font_id2 = fonts.font_id(&font("Times")).unwrap_or(font_id);
         let font_runs_different = &[
-            FontRun { font_id, len: 5 }, // "hello"
-            // " world"
+            FontRun { font_id, len: 5 },
             FontRun {
                 font_id: font_id2,
                 len: 6,
@@ -964,9 +887,9 @@ mod tests {
 
         let text = "abc";
         let font_runs = &[
-            FontRun { font_id, len: 1 }, // "a"
-            FontRun { font_id, len: 1 }, // "b"
-            FontRun { font_id, len: 1 }, // "c"
+            FontRun { font_id, len: 1 },
+            FontRun { font_id, len: 1 },
+            FontRun { font_id, len: 1 },
         ];
         let layout = fonts.layout_line(text, px(16.), font_runs);
         assert_eq!(layout.len, text.len());
@@ -982,7 +905,6 @@ mod tests {
             }
         }
 
-        // Test with empty text
         let text = "";
         let font_runs = &[];
         let layout = fonts.layout_line(text, px(16.), font_runs);

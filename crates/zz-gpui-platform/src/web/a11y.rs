@@ -1,18 +1,3 @@
-//! The window's accessibility tree, mirrored as transparent page elements laid
-//! over its canvas.
-//!
-//! Each AccessKit node becomes a `div` with the matching ARIA role, name,
-//! value and states, positioned over the pixels it describes. The layer never
-//! takes pointer input, so real clicks still land on the canvas, while
-//! assistive technology and page automation see a regular DOM tree.
-//! `element.click()` on a mirrored node becomes an AccessKit `Click` action.
-//!
-//! In interactive mode, nodes that can be clicked or focused take pointer
-//! input themselves, so tools that only target hit-testable elements (such as
-//! Playwright's agent snapshots) can reach them. Their pointer and wheel
-//! events are re-dispatched to the canvas, which keeps hover, drag and
-//! scrolling identical to a click on the canvas itself.
-
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;

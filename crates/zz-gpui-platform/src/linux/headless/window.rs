@@ -1,11 +1,3 @@
-//! Windows for the headless platform client.
-//!
-//! A headless window has no compositor surface and no GPU: layout, text
-//! shaping, and entity plumbing run normally, `draw` discards the scene, and
-//! the sprite atlas hands out tiles without uploading pixels (the same
-//! `HeadlessAtlas` GPUI's `TestWindow` uses). This lets command-line tools
-//! drive real `Window`-based code paths without a display server.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -39,7 +31,6 @@ impl PlatformDisplay for HeadlessDisplay {
     }
 
     fn uuid(&self) -> anyhow::Result<Uuid> {
-        // Stable identity: there is exactly one headless display.
         Ok(Uuid::nil())
     }
 
@@ -62,7 +53,6 @@ impl raw_window_handle::HasWindowHandle for HeadlessWindow {
     fn window_handle(
         &self,
     ) -> Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError> {
-        // Headless windows are not backed by a native window.
         Err(raw_window_handle::HandleError::NotSupported)
     }
 }
@@ -147,7 +137,6 @@ impl PlatformWindow for HeadlessWindow {
         _detail: Option<&str>,
         _answers: &[PromptButton],
     ) -> Option<futures::channel::oneshot::Receiver<usize>> {
-        // Fall back to GPUI's rendered prompts.
         None
     }
 
@@ -158,7 +147,6 @@ impl PlatformWindow for HeadlessWindow {
     }
 
     fn visibility(&self) -> WindowVisibility {
-        // There is no display server: `draw` discards every scene.
         WindowVisibility::Hidden
     }
 
@@ -193,8 +181,6 @@ impl PlatformWindow for HeadlessWindow {
         self.0.borrow().is_fullscreen
     }
 
-    // No compositor drives a frame loop, so frame and status callbacks are
-    // dropped: anything that awaits a frame will never resolve headlessly.
     fn on_request_frame(&self, _callback: Box<dyn FnMut(RequestFrameOptions)>) {}
 
     fn on_input(&self, _callback: Box<dyn FnMut(PlatformInput) -> DispatchEventResult>) {}

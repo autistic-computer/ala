@@ -9,7 +9,6 @@ use crate::{
     LineEnding, ShapeLine, Shaping, Wrap,
 };
 
-/// A line (or paragraph) of text that is shaped and laid out
 #[derive(Clone, Debug)]
 pub struct BufferLine {
     text: String,
@@ -23,9 +22,6 @@ pub struct BufferLine {
 }
 
 impl BufferLine {
-    /// Create a new line with the given text and attributes list
-    /// Cached shaping and layout can be done using the [`Self::shape`] and
-    /// [`Self::layout`] functions
     pub fn new<T: Into<String>>(
         text: T,
         ending: LineEnding,
@@ -44,9 +40,6 @@ impl BufferLine {
         }
     }
 
-    /// Resets the current line with new internal values.
-    ///
-    /// Avoids deallocating internal caches so they can be reused.
     pub fn reset_new<T: Into<String>>(
         &mut self,
         text: T,
@@ -64,15 +57,10 @@ impl BufferLine {
         self.metadata = None;
     }
 
-    /// Get current text
     pub fn text(&self) -> &str {
         &self.text
     }
 
-    /// Set text and attributes list
-    ///
-    /// Will reset shape and layout if it differs from current text and attributes list.
-    /// Returns true if the line was reset
     pub fn set_text<T: AsRef<str>>(
         &mut self,
         text: T,
@@ -92,20 +80,14 @@ impl BufferLine {
         }
     }
 
-    /// Consume this line, returning only its text contents as a String.
     pub fn into_text(self) -> String {
         self.text
     }
 
-    /// Get line ending
     pub const fn ending(&self) -> LineEnding {
         self.ending
     }
 
-    /// Set line ending
-    ///
-    /// Will reset shape and layout if it differs from current line ending.
-    /// Returns true if the line was reset
     pub fn set_ending(&mut self, ending: LineEnding) -> bool {
         if ending != self.ending {
             self.ending = ending;
@@ -116,15 +98,10 @@ impl BufferLine {
         }
     }
 
-    /// Get attributes list
     pub const fn attrs_list(&self) -> &AttrsList {
         &self.attrs_list
     }
 
-    /// Set attributes list
-    ///
-    /// Will reset shape and layout if it differs from current attributes list.
-    /// Returns true if the line was reset
     pub fn set_attrs_list(&mut self, attrs_list: AttrsList) -> bool {
         if attrs_list != self.attrs_list {
             self.attrs_list = attrs_list;
@@ -135,16 +112,10 @@ impl BufferLine {
         }
     }
 
-    /// Get the Text alignment
     pub const fn align(&self) -> Option<Align> {
         self.align
     }
 
-    /// Set the text alignment
-    ///
-    /// Will reset layout if it differs from current alignment.
-    /// Setting to None will use `Align::Right` for RTL lines, and `Align::Left` for LTR lines.
-    /// Returns true if the line was reset
     pub fn set_align(&mut self, align: Option<Align>) -> bool {
         if align != self.align {
             self.align = align;
@@ -155,24 +126,18 @@ impl BufferLine {
         }
     }
 
-    /// Append line at end of this line
-    ///
-    /// The wrap setting of the appended line will be lost
     pub fn append(&mut self, other: &Self) {
         let len = self.text.len();
         self.text.push_str(other.text());
 
-        // To preserve line endings, we use the one from the other line
         self.ending = other.ending();
 
         if other.attrs_list.defaults() != self.attrs_list.defaults() {
-            // If default formatting does not match, make a new span for it
             self.attrs_list
                 .add_span(len..len + other.text().len(), &other.attrs_list.defaults());
         }
 
         for (other_range, attrs) in other.attrs_list.spans_iter() {
-            // Add previous attrs spans
             let range = other_range.start + len..other_range.end + len;
             self.attrs_list.add_span(range, &attrs.as_attrs());
         }
@@ -180,37 +145,31 @@ impl BufferLine {
         self.reset();
     }
 
-    /// Split off new line at index
     pub fn split_off(&mut self, index: usize) -> Self {
         let text = self.text.split_off(index);
         let attrs_list = self.attrs_list.split_off(index);
         self.reset();
 
         let mut new = Self::new(text, self.ending, attrs_list, self.shaping);
-        // To preserve line endings, it moves to the new line
         self.ending = LineEnding::None;
         new.align = self.align;
         new
     }
 
-    /// Reset shaping, layout, and metadata caches
     pub fn reset(&mut self) {
         self.metadata = None;
         self.reset_shaping();
     }
 
-    /// Reset shaping and layout caches
     pub fn reset_shaping(&mut self) {
         self.shape_opt.set_unused();
         self.reset_layout();
     }
 
-    /// Reset only layout cache
     pub fn reset_layout(&mut self) {
         self.layout_opt.set_unused();
     }
 
-    /// Shape line, will cache results
     #[allow(clippy::missing_panics_doc)]
     pub fn shape(&mut self, font_system: &mut FontSystem, tab_width: u16) -> &ShapeLine {
         if self.shape_opt.is_unused() {
@@ -231,7 +190,6 @@ impl BufferLine {
         self.shape_opt.get().expect("shape not found")
     }
 
-    /// Get line shaping cache
     pub const fn shape_opt(&self) -> Option<&ShapeLine> {
         self.shape_opt.get()
     }
@@ -240,7 +198,6 @@ impl BufferLine {
         self.shape_opt.is_invalidated() || self.layout_opt.is_invalidated()
     }
 
-    /// Layout line, will cache results
     #[allow(clippy::missing_panics_doc)]
     pub fn layout(
         &mut self,
@@ -276,30 +233,22 @@ impl BufferLine {
         self.layout_opt.get().expect("layout not found")
     }
 
-    /// Get line layout cache
     pub const fn layout_opt(&self) -> Option<&Vec<LayoutLine>> {
         self.layout_opt.get()
     }
 
-    /// Get the visible layout runs for rendering and other tasks
     pub fn layout_runs(&self, height_opt: Option<f32>, line_height: f32) -> LayoutRunIter<'_> {
         LayoutRunIter::from_lines(core::slice::from_ref(self), height_opt, line_height, 0.0, 0)
     }
 
-    /// Get line metadata. This will be None if [`BufferLine::set_metadata`] has not been called
-    /// after the last reset of shaping and layout caches
     pub const fn metadata(&self) -> Option<usize> {
         self.metadata
     }
 
-    /// Set line metadata. This is stored until the next line reset
     pub fn set_metadata(&mut self, metadata: usize) {
         self.metadata = Some(metadata);
     }
 
-    /// Makes an empty buffer line.
-    ///
-    /// The buffer line is in an invalid state after this is called. See [`Self::reset_new`].
     pub(crate) fn empty() -> Self {
         Self {
             text: String::default(),
@@ -313,16 +262,10 @@ impl BufferLine {
         }
     }
 
-    /// Reclaim attributes list memory that isn't needed any longer.
-    ///
-    /// The buffer line is in an invalid state after this is called. See [`Self::reset_new`].
     pub(crate) fn reclaim_attrs(&mut self) -> AttrsList {
         mem::replace(&mut self.attrs_list, AttrsList::new(&Attrs::new()))
     }
 
-    /// Reclaim text memory that isn't needed any longer.
-    ///
-    /// The buffer line is in an invalid state after this is called. See [`Self::reset_new`].
     pub(crate) fn reclaim_text(&mut self) -> String {
         let mut text = mem::take(&mut self.text);
         text.clear();

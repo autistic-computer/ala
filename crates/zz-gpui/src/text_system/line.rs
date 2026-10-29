@@ -9,13 +9,10 @@ use derive_more::{Deref, DerefMut};
 use smallvec::SmallVec;
 use std::{ops::Range, sync::Arc};
 
-/// One pre-resolved glyph sprite: everything paint needs except the final origin.
 #[derive(Clone, Debug)]
 pub struct GlyphRasterItem {
-    /// Raster bounds relative to the quantized line origin, in scaled pixels.
     relative_bounds: Bounds<ScaledPixels>,
     tile: AtlasTile,
-    /// Resolved decoration-run color without element opacity applied.
     color: Hsla,
     kind: GlyphSpriteKind,
 }
@@ -27,52 +24,37 @@ enum GlyphSpriteKind {
     Polychrome,
 }
 
-/// Pre-computed glyph data for efficient painting without per-glyph cache lookups.
-///
-/// This is produced by `ShapedLine::compute_glyph_raster_data` during prepaint
-/// and consumed by `ShapedLine::paint_with_raster_data` during paint.
 #[derive(Clone, Debug)]
 pub struct GlyphRasterData {
     items: Vec<GlyphRasterItem>,
-    /// Subpixel phase of the quantized line origin used to compute the items.
     origin_phase: Point<u8>,
     scale_factor: f32,
-    /// Fingerprint of window-level text raster state.
     window_state: u64,
 }
 
-/// Set the text decoration for a run of text.
 #[derive(Debug, Clone)]
 pub struct DecorationRun {
-    /// The length of the run in utf-8 bytes.
     pub len: u32,
 
-    /// The color for this run
     pub color: Hsla,
 
-    /// The background color for this run
     pub background_color: Option<Hsla>,
 
-    /// The underline style for this run
     pub underline: Option<UnderlineStyle>,
 
-    /// The strikethrough style for this run
     pub strikethrough: Option<StrikethroughStyle>,
 }
 
-/// A line of text that has been shaped and decorated.
 #[derive(Clone, Default, Debug, Deref, DerefMut)]
 pub struct ShapedLine {
     #[deref]
     #[deref_mut]
     pub(crate) layout: Arc<LineLayout>,
-    /// The text that was shaped for this line.
     pub text: SharedString,
     pub(crate) decoration_runs: SmallVec<[DecorationRun; 32]>,
 }
 
 impl ShapedLine {
-    /// Returns a forward-only cursor for this shaped line.
     pub fn cursor(&self) -> ShapedLineCursor<'_> {
         assert_eq!(
             self.len(),
@@ -97,22 +79,15 @@ impl ShapedLine {
         }
     }
 
-    /// The length of the line in utf-8 bytes.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.layout.len
     }
 
-    /// The width of the shaped line in pixels.
-    ///
-    /// This is the glyph advance width computed by the text shaping system and is useful for
-    /// incrementally advancing a "pen" when painting multiple fragments on the same row.
     pub fn width(&self) -> Pixels {
         self.layout.width
     }
 
-    /// Override the len, useful if you're rendering text a
-    /// as text b (e.g. rendering invisibles).
     pub fn with_len(mut self, len: usize) -> Self {
         let layout = self.layout.as_ref();
         self.layout = Arc::new(LineLayout {
@@ -126,7 +101,6 @@ impl ShapedLine {
         self
     }
 
-    /// Paint the line of text to the window.
     pub fn paint(
         &self,
         origin: Point<Pixels>,
@@ -147,7 +121,6 @@ impl ShapedLine {
         )
     }
 
-    /// Paint the line with a handler for each underline.
     pub fn paint_with_underline_handler(
         &self,
         origin: Point<Pixels>,
@@ -179,7 +152,6 @@ impl ShapedLine {
         )
     }
 
-    /// Paint the line with per-glyph raster effects.
     pub fn paint_with_options(
         &self,
         origin: Point<Pixels>,
@@ -205,10 +177,6 @@ impl ShapedLine {
         )
     }
 
-    /// Pre-resolves this line's glyph sprites during prepaint for use during paint.
-    ///
-    /// Returns `Ok(None)` for decorated lines whose underline or strikethrough state
-    /// requires the caller to fall back to [`Self::paint_with_options`].
     pub fn compute_glyph_raster_data(
         &self,
         origin: Point<Pixels>,
@@ -362,10 +330,6 @@ impl ShapedLine {
         }))
     }
 
-    /// Paints glyph sprites pre-resolved by [`Self::compute_glyph_raster_data`].
-    ///
-    /// Returns `false` when the cached raster state is invalid, in which case the
-    /// caller must fall back to [`Self::paint_with_options`] and recompute it.
     #[must_use]
     pub fn paint_with_raster_data(
         &self,
@@ -417,7 +381,6 @@ impl ShapedLine {
         true
     }
 
-    /// Paint the background of the line to the window.
     pub fn paint_background(
         &self,
         origin: Point<Pixels>,
@@ -442,19 +405,9 @@ impl ShapedLine {
         Ok(())
     }
 
-    /// Split this shaped line at a byte index, returning `(prefix, suffix)`.
-    ///
-    /// - `prefix` contains glyphs for bytes `[0, byte_index)` with original positions.
-    ///   Its width equals the x-advance up to the split point.
-    /// - `suffix` contains glyphs for bytes `[byte_index, len)` with positions
-    ///   shifted left so the first glyph starts at x=0, and byte indices rebased to 0.
-    /// - Decoration runs are partitioned at the boundary; a run that straddles it is
-    ///   split into two with adjusted lengths.
-    /// - `font_size`, `ascent`, and `descent` are copied to both halves.
     pub fn split_at(&self, byte_index: usize) -> (ShapedLine, ShapedLine) {
         let (left_layout, right_layout) = self.layout.split_at(byte_index);
 
-        // Partition decoration runs. A run straddling the boundary is split into two.
         let mut left_decorations = SmallVec::new();
         let mut right_decorations = SmallVec::new();
         let mut decoration_offset = 0u32;
@@ -489,7 +442,6 @@ impl ShapedLine {
             decoration_offset = run_end;
         }
 
-        // Split text
         let left_text = if byte_index == self.text.len() {
             self.text.clone()
         } else {
@@ -517,15 +469,8 @@ impl ShapedLine {
     }
 }
 
-/// Incrementally splits a [`ShapedLine`] at increasing UTF-8 byte boundaries.
-///
-/// Each piece preserves the original glyphs and decorations, rebased as in
-/// [`ShapedLine::split_at`]. Byte-ordered glyphs are advanced in linear time,
-/// copying each glyph and byte at most once; visually reordered glyphs fall
-/// back to the existing split operation.
 pub struct ShapedLineCursor<'a> {
     line: &'a ShapedLine,
-    /// Bidirectional shaping can put glyphs out of byte order.
     unordered_remainder: Option<ShapedLine>,
     byte_index: usize,
     run_index: usize,
@@ -536,10 +481,6 @@ pub struct ShapedLineCursor<'a> {
 }
 
 impl<'a> ShapedLineCursor<'a> {
-    /// Takes the bytes since the previous boundary.
-    ///
-    /// Panics if the boundary precedes the previous one, exceeds the line's
-    /// length, or falls inside a UTF-8 character.
     pub fn take_until(&mut self, byte_index: usize) -> ShapedLine {
         assert!(
             byte_index >= self.byte_index,
@@ -634,18 +575,12 @@ impl<'a> ShapedLineCursor<'a> {
         }
     }
 
-    /// Returns the original line's x position at the current boundary.
     pub fn x_offset(&self) -> Pixels {
         self.x_offset
     }
 }
 
 impl LineLayout {
-    /// Paint this layout to the window, using the given decoration runs to color
-    /// glyphs and draw underlines and strikethroughs.
-    ///
-    /// This is a lower-level alternative to [`ShapedLine::paint`] for callers that
-    /// hold a bare layout and track decorations themselves.
     pub fn paint(
         &self,
         origin: Point<Pixels>,
@@ -671,11 +606,6 @@ impl LineLayout {
         )
     }
 
-    /// Paint the background of this layout to the window, using the given
-    /// decoration runs to determine background colors.
-    ///
-    /// This is a lower-level alternative to [`ShapedLine::paint_background`] for
-    /// callers that hold a bare layout and track decorations themselves.
     pub fn paint_background(
         &self,
         origin: Point<Pixels>,
@@ -733,25 +663,21 @@ fn glyph_raster_data_is_valid(
         && data.window_state == window_state
 }
 
-/// A line of text that has been shaped, decorated, and wrapped by the text layout system.
 #[derive(Default, Debug, Deref, DerefMut)]
 pub struct WrappedLine {
     #[deref]
     #[deref_mut]
     pub(crate) layout: Arc<WrappedLineLayout>,
-    /// The text that was shaped for this line.
     pub text: SharedString,
     pub(crate) decoration_runs: Vec<DecorationRun>,
 }
 
 impl WrappedLine {
-    /// The length of the underlying, unwrapped layout, in utf-8 bytes.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.layout.len()
     }
 
-    /// Paint this line of text to the window.
     pub fn paint(
         &self,
         origin: Point<Pixels>,
@@ -783,7 +709,6 @@ impl WrappedLine {
         Ok(())
     }
 
-    /// Paint the background of line of text to the window.
     pub fn paint_background(
         &self,
         origin: Point<Pixels>,
@@ -934,7 +859,6 @@ fn paint_line(
                 if glyph.index >= run_end {
                     let mut style_run = decoration_runs.next();
 
-                    // ignore style runs that apply to a partial glyph
                     while let Some(run) = style_run {
                         if glyph.index < run_end + (run.len as usize) {
                             break;
@@ -1175,7 +1099,6 @@ fn paint_line_background(
                 if glyph.index >= run_end {
                     let mut style_run = decoration_runs.next();
 
-                    // ignore style runs that apply to a partial glyph
                     while let Some(run) = style_run {
                         if glyph.index < run_end + (run.len as usize) {
                             break;
@@ -1320,8 +1243,6 @@ mod tests {
     };
     use std::rc::Rc;
 
-    /// Helper: build a ShapedLine from glyph descriptors without the platform text system.
-    /// Each glyph is described as (byte_index, x_position).
     fn make_shaped_line(
         text: &str,
         glyphs: &[(usize, f32)],
@@ -1776,7 +1697,6 @@ mod tests {
 
     #[test]
     fn test_split_at_invariants() {
-        // Split "abcdef" at every possible byte index and verify structural invariants.
         let line = make_shaped_line(
             "abcdef",
             &[
@@ -1814,12 +1734,10 @@ mod tests {
             assert_eq!(right.descent, line.descent, "descent at split={i}");
         }
 
-        // Edge: split at 0 produces no left runs, full content on right
         let (left, right) = line.split_at(0);
         assert_eq!(left.runs.len(), 0);
         assert_eq!(right.runs[0].glyphs.len(), 6);
 
-        // Edge: split at end produces full content on left, no right runs
         let (left, right) = line.split_at(6);
         assert_eq!(left.runs[0].glyphs.len(), 6);
         assert_eq!(right.runs.len(), 0);
@@ -1827,10 +1745,6 @@ mod tests {
 
     #[test]
     fn test_split_at_glyph_rebasing() {
-        // Two font runs (simulating a font fallback boundary at byte 3):
-        //   run A (FontId 0): glyphs at bytes 0,1,2  positions 0,10,20
-        //   run B (FontId 1): glyphs at bytes 3,4,5  positions 30,40,50
-        // Successive splits simulate the incremental splitting done during wrap.
         let line = ShapedLine {
             layout: Arc::new(LineLayout {
                 font_size: px(16.0),
@@ -1891,13 +1805,11 @@ mod tests {
             decoration_runs: SmallVec::new(),
         };
 
-        // First split at byte 2 — mid-run in run A
         let (first, remainder) = line.split_at(2);
         assert_eq!(first.text.as_ref(), "ab");
         assert_eq!(first.runs.len(), 1);
         assert_eq!(first.runs[0].font_id, FontId(0));
 
-        // Remainder "cdef" should have two runs: tail of A (1 glyph) + all of B (3 glyphs)
         assert_eq!(remainder.text.as_ref(), "cdef");
         assert_eq!(remainder.runs.len(), 2);
         assert_eq!(remainder.runs[0].font_id, FontId(0));
@@ -1908,14 +1820,12 @@ mod tests {
         assert_eq!(remainder.runs[1].glyphs[0].index, 1);
         assert_eq!(remainder.runs[1].glyphs[0].position.x, px(10.0));
 
-        // Second split at byte 2 within remainder — crosses the run boundary
         let (second, final_part) = remainder.split_at(2);
         assert_eq!(second.text.as_ref(), "cd");
         assert_eq!(final_part.text.as_ref(), "ef");
         assert_eq!(final_part.runs[0].glyphs[0].index, 0);
         assert_eq!(final_part.runs[0].glyphs[0].position.x, px(0.0));
 
-        // Widths must sum across all three pieces
         assert_eq!(
             first.width() + second.width() + final_part.width(),
             line.width()
@@ -1924,8 +1834,6 @@ mod tests {
 
     #[test]
     fn test_split_at_decorations() {
-        // Three decoration runs: red [0..2), green [2..5), blue [5..6).
-        // Split at byte 3 — red goes entirely left, green straddles, blue goes entirely right.
         let red = Hsla {
             h: 0.0,
             s: 1.0,
@@ -1983,14 +1891,12 @@ mod tests {
 
         let (left, right) = line.split_at(3);
 
-        // Left: red(2) + green(1) — green straddled, left portion has len 1
         assert_eq!(left.decoration_runs.len(), 2);
         assert_eq!(left.decoration_runs[0].len, 2);
         assert_eq!(left.decoration_runs[0].color, red);
         assert_eq!(left.decoration_runs[1].len, 1);
         assert_eq!(left.decoration_runs[1].color, green);
 
-        // Right: green(2) + blue(1) — green straddled, right portion has len 2
         assert_eq!(right.decoration_runs.len(), 2);
         assert_eq!(right.decoration_runs[0].len, 2);
         assert_eq!(right.decoration_runs[0].color, green);

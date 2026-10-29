@@ -24,10 +24,6 @@ impl MetalAtlas {
         })))
     }
 
-    /// Returns the GPU texture backing `id`, or `None` once every tile in it
-    /// has been removed. A scene can still reference such a texture when a
-    /// cached view replays a paint from before the image was dropped, so
-    /// callers must skip those sprites rather than assume the texture exists.
     pub(crate) fn metal_texture(&self, id: AtlasTextureId) -> Option<metal::Texture> {
         Some(self.0.lock().backend.texture(id)?.metal_texture.clone())
     }
@@ -207,7 +203,6 @@ impl MetalAtlasTextures {
             width: DevicePixels(1024),
             height: DevicePixels(1024),
         };
-        // Max texture size on all modern Apple GPUs. Anything bigger than that crashes in validateWithDevice.
         const MAX_ATLAS_SIZE: Size<DevicePixels> = Size {
             width: DevicePixels(16384),
             height: DevicePixels(16384),
@@ -231,8 +226,6 @@ impl MetalAtlasTextures {
         }
         texture_descriptor.set_pixel_format(pixel_format);
         texture_descriptor.set_usage(usage);
-        // Shared memory mode can be used only on Apple GPU families
-        // https://developer.apple.com/documentation/metal/mtlresourceoptions/storagemodeshared
         texture_descriptor.set_storage_mode(if self.is_apple_gpu {
             metal::MTLStorageMode::Shared
         } else {
@@ -407,21 +400,14 @@ mod tests {
         assert_eq!(tile_a.texture_id, tile_b.texture_id);
         assert_eq!(tile_b.texture_id, tile_c.texture_id);
 
-        // Remove A: texture still has B and C, so it stays.
-        // The key for A must be removed from tiles_by_key.
         atlas.remove(&key_a);
 
-        // Remove B: texture still has C.
         atlas.remove(&key_b);
 
-        // Remove C: texture becomes unreferenced and is deleted.
         atlas.remove(&key_c);
 
-        // Re-inserting A must allocate a fresh tile on a new texture,
-        // NOT return a stale tile referencing the deleted texture.
         let tile_a2 = insert_tile(&atlas, key_a, small);
 
-        // The texture must actually exist — this would panic before the fix.
         assert!(atlas.metal_texture(tile_a2.texture_id).is_some());
     }
 
@@ -442,8 +428,6 @@ mod tests {
         );
         assert!(atlas.metal_texture(tile.texture_id).is_some());
 
-        // A scene built before the removal may still carry `tile`; looking its
-        // texture up must report the gap instead of panicking.
         atlas.remove(&key);
         assert!(atlas.metal_texture(tile.texture_id).is_none());
     }
@@ -578,7 +562,6 @@ mod tests {
             let commands = queue.new_command_buffer().to_owned();
             let frame = atlas.begin_frame();
             let block = RcBlock::new(move |_: ptr::NonNull<AnyObject>| frame.complete());
-            // SAFETY: Both pointee types are opaque views of the same Objective-C block pointer ABI.
             unsafe {
                 commands.add_completed_handler(&*RcBlock::as_ptr(&block).cast());
             }
@@ -658,7 +641,6 @@ mod tests {
                 frame.complete();
                 complete.send(()).unwrap();
             });
-            // SAFETY: Both pointee types are opaque views of the same Objective-C block pointer ABI.
             unsafe {
                 commands.add_completed_handler(&*RcBlock::as_ptr(&block).cast());
             }

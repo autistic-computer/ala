@@ -1,10 +1,7 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 use unicode_script::Script;
 
 use super::Fallback;
 
-/// A platform-specific font fallback list, for Unix.
 #[derive(Debug)]
 pub struct PlatformFallback;
 
@@ -26,60 +23,41 @@ impl Fallback for PlatformFallback {
     }
 }
 
-// Fallbacks to use after any script specific fallbacks
 const fn common_fallback() -> &'static [&'static str] {
-    //TODO: abstract style (sans/serif/monospaced)
     &[
-        /* Sans-serif fallbacks */
         "Noto Sans",
-        /* More sans-serif fallbacks */
         "DejaVu Sans",
         "FreeSans",
-        /* Mono fallbacks */
         "Noto Sans Mono",
         "DejaVu Sans Mono",
         "FreeMono",
-        /* Symbols fallbacks */
         "Noto Sans Symbols",
         "Noto Sans Symbols2",
-        /* Emoji fallbacks*/
         "Noto Color Emoji",
-        //TODO: Add CJK script here for doublewides?
     ]
 }
 
-// Fallbacks to never use
 const fn forbidden_fallback() -> &'static [&'static str] {
     &[]
 }
 
 fn han_unification(locale: &str) -> &'static [&'static str] {
     match locale {
-        // Japan
         "ja" => &["Noto Sans CJK JP"],
-        // Korea
         "ko" => &["Noto Sans CJK KR"],
-        // Hong Kong
         "zh-HK" => &["Noto Sans CJK HK"],
-        // Taiwan
         "zh-TW" => &["Noto Sans CJK TC"],
-        // Simplified Chinese is the default (also catches "zh-CN" for China)
         _ => &["Noto Sans CJK SC"],
     }
 }
 
-// Fallbacks to use per script
 fn script_fallback(script: Script, locale: &str) -> &'static [&'static str] {
-    //TODO: abstract style (sans/serif/monospaced)
     match script {
         Script::Adlam => &["Noto Sans Adlam", "Noto Sans Adlam Unjoined"],
         Script::Arabic => &["Noto Sans Arabic"],
         Script::Armenian => &["Noto Sans Armenian"],
         Script::Bengali => &["Noto Sans Bengali"],
         Script::Bopomofo => han_unification(locale),
-        //TODO: DejaVu Sans would typically be selected for braille characters,
-        // but this breaks alignment when used alongside monospaced text.
-        // By requesting the use of FreeMono first, this issue can be avoided.
         Script::Braille => &["FreeMono"],
         Script::Buhid => &["Noto Sans Buhid"],
         Script::Chakma => &["Noto Sans Chakma"],
@@ -118,11 +96,9 @@ fn script_fallback(script: Script, locale: &str) -> &'static [&'static str] {
         Script::Telugu => &["Noto Sans Telugu"],
         Script::Thaana => &["Noto Sans Thaana"],
         Script::Thai => &["Noto Sans Thai"],
-        //TODO: no sans script?
         Script::Tibetan => &["Noto Serif Tibetan"],
         Script::Tifinagh => &["Noto Sans Tifinagh"],
         Script::Vai => &["Noto Sans Vai"],
-        //TODO: Use han_unification?
         Script::Yi => &["Noto Sans Yi", "Noto Sans CJK SC"],
         _ => &[],
     }

@@ -1,7 +1,3 @@
-//! `TextArea` — a multi-line text box. Same `Editor` workhorse, taller chrome,
-//! and `Enter` inserts a newline instead of being ignored. Constructible from a
-//! string or an editor, exactly like [`Input`](crate::example_input::Input).
-
 use zz_gpui::{
     App, BoxShadow, CursorStyle, Entity, EntityId, Hsla, IntoElement, StyleRefinement, Window, div,
     hsla, point, prelude::*, px, white,
@@ -79,7 +75,6 @@ impl zz_gpui::View for TextArea {
             .track_focus(&focus_handle)
             .cursor(CursorStyle::IBeam)
             .map(standard_actions(editor.clone()))
-            // Enter is the one binding that differs from a single-line input.
             .on_action({
                 let editor = editor.clone();
                 move |_: &Enter, _window, cx| editor.update(cx, |e, cx| e.insert_newline(cx))
@@ -104,9 +99,6 @@ impl zz_gpui::View for TextArea {
             .line_height(row_height)
             .text_size(px(14.))
             .text_color(text_color)
-            // The cache style is computed from the `rows` prop: change `rows` and
-            // the editor's cached bounds change, busting its cache and re-laying
-            // out the text. (`Input` just uses `size_full()` — nothing to vary.)
             .child(
                 editor.cached(
                     StyleRefinement::default()

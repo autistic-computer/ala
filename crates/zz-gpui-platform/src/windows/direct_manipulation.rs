@@ -13,9 +13,6 @@ use zz_gpui::*;
 
 use crate::windows::*;
 
-/// Default viewport size in pixels. The actual content size doesn't matter
-/// because we're using the viewport only for gesture recognition, not for
-/// visual output.
 const DEFAULT_VIEWPORT_SIZE: i32 = 1000;
 
 pub(crate) struct DirectManipulationHandler {
@@ -214,7 +211,6 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
             return Ok(());
         }
 
-        // A new gesture interrupted inertia, so end the old sequence.
         if current == DIRECTMANIPULATION_RUNNING && previous == DIRECTMANIPULATION_INERTIA {
             self.end_gesture();
         }
@@ -222,8 +218,6 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
         if current == DIRECTMANIPULATION_READY {
             self.end_gesture();
 
-            // Reset the content transform so the viewport is ready for the next gesture.
-            // ZoomToRect triggers a second RUNNING -> READY cycle, so prevent an infinite loop here.
             if self.last_scale.get() != 1.0
                 || self.last_x_offset.get() != 0.0
                 || self.last_y_offset.get() != 0.0
@@ -265,7 +259,6 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
     ) -> windows_core::Result<()> {
         let content = content.as_ref().ok_or(E_POINTER)?;
 
-        // Get the 6-element content transform: [scale, 0, 0, scale, tx, ty]
         let mut xform = [0.0f32; 6];
         unsafe {
             content.GetContentTransform(&mut xform)?;
@@ -294,10 +287,6 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
         let position = self.mouse_position();
         let modifiers = current_modifiers();
 
-        // Direct Manipulation reports both translation and scale in every content update.
-        // Translation values can shift during a pinch due to the zoom center shifting.
-        // We classify each gesture as either scroll or pinch and only emit one type of event.
-        // We allow Scroll -> Pinch (a pinch can start with a small pan) but not the reverse.
         if !float_equals(scale, 1.0) {
             if self.gesture_kind.get() != GestureKind::Pinch {
                 self.end_gesture();

@@ -28,7 +28,6 @@ impl SelectionSerial {
 }
 
 #[derive(Debug)]
-/// Helper for tracking of different serial kinds.
 pub(crate) struct SerialTracker {
     serials: HashMap<SerialKind, Serial>,
     selection_serial: Option<SelectionSerial>,
@@ -52,9 +51,6 @@ impl SerialTracker {
         self.serials.insert(kind, serial);
     }
 
-    /// Returns the latest tracked serial of the provided [`SerialKind`].
-    ///
-    /// Returns a serial with a raw value of 0 if the kind has not been tracked.
     pub fn get(&self, kind: SerialKind) -> Serial {
         self.serials.get(&kind).copied().unwrap_or(Serial(0))
     }

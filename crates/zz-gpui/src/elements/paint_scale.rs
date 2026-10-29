@@ -3,19 +3,13 @@ use crate::{
     LayoutId, Pixels, Point, Window,
 };
 
-/// An element painted scaled around its own origin and then moved, with its
-/// layout and hit testing left as they are. See [`PaintScaleExt::paint_scale`].
 pub struct PaintScale<E> {
     element: Option<E>,
     scale: f32,
     offset: Point<Pixels>,
 }
 
-/// Paint an element scaled without laying it out again.
 pub trait PaintScaleExt {
-    /// Paint this element scaled by `scale` around its top-left corner, then
-    /// moved by `offset`, clipped to the content mask it is painted in. Mouse
-    /// input still lands where the element is laid out.
     fn paint_scale(self, scale: f32, offset: Point<Pixels>) -> PaintScale<Self>
     where
         Self: Sized,

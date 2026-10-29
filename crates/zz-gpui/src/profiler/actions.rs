@@ -38,7 +38,7 @@ impl std::fmt::Display for ActionStatistics {
         {
             f.write_fmt(format_args!(
                 "{:<20} - {}",
-                format!("{:?}", action.runtime()), // impl dbg does not support alignment
+                format!("{:?}", action.runtime()),
                 action.name
             ))?;
             writeln!(f)?;
@@ -56,8 +56,6 @@ impl Default for ActionStatistics {
 impl ActionStatistics {
     const fn new() -> Self {
         Self {
-            // This keeps more calls on the fast path by only tracking
-            // problematic polls
             runtime_to_beat: Duration::from_micros(100),
             longest_runtimes: heapless::Vec::new(),
             running: None,
@@ -86,12 +84,6 @@ impl ActionStatistics {
         let now = Instant::now();
 
         let Some((action, started)) = self.running.take() else {
-            // Actions are ran only on the foreground executor and therefore
-            // sequentially _except_ in tests where they can run concurrently.
-            //
-            // When ran sequentially self.running will always be Some. When ran
-            // concurrently that is no longer true. But that is fine, we do not
-            // need to track action timings in tests.
             std::hint::cold_path();
             return;
         };
@@ -104,7 +96,7 @@ impl ActionStatistics {
 
         let runtime = now.duration_since(started);
         if runtime >= self.runtime_to_beat {
-            std::hint::cold_path(); // most actions are not the worst, optimize for that
+            std::hint::cold_path();
 
             if self.longest_runtimes.is_full()
                 && let Some(to_replace) = self
@@ -145,7 +137,6 @@ impl ActionStatistics {
 }
 
 #[doc(hidden)]
-/// UNSTABLE only for use in the profiler and zed-reliability
 #[derive(Copy, Clone)]
 pub struct ActionTiming {
     pub name: &'static str,
@@ -175,8 +166,6 @@ impl ActionTiming {
     }
 }
 
-// The profiler is careful to never block when the lock is held, therefore a
-// spinlock is optimal.
 #[cfg(feature = "profiler")]
 static ACTION_STATISTICS: spin::Mutex<ActionStatistics> =
     const { spin::Mutex::new(ActionStatistics::new()) };

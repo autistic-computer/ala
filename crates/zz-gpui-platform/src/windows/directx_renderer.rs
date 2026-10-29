@@ -27,7 +27,6 @@ use zz_gpui::*;
 
 pub(crate) const DISABLE_DIRECT_COMPOSITION: &str = "GPUI_DISABLE_DIRECT_COMPOSITION";
 const RENDER_TARGET_FORMAT: DXGI_FORMAT = DXGI_FORMAT_B8G8R8A8_UNORM;
-// This configuration is used for MSAA rendering on paths only, and it's guaranteed to be supported by DirectX 11.
 const PATH_MULTISAMPLE_COUNT: u32 = 4;
 const MAX_INSTANCE_BUFFER_SIZE: usize = 256 * 1024 * 1024;
 
@@ -51,14 +50,9 @@ pub(crate) struct DirectXRenderer {
     width: u32,
     height: u32,
 
-    /// Whether we want to skip drwaing due to device lost events.
-    ///
-    /// In that case we want to discard the first frame that we draw as we got reset in the middle of a frame
-    /// meaning we lost all the allocated gpu textures and scene resources.
     skip_draws: bool,
 }
 
-/// Direct3D objects
 #[derive(Clone)]
 pub(crate) struct DirectXRendererDevices {
     pub(crate) adapter: IDXGIAdapter1,
@@ -70,18 +64,15 @@ pub(crate) struct DirectXRendererDevices {
 }
 
 struct DirectXResources {
-    // Direct3D rendering objects
     swap_chain: IDXGISwapChain1,
     render_target: Option<ID3D11Texture2D>,
     render_target_view: Option<ID3D11RenderTargetView>,
 
-    // Path intermediate textures (with MSAA)
     path_intermediate_texture: ID3D11Texture2D,
     path_intermediate_srv: Option<ID3D11ShaderResourceView>,
     path_intermediate_msaa_texture: ID3D11Texture2D,
     path_intermediate_msaa_view: Option<ID3D11RenderTargetView>,
 
-    // Cached viewport
     viewport: D3D11_VIEWPORT,
 }
 
@@ -337,19 +328,12 @@ impl DirectXRenderer {
         background_appearance: WindowBackgroundAppearance,
     ) -> Result<()> {
         if self.skip_draws {
-            // skip drawing this frame, we just recovered from a device lost event
-            // and so likely do not have the textures anymore that are required for drawing
             return Ok(());
         }
         self.render(scene, background_appearance)?;
         self.present()
     }
 
-    /// Clear the render target for `background_appearance` and encode every
-    /// primitive batch of `scene` into it, without presenting. Shared by
-    /// [`draw`](Self::draw) (which then presents) and
-    /// [`render_to_image`](Self::render_to_image) (which reads the target back
-    /// instead), so the two cannot drift.
     fn render(
         &mut self,
         scene: &Scene,
@@ -362,8 +346,6 @@ impl DirectXRenderer {
         self.draw_scene(scene)
     }
 
-    /// Custom shaders are not compiled here, so a shader layer's content is
-    /// drawn in place, unchanged.
     fn draw_scene(&mut self, scene: &Scene) -> Result<()> {
         self.upload_scene_buffers(scene)?;
 
@@ -404,8 +386,6 @@ impl DirectXRenderer {
                     }
                     self.upload_scene_buffers(scene)
                 }
-                // This renderer cannot read back the frame, so its windows
-                // paint glass as a plain fill and never produce any.
                 PrimitiveBatch::Glass(_) => Ok(()),
             }
             .with_context(|| {
@@ -426,20 +406,12 @@ impl DirectXRenderer {
         Ok(())
     }
 
-    /// Render `scene` to an offscreen CPU image **without presenting** so
-    /// the window need never be shown or visible (the macOS headless path
-    /// goes through MetalRenderer; this is the Windows analogue). Draws into
-    /// the existing render target, copies it into a `D3D11_USAGE_STAGING`
-    /// texture, maps it, and converts BGRA to RGBA.
     #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn render_to_image(
         &mut self,
         scene: &Scene,
         background_appearance: WindowBackgroundAppearance,
     ) -> Result<image::RgbaImage> {
-        // A pending device-lost recovery (`skip_draws`) leaves the atlas holding
-        // tile references from the previous device; drawing before the forced
-        // re-render rebuilds them panics in `DirectXAtlasTextures::texture`.
         anyhow::ensure!(
             !self.skip_draws,
             "render_to_image unavailable while recovering from a lost device"
@@ -455,7 +427,6 @@ impl DirectXRenderer {
             .as_ref()
             .context("render target missing")?;
 
-        // A CPU-readable copy of the render target.
         let mut desc = D3D11_TEXTURE2D_DESC::default();
         unsafe { render_target.GetDesc(&mut desc) };
         let width = desc.Width;
@@ -482,11 +453,6 @@ impl DirectXRenderer {
         unsafe { context.Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))? };
         let row_bytes = (width as usize) * 4;
         let mut pixels = vec![0u8; row_bytes * height as usize];
-        // SAFETY: `Map` succeeded, so `pData` points at `RowPitch * height`
-        // readable bytes for as long as the mapping is held, and `RowPitch >=
-        // row_bytes` (it only ever adds trailing padding). `pixels` is sized
-        // `row_bytes * height`, so every copy stays in bounds on both sides,
-        // and the regions cannot overlap (`pixels` is a fresh allocation).
         unsafe {
             let src = mapped.pData as *const u8;
             for row in 0..height as usize {
@@ -496,7 +462,6 @@ impl DirectXRenderer {
             }
             context.Unmap(&staging, 0);
         }
-        // The render target is BGRA; image::RgbaImage expects RGBA.
         for px in pixels.chunks_exact_mut(4) {
             px.swap(0, 2);
         }
@@ -513,17 +478,12 @@ impl DirectXRenderer {
         self.width = width;
         self.height = height;
 
-        // Clear the render target before resizing
         let devices = self.devices.as_ref().context("devices missing")?;
         unsafe { devices.device_context.OMSetRenderTargets(None, None) };
         let resources = self.resources.as_mut().context("resources missing")?;
         resources.render_target.take();
         resources.render_target_view.take();
 
-        // Resizing the swap chain requires a call to the underlying DXGI adapter, which can return the device removed error.
-        // The app might have moved to a monitor that's attached to a different graphics device.
-        // When a graphics device is removed or reset, the desktop resolution often changes, resulting in a window size change.
-        // But here we just return the error, because we are handling device lost scenarios elsewhere.
         unsafe {
             resources
                 .swap_chain
@@ -657,20 +617,17 @@ impl DirectXRenderer {
 
         let devices = self.devices.as_ref().context("devices missing")?;
         let resources = self.resources.as_ref().context("resources missing")?;
-        // Clear intermediate MSAA texture
         unsafe {
             devices.device_context.ClearRenderTargetView(
                 resources.path_intermediate_msaa_view.as_ref().unwrap(),
                 &[0.0; 4],
             );
-            // Set intermediate MSAA texture as render target
             devices.device_context.OMSetRenderTargets(
                 Some(slice::from_ref(&resources.path_intermediate_msaa_view)),
                 None,
             );
         }
 
-        // Collect all vertices and sprites for a single draw call
         let mut vertices = Vec::new();
 
         for path in paths {
@@ -695,7 +652,6 @@ impl DirectXRenderer {
             1,
         )?;
 
-        // Resolve MSAA to non-MSAA intermediate texture
         unsafe {
             devices.device_context.ResolveSubresource(
                 &resources.path_intermediate_texture,
@@ -704,7 +660,6 @@ impl DirectXRenderer {
                 0,
                 RENDER_TARGET_FORMAT,
             );
-            // Restore main render target
             devices
                 .device_context
                 .OMSetRenderTargets(Some(slice::from_ref(&resources.render_target_view)), None);
@@ -718,13 +673,6 @@ impl DirectXRenderer {
             return Ok(());
         };
 
-        // When copying paths from the intermediate texture to the drawable,
-        // each pixel must only be copied once, in case of transparent paths.
-        //
-        // If all paths have the same draw order, then their bounds are all
-        // disjoint, so we can copy each path's bounds individually. If this
-        // batch combines different draw orders, we perform a single copy
-        // for a minimal spanning rect.
         let sprites = if paths.last().unwrap().order == first_path.order {
             paths
                 .iter()
@@ -748,7 +696,6 @@ impl DirectXRenderer {
             &sprites,
         )?;
 
-        // Draw the sprites with the path texture
         self.pipelines.path_sprite_pipeline.draw_with_texture(
             &devices.device_context,
             slice::from_ref(&resources.path_intermediate_srv),
@@ -857,10 +804,6 @@ impl DirectXRenderer {
         }
         let devices = self.devices.as_ref().context("devices missing")?;
         for (offset, surface) in surfaces.iter().enumerate() {
-            // The view is built per draw rather than cached against the texture
-            // pointer: the embedder owns these textures and may recycle a slot
-            // between frames, which would leave a cached view sampling a stale
-            // resource. Creating one is cheap next to the copy that filled it.
             let Some(view) = create_texture_view(&devices.device, &surface.texture).log_err()
             else {
                 continue;
@@ -904,7 +847,6 @@ impl DirectXRenderer {
         let driver_version = match desc.VendorId {
             0x10DE => nvidia::get_driver_version(),
             0x1002 => amd::get_driver_version(),
-            // For Intel and other vendors, we use the DXGI API to get the driver version.
             _ => dxgi::get_driver_version(&devices.adapter),
         }
         .context("Failed to get gpu driver info")
@@ -1133,8 +1075,6 @@ impl DirectXGlobalElements {
             output
         };
 
-        // External textures are sampled edge to edge, so they clamp instead of
-        // wrapping: filtering at the border must not pull in the far edge.
         let surface_sampler = unsafe {
             let desc = D3D11_SAMPLER_DESC {
                 Filter: D3D11_FILTER_MIN_MAG_MIP_LINEAR,
@@ -1378,8 +1318,6 @@ struct PathSprite {
     bounds: Bounds<ScaledPixels>,
 }
 
-/// The GPU-facing half of a [`PaintSurface`]: the texture travels out of band,
-/// bound per draw, because each surface samples a different one.
 #[derive(Clone, Copy)]
 #[repr(C)]
 struct Surface {
@@ -1420,7 +1358,6 @@ fn create_swap_chain_for_composition(
         },
         BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
         BufferCount: BUFFER_COUNT as u32,
-        // Composition SwapChains only support the DXGI_SCALING_STRETCH Scaling.
         Scaling: DXGI_SCALING_STRETCH,
         SwapEffect: DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
         AlphaMode: DXGI_ALPHA_MODE_PREMULTIPLIED,
@@ -1598,7 +1535,6 @@ fn set_rasterizer_state(device: &ID3D11Device, device_context: &ID3D11DeviceCont
     Ok(())
 }
 
-// https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ns-d3d11-d3d11_blend_desc
 #[inline]
 fn create_blend_state(device: &ID3D11Device) -> Result<ID3D11BlendState> {
     let mut desc = D3D11_BLEND_DESC::default();
@@ -1625,7 +1561,6 @@ fn create_blend_state_for_subpixel_rendering(device: &ID3D11Device) -> Result<ID
     desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
     desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC1_COLOR;
     desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC1_COLOR;
-    // It does not make sense to draw transparent subpixel-rendered text, since it cannot be meaningfully alpha-blended onto anything else.
     desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
     desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
     desc.RenderTarget[0].RenderTargetWriteMask =
@@ -1640,8 +1575,6 @@ fn create_blend_state_for_subpixel_rendering(device: &ID3D11Device) -> Result<ID
 
 #[inline]
 fn create_blend_state_for_path_rasterization(device: &ID3D11Device) -> Result<ID3D11BlendState> {
-    // If the feature level is set to greater than D3D_FEATURE_LEVEL_9_3, the display
-    // device performs the blend in linear space, which is ideal.
     let mut desc = D3D11_BLEND_DESC::default();
     desc.RenderTarget[0].BlendEnable = true.into();
     desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
@@ -1660,8 +1593,6 @@ fn create_blend_state_for_path_rasterization(device: &ID3D11Device) -> Result<ID
 
 #[inline]
 fn create_blend_state_for_path_sprite(device: &ID3D11Device) -> Result<ID3D11BlendState> {
-    // If the feature level is set to greater than D3D_FEATURE_LEVEL_9_3, the display
-    // device performs the blend in linear space, which is ideal.
     let mut desc = D3D11_BLEND_DESC::default();
     desc.RenderTarget[0].BlendEnable = true.into();
     desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
@@ -1678,8 +1609,6 @@ fn create_blend_state_for_path_sprite(device: &ID3D11Device) -> Result<ID3D11Ble
     }
 }
 
-/// Blends a source that already carries its alpha into its colour channels,
-/// which is what external textures hand us.
 #[inline]
 fn create_blend_state_for_premultiplied_alpha(device: &ID3D11Device) -> Result<ID3D11BlendState> {
     let mut desc = D3D11_BLEND_DESC::default();
@@ -1977,7 +1906,6 @@ pub(crate) mod shader_resources {
             let entry_point = PCSTR::from_raw(entry.as_ptr());
             let target_cstr = PCSTR::from_raw(target.as_ptr());
 
-            // really dirty trick because winapi bindings are unhappy otherwise
             let include_handler = &std::mem::transmute::<usize, ID3DInclude>(
                 D3D_COMPILE_STANDARD_FILE_INCLUDE as usize,
             );
@@ -2041,14 +1969,11 @@ mod nvidia {
 
     use crate::windows::with_dll_library;
 
-    // https://github.com/NVIDIA/nvapi/blob/7cb76fce2f52de818b3da497af646af1ec16ce27/nvapi_lite_common.h#L180
     const NVAPI_SHORT_STRING_MAX: usize = 64;
 
-    // https://github.com/NVIDIA/nvapi/blob/7cb76fce2f52de818b3da497af646af1ec16ce27/nvapi_lite_common.h#L235
     #[allow(non_camel_case_types)]
     type NvAPI_ShortString = [c_char; NVAPI_SHORT_STRING_MAX];
 
-    // https://github.com/NVIDIA/nvapi/blob/7cb76fce2f52de818b3da497af646af1ec16ce27/nvapi_lite_common.h#L447
     #[allow(non_camel_case_types)]
     type NvAPI_SYS_GetDriverAndBranchVersion_t = unsafe extern "C" fn(
         driver_version: *mut c_uint,
@@ -2066,7 +1991,6 @@ mod nvidia {
                 .ok_or_else(|| anyhow::anyhow!("Failed to get nvapi_QueryInterface address"))?;
             let nvapi_query: extern "C" fn(u32) -> *mut () = std::mem::transmute(nvapi_query_addr);
 
-            // https://github.com/NVIDIA/nvapi/blob/7cb76fce2f52de818b3da497af646af1ec16ce27/nvapi_interface.h#L41
             let nvapi_get_driver_version_ptr = nvapi_query(0x2926aaad);
             if nvapi_get_driver_version_ptr.is_null() {
                 anyhow::bail!("Failed to get NVIDIA driver version function pointer");
@@ -2108,11 +2032,8 @@ mod amd {
 
     use crate::windows::with_dll_library;
 
-    // https://github.com/GPUOpen-LibrariesAndSDKs/AGS_SDK/blob/5d8812d703d0335741b6f7ffc37838eeb8b967f7/ags_lib/inc/amd_ags.h#L145
     const AGS_CURRENT_VERSION: i32 = (6 << 22) | (3 << 12);
 
-    // https://github.com/GPUOpen-LibrariesAndSDKs/AGS_SDK/blob/5d8812d703d0335741b6f7ffc37838eeb8b967f7/ags_lib/inc/amd_ags.h#L204
-    // This is an opaque type, using struct to represent it properly for FFI
     #[repr(C)]
     struct AGSContext {
         _private: [u8; 0],
@@ -2126,7 +2047,6 @@ mod amd {
         pub devices: *mut c_void,
     }
 
-    // https://github.com/GPUOpen-LibrariesAndSDKs/AGS_SDK/blob/5d8812d703d0335741b6f7ffc37838eeb8b967f7/ags_lib/inc/amd_ags.h#L429
     #[allow(non_camel_case_types)]
     type agsInitialize_t = unsafe extern "C" fn(
         version: c_int,
@@ -2135,7 +2055,6 @@ mod amd {
         gpu_info: *mut AGSGPUInfo,
     ) -> c_int;
 
-    // https://github.com/GPUOpen-LibrariesAndSDKs/AGS_SDK/blob/5d8812d703d0335741b6f7ffc37838eeb8b967f7/ags_lib/inc/amd_ags.h#L436
     #[allow(non_camel_case_types)]
     type agsDeInitialize_t = unsafe extern "C" fn(context: *mut AGSContext) -> c_int;
 
@@ -2172,7 +2091,6 @@ mod amd {
                 anyhow::bail!("Failed to initialize AMD AGS, error code: {}", result);
             }
 
-            // Vulkan actually returns this as the driver version
             let software_version = if !gpu_info.radeon_software_version.is_null() {
                 std::ffi::CStr::from_ptr(gpu_info.radeon_software_version)
                     .to_string_lossy()

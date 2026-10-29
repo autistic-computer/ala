@@ -40,7 +40,6 @@ struct WgpuAtlasTextures {
 
 pub struct WgpuTextureInfo {
     pub view: wgpu::TextureView,
-    /// Distinguishes new textures that reuse an [`AtlasTextureId`].
     pub generation: u64,
 }
 
@@ -67,10 +66,6 @@ impl WgpuAtlas {
         lock.backend.flush_uploads(encoder);
     }
 
-    /// Returns the view backing `id`, or `None` once every tile in it has been
-    /// removed. A scene can still reference such a texture when a cached view
-    /// replays a paint from before the image was dropped, so callers must skip
-    /// those sprites rather than assume the texture exists.
     pub fn get_texture_info(&self, id: AtlasTextureId) -> Option<WgpuTextureInfo> {
         let lock = self.0.lock();
         let texture = lock.backend.storage.get(id)?;
@@ -80,8 +75,6 @@ impl WgpuAtlas {
         })
     }
 
-    /// Clears all cached textures and tiles, forcing them to be recreated.
-    /// Use this for incremental recovery when the device is still valid.
     pub fn clear(&self) {
         self.0.lock().clear(|textures| {
             textures.storage = WgpuAtlasStorage::default();
@@ -90,8 +83,6 @@ impl WgpuAtlas {
         });
     }
 
-    /// Handles device lost by clearing all textures and cached tiles.
-    /// The atlas will lazily recreate textures as needed on subsequent frames.
     pub fn handle_device_lost(&self, context: &WgpuContext) {
         self.0.lock().clear(|textures| {
             textures.device = context.device.clone();
@@ -612,7 +603,6 @@ mod tests {
         };
         let mut build = || Ok(Some((size, Cow::Owned(vec![0, 0, 0, 255]))));
 
-        // Regression test: before the fix, this panicked in flush_uploads
         atlas
             .get_or_insert_with(key.clone(), &mut build)?
             .expect("tile should be created");

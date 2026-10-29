@@ -83,7 +83,6 @@ mod macos_build {
 
         let crate_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
-        // Source files from zz-gpui that define types used in shaders
         let gpui_src_paths = [
             gpui_dir.join("src/scene.rs"),
             gpui_dir.join("src/geometry.rs"),
@@ -92,7 +91,6 @@ mod macos_build {
             gpui_dir.join("src/platform.rs"),
         ];
 
-        // Source files from this crate
         let local_src_paths = [crate_dir.join("src/apple/metal_renderer.rs")];
 
         for src_path in gpui_src_paths.iter().chain(local_src_paths.iter()) {
@@ -109,15 +107,10 @@ mod macos_build {
         output_path
     }
 
-    /// Locate the zz-gpui crate directory relative to this crate. Resolved at
-    /// build-script runtime against this crate's manifest dir, so no checkout
-    /// path is baked into a compiled artifact (which corgi rejects).
     fn find_zz_gpui_crate_dir() -> PathBuf {
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("../zz-gpui")
     }
 
-    /// To enable runtime compilation, we need to "stitch" the shaders file with the generated header
-    /// so that it is self-contained.
     #[cfg(feature = "runtime_shaders")]
     fn emit_stitched_shaders(header_path: &Path) {
         fn stitch_header(header: &Path, shader_path: &Path) -> std::io::Result<PathBuf> {
@@ -144,10 +137,6 @@ mod macos_build {
             PathBuf::from(env::var("OUT_DIR").unwrap()).join("shaders.metallib");
         println!("cargo:rerun-if-changed={}", shader_path);
 
-        // The metal compiler records the resolved absolute path of its input
-        // unconditionally. Compile a copy staged in OUT_DIR so the recorded
-        // location is the build's canonical output directory, never the
-        // checkout (corgi rejects artifacts that embed the build path).
         let staged_shader_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("shaders.metal");
         std::fs::copy(shader_path, &staged_shader_path).unwrap();
 
@@ -191,10 +180,6 @@ mod macos_build {
             process::exit(1);
         }
 
-        // The .air intermediate records the compiler's working directory in
-        // its debug info; the metallib built from it does not. Nothing reads
-        // the .air after this point, so drop it rather than leave a
-        // checkout-path-bearing file in OUT_DIR.
         std::fs::remove_file(&air_output_path).unwrap();
     }
 }
@@ -215,10 +200,8 @@ mod shader_compilation {
 
         println!("cargo:rerun-if-changed={}", shader_path.display());
 
-        // Check if fxc.exe is available
         let fxc_path = find_fxc_compiler();
 
-        // Define all modules
         let modules = [
             "quad",
             "shadow",
@@ -259,14 +242,13 @@ mod shader_compilation {
         }
     }
 
-    /// Locate `binary` in the newest installed Windows SDK.
     pub fn find_latest_windows_sdk_binary(
         binary: &str,
     ) -> Result<Option<PathBuf>, Box<dyn std::error::Error>> {
         let key = windows_registry::LOCAL_MACHINE
             .open("SOFTWARE\\WOW6432Node\\Microsoft\\Microsoft SDKs\\Windows\\v10.0")?;
 
-        let install_folder: String = key.get_string("InstallationFolder")?; // "C:\Program Files (x86)\Windows Kits\10\"
+        let install_folder: String = key.get_string("InstallationFolder")?;
         let install_folder_bin = Path::new(&install_folder).join("bin");
 
         let mut versions: Vec<_> = std::fs::read_dir(&install_folder_bin)?
@@ -302,17 +284,13 @@ mod shader_compilation {
         Ok(None)
     }
 
-    /// You can set the `GPUI_FXC_PATH` environment variable to specify the path to the fxc.exe compiler.
     fn find_fxc_compiler() -> String {
-        // Check environment variable
         if let Ok(path) = std::env::var("GPUI_FXC_PATH")
             && Path::new(&path).exists()
         {
             return path;
         }
 
-        // Try to find in PATH
-        // NOTE: This has to be `where.exe` on Windows, not `where`, it must be ended with `.exe`
         if let Ok(output) = std::process::Command::new("where.exe")
             .arg("fxc.exe")
             .output()
@@ -336,7 +314,6 @@ mod shader_compilation {
         shader_path: &str,
         rust_binding_path: &str,
     ) {
-        // Compile vertex shader
         let output_file = format!("{}/{}_vs.h", out_dir, module);
         let const_name = format!("{}_VERTEX_BYTES", module.to_uppercase());
         compile_shader_impl(
@@ -349,7 +326,6 @@ mod shader_compilation {
         );
         generate_rust_binding(&const_name, &output_file, rust_binding_path);
 
-        // Compile fragment shader
         let output_file = format!("{}/{}_ps.h", out_dir, module);
         let const_name = format!("{}_FRAGMENT_BYTES", module.to_uppercase());
         compile_shader_impl(

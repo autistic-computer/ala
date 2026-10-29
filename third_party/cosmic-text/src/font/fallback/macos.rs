@@ -1,10 +1,7 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 use unicode_script::Script;
 
 use super::Fallback;
 
-/// A platform-specific font fallback list, for `MacOS`.
 #[derive(Debug)]
 pub struct PlatformFallback;
 
@@ -26,7 +23,6 @@ impl Fallback for PlatformFallback {
     }
 }
 
-// Fallbacks to use after any script specific fallbacks
 fn common_fallback() -> &'static [&'static str] {
     &[
         ".SF NS",
@@ -37,30 +33,21 @@ fn common_fallback() -> &'static [&'static str] {
     ]
 }
 
-// Fallbacks to never use
 fn forbidden_fallback() -> &'static [&'static str] {
     &[".LastResort"]
 }
 
 fn han_unification(locale: &str) -> &'static [&'static str] {
     match locale {
-        // Japan
         "ja" => &["Hiragino Sans"],
-        // Korea
         "ko" => &["Apple SD Gothic Neo"],
-        // Hong Kong
         "zh-HK" => &["PingFang HK"],
-        // Taiwan
         "zh-TW" => &["PingFang TC"],
-        // Simplified Chinese is the default (also catches "zh-CN" for China)
         _ => &["PingFang SC"],
     }
 }
 
-// Fallbacks to use per script
 fn script_fallback(script: Script, locale: &str) -> &'static [&'static str] {
-    //TODO: abstract style (sans/serif/monospaced)
-    //TODO: pull more data from about:config font.name-list.sans-serif in Firefox
     match script {
         Script::Adlam => &["Noto Sans Adlam"],
         Script::Arabic => &["Geeza Pro"],
@@ -103,7 +90,6 @@ fn script_fallback(script: Script, locale: &str) -> &'static [&'static str] {
         Script::Tibetan => &["Kailasa"],
         Script::Tifinagh => &["Noto Sans Tifinagh"],
         Script::Vai => &["Noto Sans Vai"],
-        //TODO: Use han_unification?
         Script::Yi => &["Noto Sans Yi", "PingFang SC"],
         _ => &[],
     }

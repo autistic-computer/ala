@@ -1,14 +1,10 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 use harfrust::Shaper;
-use linebender_resource_handle::{Blob, FontData};
-use skrifa::raw::{ReadError, TableProvider as _};
-use skrifa::{metrics::Metrics, prelude::*};
-// re-export skrifa
-pub use skrifa;
-// re-export peniko::Font;
 #[cfg(feature = "peniko")]
 pub use linebender_resource_handle::FontData as PenikoFont;
+use linebender_resource_handle::{Blob, FontData};
+pub use skrifa;
+use skrifa::raw::{ReadError, TableProvider as _};
+use skrifa::{metrics::Metrics, prelude::*};
 
 use core::fmt;
 
@@ -46,7 +42,6 @@ struct FontMonospaceFallback {
     unicode_codepoints: Vec<u32>,
 }
 
-/// A font
 pub struct Font {
     #[cfg(feature = "swash")]
     swash: (u32, swash::CacheKey),
@@ -133,10 +128,6 @@ impl Font {
             fontdb::Source::SharedFile(_path, data) => Arc::clone(data),
         };
 
-        // It's a bit unfortunate but we need to parse the data into a `FontRef`
-        // twice--once to construct the HarfRust `ShaperInstance` and
-        // `ShaperData`, and once to create the persistent `FontRef` tied to the
-        // lifetime of the face data.
         let font_ref = FontRef::from_index((*data).as_ref(), info.index).ok()?;
         let location = font_ref
             .axes()

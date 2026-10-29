@@ -4,21 +4,14 @@ use zz_gpui::{
     GlassUniform, Size, WindowCornerMask, glass_level_size, plan_glass,
 };
 
-/// Slots a glass draw can take in the uniform buffer: its own block, and one
-/// per blur pass down and back up the chain.
 const SLOTS_PER_GLASS: u64 = 1 + 2 * GLASS_MAX_BLUR_LEVELS as u64;
 
-/// The chain grows in steps of this many level 0 texels, so a glass that
-/// moves or springs does not reallocate it every frame.
 const CHAIN_STEP: u32 = 256;
 
-/// Pipelines and the blur chain for [`Glass`], created when a scene first
-/// paints glass.
 pub(crate) struct GlassResources {
     glass_layout: wgpu::BindGroupLayout,
     blur_layout: wgpu::BindGroupLayout,
     glass_pipeline: wgpu::RenderPipeline,
-    /// For glass that reads its backdrop, which writes its pixels itself.
     reading_pipeline: wgpu::RenderPipeline,
     down_pipeline: wgpu::RenderPipeline,
     up_pipeline: wgpu::RenderPipeline,
@@ -29,25 +22,19 @@ pub(crate) struct GlassResources {
     uniform_bytes: Vec<u8>,
     levels: Vec<Level>,
     glass_bind_group: Option<wgpu::BindGroup>,
-    /// Bound in place of the chain for glass that reads no backdrop.
     placeholder: wgpu::TextureView,
     placeholder_bind_group: Option<wgpu::BindGroup>,
-    /// The largest chain any run needed this frame, in level 0 texels.
     peak: Size<i32>,
 }
 
-/// Glass draws waiting for a pass over the target.
 pub(crate) struct PendingGlass {
     bind_group: wgpu::BindGroup,
-    /// Each draw's uniform offset, scissor, whether it reads its backdrop,
-    /// and how many vertices it draws.
     draws: Vec<(u32, Bounds<i32>, bool, u32)>,
 }
 
 struct Level {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
-    /// Reads this level as a blur pass's source.
     bind_group: wgpu::BindGroup,
 }
 
@@ -216,7 +203,6 @@ impl GlassResources {
         }
     }
 
-    /// Starts a frame that draws at most `glass_count` glasses.
     pub(crate) fn begin_frame(&mut self, device: &wgpu::Device, glass_count: usize) {
         self.peak = Size::default();
         self.uniform_bytes.clear();
@@ -235,13 +221,10 @@ impl GlassResources {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         }));
-        // Bind groups name the buffer they read.
         self.release_textures();
         self.placeholder_bind_group = None;
     }
 
-    /// Uploads the frame's uniform blocks, and frees a chain the frame did
-    /// not use, or used little of. Call before submitting.
     pub(crate) fn finish_frame(&mut self, queue: &wgpu::Queue) {
         if let Some(level) = self.levels.first() {
             let area = level.texture.width() as i64 * level.texture.height() as i64;
@@ -314,7 +297,6 @@ impl GlassResources {
         offset as u32
     }
 
-    /// Makes the chain span `extent` level 0 texels and reach `depth` levels.
     fn ensure_chain(&mut self, device: &wgpu::Device, extent: Size<i32>, depth: u32) {
         self.peak = Size {
             width: self.peak.width.max(extent.width),
@@ -328,9 +310,6 @@ impl GlassResources {
             Some(current) if current.width >= extent.width && current.height >= extent.height => {
                 current
             }
-            // Grow each side to the larger of what is there and what is
-            // asked, so a tall run and a wide one do not trade the chain back
-            // and forth every frame.
             current => {
                 self.release_textures();
                 let current = current.unwrap_or_default();
@@ -402,14 +381,6 @@ impl GlassResources {
         }
     }
 
-    /// Draws a batch of glass over `target`, which must be readable by copy.
-    /// The caller ends its render pass first. Every run but the last draws
-    /// in a pass of its own; the last run's draws come back, for the caller
-    /// to issue with [`Self::draw_pending`] at the start of the pass that
-    /// resumes the scene, which saves a tiled GPU a load and store of the
-    /// whole target. A batch in which no glass reads its backdrop needs none
-    /// of this, nor a copyable target: issue [`Self::draw_in_place`] in the
-    /// scene's own pass instead.
     pub(crate) fn draw(
         &mut self,
         device: &wgpu::Device,
@@ -499,8 +470,6 @@ impl GlassResources {
         pending
     }
 
-    /// The draws of a batch in which no glass reads its backdrop, in order,
-    /// for [`Self::draw_pending`] in the pass already drawing the scene.
     pub(crate) fn draw_in_place(
         &mut self,
         device: &wgpu::Device,
@@ -524,8 +493,6 @@ impl GlassResources {
         Some(PendingGlass { bind_group, draws })
     }
 
-    /// Issues a run's glass draws into `pass`, a pass over the target, and
-    /// gives the pass back its full scissor.
     pub(crate) fn draw_pending(
         &self,
         pass: &mut wgpu::RenderPass<'_>,
@@ -609,8 +576,6 @@ impl GlassResources {
     }
 }
 
-/// Whether any glass in a scene, its shader layers' included, reads the
-/// frame under it, which only a copyable frame allows.
 pub(crate) fn scene_reads_backdrop(scene: &zz_gpui::Scene) -> bool {
     scene.glasses.iter().any(Glass::reads_backdrop)
         || scene
@@ -619,7 +584,6 @@ pub(crate) fn scene_reads_backdrop(scene: &zz_gpui::Scene) -> bool {
             .any(|layer| scene_reads_backdrop(&layer.scene))
 }
 
-/// How many glasses a scene paints, its shader layers' included.
 pub(crate) fn glass_count(scene: &zz_gpui::Scene) -> usize {
     scene.glasses.len()
         + scene

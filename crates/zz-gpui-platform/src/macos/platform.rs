@@ -107,7 +107,6 @@ unsafe fn build_classes() {
                 sel!(handleGPUIMenuItem:),
                 handle_menu_item as extern "C" fn(&mut Object, Sel, id),
             );
-            // Add menu item handlers so that OS save panels have the correct key commands
             decl.add_method(
                 sel!(cut:),
                 handle_menu_item as extern "C" fn(&mut Object, Sel, id),
@@ -200,7 +199,6 @@ pub(crate) struct MacPlatformState {
     dock_menu: Option<id>,
     menus: Option<Vec<OwnedMenu>>,
     keyboard_mapper: Rc<MacKeyboardMapper>,
-    /// Mirrors `[NSCursor setHiddenUntilMouseMoves:]` state, which AppKit doesn't expose.
     cursor_visible: Arc<AtomicBool>,
     system_notifications: crate::macos::system_notifications::SystemNotificationState,
 }
@@ -339,9 +337,6 @@ impl MacPlatform {
                     checked,
                     disabled,
                 } => {
-                    // Note that this is intentionally using earlier bindings, whereas typically
-                    // later ones take display precedence. See the discussion on
-                    // https://github.com/zed-industries/zed/issues/23621
                     let keystrokes = keymap
                         .bindings_for_action(action.as_ref())
                         .find_or_first(|binding| {
@@ -367,8 +362,6 @@ impl MacPlatform {
                         Some(zz_gpui::OsAction::Copy) => selector("copy:"),
                         Some(zz_gpui::OsAction::Paste) => selector("paste:"),
                         Some(zz_gpui::OsAction::SelectAll) => selector("selectAll:"),
-                        // "undo:" and "redo:" are always disabled in our case, as
-                        // we don't have a NSTextView/NSTextField to enable them on.
                         Some(zz_gpui::OsAction::Undo) => selector("handleGPUIMenuItem:"),
                         Some(zz_gpui::OsAction::Redo) => selector("handleGPUIMenuItem:"),
                         None => selector("handleGPUIMenuItem:"),
@@ -490,18 +483,11 @@ impl MacPlatform {
         )
     }
 
-    // Before the app finishes launching there is no delegate yet;
-    // `did_finish_launching` registers the observers then.
     fn ensure_system_power_observers(&self) {
         if self.0.lock().system_power_observers_registered {
             return;
         }
 
-        // The shared application must be created through `APP_CLASS`, or `run`
-        // finds a plain `NSApplication` without the `platform` ivar; only the
-        // delegate lookup goes through the typed binding.
-        // SAFETY: APP_CLASS is registered during startup and `sharedApplication`
-        // returns a live NSApplication instance.
         let delegate = unsafe {
             let app: id = msg_send![APP_CLASS, sharedApplication];
             (*(app as *const objc2_app_kit::NSApplication)).delegate()
@@ -556,13 +542,6 @@ impl Platform for MacPlatform {
     }
 
     fn quit(&self) {
-        // Quitting the app causes us to close windows, which invokes `Window::on_close` callbacks
-        // synchronously before this method terminates. If we call `Platform::quit` while holding a
-        // borrow of the app state (which most of the time we will do), we will end up
-        // double-borrowing the app state in the `on_close` callbacks for our open windows. To solve
-        // this, we make quitting the application asynchronous so that we aren't holding borrows to
-        // the app state on the stack when we actually terminate the app.
-
         unsafe {
             DispatchQueue::main().exec_async_f(ptr::null_mut(), quit);
         }
@@ -583,14 +562,10 @@ impl Platform for MacPlatform {
             .or_else(|| {
                 self.app_path()
                     .ok()
-                    // When the app is not bundled, `app_path` returns the
-                    // directory containing the executable. Disregard this
-                    // and get the path to the executable itself.
                     .and_then(|path| (path.extension()?.to_str()? == "app").then_some(path))
             })
             .unwrap_or_else(|| std::env::current_exe().unwrap());
 
-        // Wait until this process has exited and then re-open this path.
         let script = r#"
             while kill -0 $0 2> /dev/null; do
                 sleep 0.1
@@ -665,8 +640,6 @@ impl Platform for MacPlatform {
         MacWindow::active_window()
     }
 
-    // Returns the windows ordered front-to-back, meaning that the active
-    // window is the first one in the returned vec.
     fn window_stack(&self) -> Option<Vec<AnyWindowHandle>> {
         Some(MacWindow::ordered_windows())
     }
@@ -676,8 +649,6 @@ impl Platform for MacPlatform {
         handle: AnyWindowHandle,
         options: WindowParams,
     ) -> Result<Box<dyn PlatformWindow>> {
-        // Native popups are not implemented on macOS yet. Rejecting lets callers fall back to
-        // zz-gpui's in-window popovers.
         if let WindowKind::AnchoredPopup(_) = options.kind {
             return Err(PopupNotSupportedError.into());
         }
@@ -714,8 +685,6 @@ impl Platform for MacPlatform {
     fn set_window_appearance(&self, appearance: Option<WindowAppearance>) {
         unsafe {
             let app: id = msg_send![APP_CLASS, sharedApplication];
-            // `None` clears the override by setting a nil appearance, so the app
-            // falls back to tracking the system-wide light/dark setting.
             let ns_appearance: id = match appearance {
                 None => nil,
                 Some(appearance) => {
@@ -752,8 +721,6 @@ impl Platform for MacPlatform {
     fn register_url_scheme(&self, scheme: &str) -> Task<anyhow::Result<()>> {
         use objc2_foundation::{NSBundle, NSError, NSString};
 
-        // API only available post Monterey
-        // https://developer.apple.com/documentation/appkit/nsworkspace/3753004-setdefaultapplicationaturl
         let (done_tx, done_rx) = oneshot::channel();
         if Self::os_version() < Version::new(12, 0, 0) {
             return Task::ready(Err(anyhow!(
@@ -893,13 +860,6 @@ impl Platform for MacPlatform {
                                         .split(|&b| b == b'.')
                                         .collect::<Vec<_>>();
 
-                                    // https://github.com/zed-industries/zed/issues/16969
-                                    // Workaround a bug in macOS Sequoia that adds an extra file-extension
-                                    // sometimes. e.g. `a.sql` becomes `a.sql.s` or `a.txtx` becomes `a.txtx.txt`
-                                    //
-                                    // This is conditional on OS version because I'd like to get rid of it, so that
-                                    // you can manually create a file called `a.sql.s`. That said it seems better
-                                    // to break that use-case than breaking `a.sql`.
                                     if let &[_, second, third] = chunks.as_slice()
                                         && second.starts_with(third)
                                         && Self::os_version() >= Version::new(15, 0, 0)
@@ -1114,8 +1074,6 @@ impl Platform for MacPlatform {
         }
     }
 
-    /// Match cursor style to one of the styles available
-    /// in macOS's [NSCursor](https://developer.apple.com/documentation/appkit/nscursor).
     fn set_cursor_style(&self, style: CursorStyle) {
         unsafe {
             set_active_window_cursor_style(style);
@@ -1178,8 +1136,6 @@ impl Platform for MacPlatform {
                 let username = CFString::from(username.as_str());
                 let password = CFData::from_buffer(&password);
 
-                // First, check if there are already credentials for the given server. If so, then
-                // update the username and password.
                 let mut verb = "updating";
                 let mut query_attrs = CFMutableDictionary::with_capacity(2);
                 query_attrs.set(kSecClass as *const _, kSecClassInternetPassword as *const _);
@@ -1196,7 +1152,6 @@ impl Platform for MacPlatform {
                     attrs.as_concrete_TypeRef(),
                 );
 
-                // If there were no existing credentials for the given server, then create them.
                 if status == errSecItemNotFound {
                     verb = "creating";
                     status = SecItemAdd(attrs.as_concrete_TypeRef(), ptr::null_mut());
@@ -1216,7 +1171,6 @@ impl Platform for MacPlatform {
             unsafe {
                 use security::*;
 
-                // Find any credentials for the given server URL.
                 let mut attrs = CFMutableDictionary::with_capacity(5);
                 attrs.set(kSecClass as *const _, kSecClassInternetPassword as *const _);
                 attrs.set(kSecAttrServer as *const _, url.as_CFTypeRef());
@@ -1291,10 +1245,6 @@ extern "C" fn will_finish_launching(_this: &mut Object, _: Sel, _: id) {
     unsafe {
         let user_defaults: id = msg_send![class!(NSUserDefaults), standardUserDefaults];
 
-        // The autofill heuristic controller causes slowdown and high CPU usage.
-        // We don't know exactly why. This disables the full heuristic controller.
-        //
-        // Adapted from: https://github.com/ghostty-org/ghostty/pull/8625
         let name = ns_string("NSAutoFillHeuristicControllerEnabled");
         let existing_value: id = msg_send![user_defaults, objectForKey: name];
         if existing_value == nil {
@@ -1326,7 +1276,6 @@ extern "C" fn did_finish_launching(this: &mut Object, _: Sel, _: id) {
             object: process_info
         ];
 
-        // SAFETY: `this` is a live Objective-C object; only the pointer's type changes.
         let observer = &*(this as *mut Object as *const AnyObject);
         let platform = get_mac_platform(this);
         let callback = {
@@ -1345,12 +1294,8 @@ extern "C" fn did_finish_launching(this: &mut Object, _: Sel, _: id) {
     }
 }
 
-/// `observer` must be the app delegate, whose class declares `onSystemSleep:`
-/// and `onSystemWake:` (see `build_classes`).
 fn register_system_power_observers(observer: &AnyObject) {
     let center = NSWorkspace::sharedWorkspace().notificationCenter();
-    // SAFETY: both selectors are declared on the delegate class with the
-    // notification-handler signature these observers are invoked with.
     unsafe {
         center.addObserver_selector_name_object(
             observer,
@@ -1406,9 +1351,6 @@ extern "C" fn on_keyboard_layout_change(this: &mut Object, _: Sel, _: id) {
 }
 
 extern "C" fn on_thermal_state_change(this: &mut Object, _: Sel, _: id) {
-    // Defer to the next run loop iteration to avoid re-entrant borrows of the App RefCell,
-    // as NSNotificationCenter delivers this notification synchronously and it may fire while
-    // the App is already borrowed (same pattern as quit() above).
     let platform = unsafe { get_mac_platform(this) };
     let platform_ptr = platform as *const MacPlatform as *mut c_void;
     unsafe {
@@ -1430,20 +1372,14 @@ extern "C" fn on_thermal_state_change(this: &mut Object, _: Sel, _: id) {
     }
 }
 
-// Deferred to the main queue like the wake and thermal notifications. The
-// machine keeps running the main run loop for well over a frame after the
-// observers return, so the block runs before it suspends.
 extern "C" fn on_system_sleep(this: &mut Object, _: Sel, _: id) {
-    // SAFETY: this is the registered app delegate carrying MAC_PLATFORM_IVAR.
     let platform = unsafe { get_mac_platform(this) };
     let platform_ptr = platform as *const MacPlatform as *mut c_void;
-    // SAFETY: platform lives for the process lifetime while callbacks are registered.
     unsafe {
         DispatchQueue::main().exec_async_f(platform_ptr, on_system_sleep);
     }
 
     extern "C" fn on_system_sleep(context: *mut c_void) {
-        // SAFETY: context is the MacPlatform pointer queued above.
         let platform = unsafe { &*(context as *const MacPlatform) };
         let mut lock = platform.0.lock();
         if let Some(mut callback) = lock.on_system_sleep.take() {
@@ -1455,16 +1391,13 @@ extern "C" fn on_system_sleep(this: &mut Object, _: Sel, _: id) {
 }
 
 extern "C" fn on_system_wake(this: &mut Object, _: Sel, _: id) {
-    // SAFETY: this is the registered app delegate carrying MAC_PLATFORM_IVAR.
     let platform = unsafe { get_mac_platform(this) };
     let platform_ptr = platform as *const MacPlatform as *mut c_void;
-    // SAFETY: platform lives for the process lifetime while callbacks are registered.
     unsafe {
         DispatchQueue::main().exec_async_f(platform_ptr, on_system_wake);
     }
 
     extern "C" fn on_system_wake(context: *mut c_void) {
-        // SAFETY: context is the MacPlatform pointer queued above.
         let platform = unsafe { &*(context as *const MacPlatform) };
         let mut lock = platform.0.lock();
         if let Some(mut callback) = lock.on_system_wake.take() {

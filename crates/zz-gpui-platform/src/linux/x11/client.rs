@@ -67,14 +67,8 @@ use zz_gpui::{
     TouchPhase, WindowButtonLayout, WindowParams, WindowVisibility, point, px,
 };
 
-/// Value for DeviceId parameters which selects all devices.
 pub(crate) const XINPUT_ALL_DEVICES: xinput::DeviceId = 0;
 
-/// Value for DeviceId parameters which selects all device groups. Events that
-/// occur within the group are emitted by the group itself.
-///
-/// In XInput 2's interface, these are referred to as "master devices", but that
-/// terminology is both archaic and unclear.
 pub(crate) const XINPUT_ALL_DEVICE_GROUPS: xinput::DeviceId = 1;
 
 const GPUI_X11_SCALE_FACTOR_ENV: &str = "GPUI_X11_SCALE_FACTOR";
@@ -91,9 +85,6 @@ impl WindowRef {
         self.window.state.borrow().handle
     }
 
-    /// Whether the X server is presenting this window. Compositing window
-    /// managers rarely report `FULLY_OBSCURED`, so under them this is the
-    /// mapped state alone.
     fn visibility(&self) -> WindowVisibility {
         if self.is_mapped && !matches!(self.last_visibility, Visibility::FULLY_OBSCURED) {
             WindowVisibility::Visible
@@ -167,15 +158,8 @@ struct PointerDeviceState {
 
 #[derive(Debug, Default)]
 struct ScrollAxisState {
-    /// Valuator number for looking up this axis's scroll value.
     valuator_number: Option<u16>,
-    /// Conversion factor from scroll units to lines.
     multiplier: f32,
-    /// Last scroll value for calculating scroll delta.
-    ///
-    /// This gets set to `None` whenever it might be invalid - when devices change or when window focus changes.
-    /// The logic errs on the side of invalidating this, since the consequence is just skipping the delta of one scroll event.
-    /// The consequence of not invalidating it can be large invalid deltas, which are much more user visible.
     scroll_value: Option<f32>,
 }
 
@@ -210,8 +194,6 @@ pub struct X11ClientState {
     pub(crate) xim_handler: Option<XimHandler>,
     pub modifiers: Modifiers,
     pub capslock: Capslock,
-    // TODO: Can the other updates to `modifiers` be removed so that this is unnecessary?
-    // capslock logic was done analog to modifiers
     pub last_modifiers_changed_event: Modifiers,
     pub last_capslock_changed_event: Capslock,
 
@@ -329,9 +311,6 @@ impl X11Client {
                 let handle = handle.clone();
                 move |event, _, _: &mut X11Client| {
                     if let calloop::channel::Event::Msg(runnable) = event {
-                        // Insert the runnables as idle callbacks, so we make sure that user-input and X11
-                        // events have higher priority and runnables are only worked off after the event
-                        // callbacks.
                         handle.insert_idle(|client| {
                             let location = runnable.metadata().location;
                             let spawned = runnable.metadata().spawned;
@@ -369,10 +348,6 @@ impl X11Client {
         xcb_connection.prefetch_extension_information(render::X11_EXTENSION_NAME)?;
         xcb_connection.prefetch_extension_information(xinput::X11_EXTENSION_NAME)?;
 
-        // Announce to X server that XInput up to 2.4 is supported.
-        // Version 2.4 is needed for gesture events (GesturePinchBegin/Update/End).
-        // The server responds with the highest version it supports; if < 2.4,
-        // we must not request gesture event masks in XISelectEvents.
         let xinput_version = get_reply(
             || "XInput XiQueryVersion failed",
             xcb_connection.xinput_xi_query_version(2, 4),
@@ -480,7 +455,6 @@ impl X11Client {
             None
         };
 
-        // Safety: Safe if xcb::Connection always returns a valid fd
         let fd = unsafe { FdWrapper::new(Rc::clone(&xcb_connection)) };
 
         handle
@@ -518,9 +492,7 @@ impl X11Client {
                             window.window.set_button_layout();
                         }
                     }
-                    XDPEvent::CursorTheme(_) | XDPEvent::CursorSize(_) => {
-                        // noop, X11 manages this for us.
-                    }
+                    XDPEvent::CursorTheme(_) | XDPEvent::CursorSize(_) => {}
                     XDPEvent::SystemFont(families) => {
                         if client.with_common(|common| {
                             common
@@ -601,66 +573,56 @@ impl X11Client {
 
             let mut last_key_release = None;
 
-            // event handlers for new keyboard / remapping refresh the state without using event
-            // details, this deduplicates them.
             let mut last_keymap_change_event: Option<Event> = None;
 
             loop {
                 match xcb_connection.poll_for_event() {
-                    Ok(Some(event)) => {
-                        match event {
-                            Event::Expose(expose_event) => {
-                                windows_to_refresh.insert(expose_event.window);
-                            }
-                            Event::KeyRelease(_) => {
-                                if let Some(last_keymap_change_event) =
-                                    last_keymap_change_event.take()
-                                {
-                                    if let Some(last_key_release) = last_key_release.take() {
-                                        events.push(last_key_release);
-                                    }
-                                    events.push(last_keymap_change_event);
-                                }
-
-                                last_key_release = Some(event);
-                            }
-                            Event::KeyPress(key_press) => {
-                                if let Some(last_keymap_change_event) =
-                                    last_keymap_change_event.take()
-                                {
-                                    if let Some(last_key_release) = last_key_release.take() {
-                                        events.push(last_key_release);
-                                    }
-                                    events.push(last_keymap_change_event);
-                                }
-
-                                if let Some(Event::KeyRelease(key_release)) =
-                                    last_key_release.take()
-                                {
-                                    // We ignore that last KeyRelease if it's too close to this KeyPress,
-                                    // suggesting that it's auto-generated by X11 as a key-repeat event.
-                                    if key_release.detail != key_press.detail
-                                        || key_press.time.saturating_sub(key_release.time) > 20
-                                    {
-                                        events.push(Event::KeyRelease(key_release));
-                                    }
-                                }
-                                events.push(Event::KeyPress(key_press));
-                            }
-                            Event::XkbNewKeyboardNotify(_) | Event::XkbMapNotify(_) => {
-                                if let Some(release_event) = last_key_release.take() {
-                                    events.push(release_event);
-                                }
-                                last_keymap_change_event = Some(event);
-                            }
-                            _ => {
-                                if let Some(release_event) = last_key_release.take() {
-                                    events.push(release_event);
-                                }
-                                events.push(event);
-                            }
+                    Ok(Some(event)) => match event {
+                        Event::Expose(expose_event) => {
+                            windows_to_refresh.insert(expose_event.window);
                         }
-                    }
+                        Event::KeyRelease(_) => {
+                            if let Some(last_keymap_change_event) = last_keymap_change_event.take()
+                            {
+                                if let Some(last_key_release) = last_key_release.take() {
+                                    events.push(last_key_release);
+                                }
+                                events.push(last_keymap_change_event);
+                            }
+
+                            last_key_release = Some(event);
+                        }
+                        Event::KeyPress(key_press) => {
+                            if let Some(last_keymap_change_event) = last_keymap_change_event.take()
+                            {
+                                if let Some(last_key_release) = last_key_release.take() {
+                                    events.push(last_key_release);
+                                }
+                                events.push(last_keymap_change_event);
+                            }
+
+                            if let Some(Event::KeyRelease(key_release)) = last_key_release.take() {
+                                if key_release.detail != key_press.detail
+                                    || key_press.time.saturating_sub(key_release.time) > 20
+                                {
+                                    events.push(Event::KeyRelease(key_release));
+                                }
+                            }
+                            events.push(Event::KeyPress(key_press));
+                        }
+                        Event::XkbNewKeyboardNotify(_) | Event::XkbMapNotify(_) => {
+                            if let Some(release_event) = last_key_release.take() {
+                                events.push(release_event);
+                            }
+                            last_keymap_change_event = Some(event);
+                        }
+                        _ => {
+                            if let Some(release_event) = last_key_release.take() {
+                                events.push(release_event);
+                            }
+                            events.push(event);
+                        }
+                    },
                     Ok(None) => {
                         break;
                     }
@@ -723,10 +685,6 @@ impl X11Client {
                         }
                     }
                     Err(err) => {
-                        // this might happen when xim server crashes on one of the events
-                        // we do lose 1-2 keys when crash happens since there is no reliable way to get that info
-                        // luckily, x11 sends us window not found error when xim server crashes upon further key press
-                        // hence we fall back to handle_event
                         log::error!("XIMClientError: {}", err);
                         let mut state = self.0.borrow_mut();
                         state.take_xim();
@@ -850,8 +808,6 @@ impl X11Client {
 
                 if atom == delete_window_atom {
                     if window.should_close() {
-                        // window "x" button clicked by user
-                        // Rest of the close logic is handled in drop_window()
                         window.close();
                     }
                     return Some(());
@@ -1013,7 +969,6 @@ impl X11Client {
                 let window = self.get_window(event.event)?;
                 window.set_active(false);
                 let mut state = self.0.borrow_mut();
-                // Set last scroll values to `None` so that a large delta isn't created if scrolling is done outside the window (the valuator is global)
                 reset_all_pointer_device_scroll_positions(&mut state.pointer_device_states);
                 state.keyboard_focused_window = None;
                 if let Some(compose_state) = state.compose_state.as_mut() {
@@ -1224,8 +1179,6 @@ impl X11Client {
                     }
                     Some(ButtonOrScroll::Scroll(direction)) => {
                         drop(state);
-                        // Emulated scroll button presses are sent simultaneously with smooth scrolling XinputMotion events.
-                        // Since handling those events does the scrolling, they are skipped here.
                         if !event
                             .flags
                             .contains(xinput::PointerEventFlags::POINTER_EMULATED)
@@ -1276,8 +1229,6 @@ impl X11Client {
                 let mut state = self.0.borrow_mut();
                 state.restore_cursor_after_hide();
                 if window.is_blocked() {
-                    // We want to set the cursor to the default arrow
-                    // when the window is blocked
                     let style = CursorStyle::Arrow;
 
                     let current_style = state
@@ -1342,7 +1293,6 @@ impl X11Client {
             Event::XinputLeave(event) if event.mode == xinput::NotifyMode::NORMAL => {
                 let mut state = self.0.borrow_mut();
 
-                // Set last scroll values to `None` so that a large delta isn't created if scrolling is done outside the window (the valuator is global)
                 reset_all_pointer_device_scroll_positions(&mut state.pointer_device_states);
                 state.mouse_focused_window = None;
                 let pressed_button = pressed_button_from_mask(event.buttons[0]);
@@ -1364,8 +1314,6 @@ impl X11Client {
             }
             Event::XinputHierarchy(event) => {
                 let mut state = self.0.borrow_mut();
-                // Temporarily use `state.pointer_device_states` to only store pointers that still have valid scroll values.
-                // Any change to a device invalidates its scroll values.
                 for info in event.infos {
                     if is_pointer_device(info.type_) {
                         state.pointer_device_states.remove(&info.deviceid);
@@ -1411,7 +1359,6 @@ impl X11Client {
                     px(event.event_x as f32 / u16::MAX as f32 / state.scale_factor),
                     px(event.event_y as f32 / u16::MAX as f32 / state.scale_factor),
                 );
-                // scale is in FP16.16 format: divide by 65536 to get the float value
                 let new_absolute_scale = event.scale as f32 / 65536.0;
                 let previous_scale = state.pinch_scale;
                 let zoom_delta = new_absolute_scale - previous_scale;
@@ -1707,7 +1654,6 @@ impl LinuxClient for X11Client {
 
         state.cursor_styles.insert(focused_window, style);
 
-        // Don't clobber the invisible cursor; restore reads back from `cursor_styles`.
         if state.cursor_hidden_window == Some(focused_window) {
             return;
         }
@@ -1794,8 +1740,6 @@ impl LinuxClient for X11Client {
 
     fn read_from_clipboard(&self) -> Option<zz_gpui::ClipboardItem> {
         let state = self.0.borrow_mut();
-        // if the last copy was from this app, return our cached item
-        // which has metadata attached.
         if state
             .clipboard
             .is_owner(clipboard::ClipboardKind::Clipboard)
@@ -1860,9 +1804,6 @@ impl LinuxClient for X11Client {
 
         let mut handles = Vec::new();
 
-        // We need to reverse, since _NET_CLIENT_LIST_STACKING has
-        // a back-to-front order.
-        // See: https://specifications.freedesktop.org/wm-spec/1.3/ar01s03.html
         for window_ref in window_ids
             .iter()
             .rev()
@@ -1953,9 +1894,6 @@ impl X11ClientState {
                     return;
                 };
 
-                // Ideally this would be re-queried when the window changes screens, but there
-                // doesn't seem to be an efficient / straightforward way to do this. Should also be
-                // updated when screen configurations change.
                 let mode_info = screen_resources.crtcs.iter().find_map(|crtc| {
                     let crtc_info = self
                         .xcb_connection
@@ -2016,7 +1954,6 @@ impl X11ClientState {
                     };
                     client.process_x11_events(&xcb_connection).log_err();
 
-                    // Take into account that some frames have been skipped
                     let now = Instant::now();
                     while instant < now {
                         instant += refresh_rate;
@@ -2107,7 +2044,6 @@ impl X11ClientState {
             return;
         }
         let Some(focused_window) = self.mouse_focused_window else {
-            // No window to apply the per-window invisible cursor to.
             return;
         };
         let Some(invisible_cursor) = self.get_or_create_invisible_cursor() else {
@@ -2159,8 +2095,6 @@ impl X11ClientState {
     }
 }
 
-// Adapted from:
-// https://docs.rs/winit/0.29.11/src/winit/platform_impl/linux/x11/monitor.rs.html#103-111
 pub fn mode_refresh_rate(mode: &randr::ModeInfo) -> Duration {
     if mode.dot_clock == 0 || mode.htotal == 0 || mode.vtotal == 0 {
         return Duration::from_millis(16);
@@ -2172,9 +2106,6 @@ pub fn mode_refresh_rate(mode: &randr::ModeInfo) -> Duration {
     Duration::from_micros(micros)
 }
 
-/// Applies a mapped/obscured change to the refresh loop and reports the
-/// resulting visibility to the window. Consumes the client borrow because the
-/// visibility callback re-enters GPUI.
 fn handle_visibility_changed(mut state: RefMut<'_, X11ClientState>, x_window: xproto::Window) {
     state.update_refresh_loop(x_window);
     let Some(window_ref) = state.windows.get(&x_window) else {
@@ -2214,7 +2145,6 @@ fn detect_compositor_gpu(
 }
 
 fn check_compositor_present(xcb_connection: &XCBConnection, root: xproto::Window) -> bool {
-    // Method 1: Check for _NET_WM_CM_S{root}
     let atom_name = format!("_NET_WM_CM_S{}", root);
     let atom1 = get_reply(
         || format!("Failed to intern {atom_name}"),
@@ -2234,7 +2164,6 @@ fn check_compositor_present(xcb_connection: &XCBConnection, root: xproto::Window
         _ => false,
     };
 
-    // Method 2: Check for _NET_WM_CM_OWNER
     let atom_name = "_NET_WM_CM_OWNER";
     let atom2 = get_reply(
         || format!("Failed to intern {atom_name}"),
@@ -2253,7 +2182,6 @@ fn check_compositor_present(xcb_connection: &XCBConnection, root: xproto::Window
         _ => return false,
     };
 
-    // Method 3: Check for _NET_SUPPORTING_WM_CHECK
     let atom_name = "_NET_SUPPORTING_WM_CHECK";
     let atom3 = get_reply(
         || format!("Failed to intern {atom_name}"),
@@ -2393,8 +2321,6 @@ fn xdnd_send_status(
     xcb_connection.flush().log_err();
 }
 
-/// Recomputes `pointer_device_states` by querying all pointer devices.
-/// When a device is present in `scroll_values_to_preserve`, its value for `ScrollAxisState.scroll_value` is used.
 fn current_pointer_device_states(
     xcb_connection: &XCBConnection,
     scroll_values_to_preserve: &BTreeMap<xinput::DeviceId, PointerDeviceState>,
@@ -2449,7 +2375,6 @@ fn current_pointer_device_states(
     Some(pointer_device_states)
 }
 
-/// Returns true if the device is a pointer device. Does not include pointer device groups.
 fn is_pointer_device(type_: xinput::DeviceType) -> bool {
     type_ == xinput::DeviceType::SLAVE_POINTER
 }
@@ -2478,7 +2403,6 @@ fn reset_pointer_device_scroll_positions(pointer: &mut PointerDeviceState) {
     pointer.vertical.scroll_value = None;
 }
 
-/// Returns the scroll delta for a smooth scrolling motion event, or `None` if no scroll data is present.
 fn get_scroll_delta_and_update_state(
     pointer: &mut PointerDeviceState,
     event: &xinput::MotionEvent,
@@ -2515,7 +2439,6 @@ fn make_scroll_wheel_event(
     scroll_delta: Point<f32>,
     modifiers: Modifiers,
 ) -> zz_gpui::ScrollWheelEvent {
-    // When shift is held down, vertical scrolling turns into horizontal scrolling.
     let delta = if modifiers.shift {
         Point {
             x: scroll_delta.y,
@@ -2608,14 +2531,12 @@ fn get_scale_factor(
         DpiMode::NotSet => {}
     }
 
-    // TODO: Use scale factor from XSettings here
-
     if let Some(dpi) = resource_database
         .get_value::<f32>("Xft.dpi", "Xft.dpi")
         .ok()
         .flatten()
     {
-        let scale = dpi / 96.0; // base dpi
+        let scale = dpi / 96.0;
         log::info!("Using scale factor from Xft.dpi: {}", scale);
         return scale;
     }
@@ -2637,10 +2558,10 @@ fn get_randr_scale_factor(connection: &XCBConnection, screen_index: usize) -> Op
     if version_reply.major_version < 1
         || (version_reply.major_version == 1 && version_reply.minor_version < 5)
     {
-        return legacy_get_randr_scale_factor(connection, root); // for randr <1.5
+        return legacy_get_randr_scale_factor(connection, root);
     }
 
-    let monitors_cookie = connection.randr_get_monitors(root, true).ok()?; // true for active only
+    let monitors_cookie = connection.randr_get_monitors(root, true).ok()?;
     let monitors_reply = monitors_cookie.reply().ok()?;
 
     let mut fallback_scale: Option<f32> = None;
@@ -2675,7 +2596,6 @@ fn legacy_get_randr_scale_factor(connection: &XCBConnection, root: u32) -> Optio
         .ok()?;
     let primary_output_info = primary_output_cookie.reply().ok()?;
 
-    // try primary
     if primary_output_info.connection == randr::Connection::CONNECTED
         && primary_output_info.mm_width > 0
         && primary_output_info.mm_height > 0
@@ -2698,7 +2618,6 @@ fn legacy_get_randr_scale_factor(connection: &XCBConnection, root: u32) -> Optio
         }
     }
 
-    // fallback: full scan
     let resources_cookie = connection.randr_get_screen_resources_current(root).ok()?;
     let screen_resources = resources_cookie.reply().ok()?;
 
@@ -2767,11 +2686,11 @@ fn legacy_get_randr_scale_factor(connection: &XCBConnection, root: u32) -> Optio
 }
 
 fn get_dpi_factor((width_px, height_px): (u32, u32), (width_mm, height_mm): (u64, u64)) -> f32 {
-    let ppmm = ((width_px as f64 * height_px as f64) / (width_mm as f64 * height_mm as f64)).sqrt(); // pixels per mm
+    let ppmm = ((width_px as f64 * height_px as f64) / (width_mm as f64 * height_mm as f64)).sqrt();
 
     const MM_PER_INCH: f64 = 25.4;
     const BASE_DPI: f64 = 96.0;
-    const QUANTIZE_STEP: f64 = 12.0; // e.g. 1.25 = 15/12, 1.5 = 18/12, 1.75 = 21/12, 2.0 = 24/12
+    const QUANTIZE_STEP: f64 = 12.0;
     const MIN_SCALE: f64 = 1.0;
     const MAX_SCALE: f64 = 20.0;
 
@@ -2842,7 +2761,6 @@ mod tests {
     }
 
     fn test_keymap_with_variant(layouts: &str, variant: &str) -> xkbc::Keymap {
-        // These fixtures compile layout names from local files, unlike server keymaps.
         let context = xkbc::Context::new(xkbc::CONTEXT_NO_FLAGS);
         assert!(!context.get_raw_ptr().is_null());
         xkbc::Keymap::new_from_names(
@@ -2857,8 +2775,6 @@ mod tests {
         .expect("test keymap should compile")
     }
 
-    // Returns a state where the second layout is active via a temporary
-    // mechanism (holding a key down or one-shot), not a permanent toggle.
     fn state_with_non_locked_layout(keymap: &xkbc::Keymap) -> xkbc::State {
         let mut depressed_layout_state = xkbc::State::new(keymap);
         depressed_layout_state.update_mask(0, 0, 0, 1, 0, 0);
@@ -2879,12 +2795,10 @@ mod tests {
     fn key_event_state_uses_event_modifiers_without_mutating_server_state() {
         let keymap = test_keymap("us");
         let server_state = xkbc::State::new(&keymap);
-        // The "9" key on a US keyboard.
         let keycode = keymap
             .key_by_name("AE09")
             .expect("test key should exist in the keymap");
 
-        // Simulate pressing Shift+9 (which should produce "(").
         let key_event_state = xkb_state_for_key_event(&server_state, xproto::KeyButMask::SHIFT);
         let keystroke = keystroke_from_xkb(
             &key_event_state,
@@ -2892,10 +2806,8 @@ mod tests {
             keycode,
         );
 
-        // Assert Shift+9 produces "(" on US layout.
         assert_eq!(keystroke.key, "(");
         assert_eq!(keystroke.key_char.as_deref(), Some("("));
-        // Assert the long-lived server state was not mutated by the key event.
         assert_eq!(server_state.key_get_utf8(keycode), "9");
     }
 
@@ -2903,25 +2815,20 @@ mod tests {
     fn key_event_state_ignores_pointer_button_bits() {
         let keymap = test_keymap("us");
         let server_state = xkbc::State::new(&keymap);
-        // The "9" key on a US keyboard.
         let keycode = keymap
             .key_by_name("AE09")
             .expect("test key should exist in the keymap");
 
-        // Simulate Shift held down.
         let shifted_state = xkb_state_for_key_event(&server_state, xproto::KeyButMask::SHIFT);
-        // Simulate Shift held down while also clicking the left mouse button.
         let shifted_with_button_state = xkb_state_for_key_event(
             &server_state,
             xproto::KeyButMask::SHIFT | xproto::KeyButMask::BUTTON1,
         );
 
-        // Assert the mouse button has no effect on modifier state.
         assert_eq!(
             shifted_with_button_state.serialize_mods(xkbc::STATE_MODS_EFFECTIVE),
             shifted_state.serialize_mods(xkbc::STATE_MODS_EFFECTIVE)
         );
-        // Assert both cases produce the same character.
         assert_eq!(
             shifted_with_button_state.key_get_utf8(keycode),
             shifted_state.key_get_utf8(keycode)
@@ -2930,12 +2837,8 @@ mod tests {
 
     #[test]
     fn key_event_state_preserves_non_locked_layout_components() {
-        // US + Russian dual-layout keyboard.
         let keymap = test_keymap("us,ru");
-        // Simulate the Russian layout being active via a temporary layout
-        // switch (holding a key), not a permanent toggle.
         let server_state = state_with_non_locked_layout(&keymap);
-        // The "Q" key position, which produces a Cyrillic character in Russian layout.
         let keycode = keymap
             .key_by_name("AD01")
             .expect("test key should exist in the keymap");
@@ -2943,165 +2846,114 @@ mod tests {
         let expected_text = server_state.key_get_utf8(keycode);
         let key_event_state = xkb_state_for_key_event(&server_state, xproto::KeyButMask::default());
 
-        // Assert the temporary layout switch is preserved.
         assert_eq!(
             key_event_state.serialize_layout(STATE_LAYOUT_EFFECTIVE),
             server_state.serialize_layout(STATE_LAYOUT_EFFECTIVE)
         );
-        // Assert the key produces the same character as expected from the
-        // Russian layout.
         assert_eq!(key_event_state.key_get_utf8(keycode), expected_text);
     }
 
-    // https://github.com/zed-industries/zed/issues/14282
     #[test]
     fn capslock_toggle_produces_uppercase() {
         let keymap = test_keymap("us");
         let mut server_state = xkbc::State::new(&keymap);
-        // The "A" key position on a US keyboard.
         let keycode = keymap
             .key_by_name("AC01")
             .expect("'a' key should exist in the keymap");
 
-        // Simulate the user having toggled CapsLock on (it's now permanently
-        // active until pressed again).
         let lock_mod = u16::from(xproto::KeyButMask::LOCK) as xkbc::ModMask;
         server_state.update_mask(0, 0, lock_mod, 0, 0, 0);
 
-        // Simulate pressing the "a" key while CapsLock is on.
         let key_event_state = xkb_state_for_key_event(&server_state, xproto::KeyButMask::LOCK);
 
-        // Assert CapsLock is treated as a toggle (locked), not as a held key
-        // (depressed). This distinction matters because XKB only applies
-        // capitalization when CapsLock is in the "locked" state.
         assert_eq!(
             key_event_state.serialize_mods(xkbc::STATE_MODS_LOCKED) & lock_mod,
             lock_mod,
         );
-        // Assert typing "a" with CapsLock on produces "A".
         assert_eq!(key_event_state.key_get_utf8(keycode), "A");
     }
 
-    // https://github.com/zed-industries/zed/issues/14282
     #[test]
     fn neo2_level3_via_capslock_produces_ellipsis() {
-        // Neo 2 is a German keyboard layout that repurposes CapsLock as a
-        // "level 3" modifier key for accessing additional characters.
         let keymap = test_keymap_with_variant("de", "neo");
         let server_state = xkbc::State::new(&keymap);
-        // The key in the "Q" position, which produces "x" on Neo 2 base layer.
         let keycode = keymap
             .key_by_name("AD01")
             .expect("test key should exist in the keymap");
 
-        // Simulate holding CapsLock, which in Neo 2 activates the "level 3"
-        // layer (mapped to the Mod5 modifier internally).
         let key_event_state = xkb_state_for_key_event(&server_state, xproto::KeyButMask::MOD5);
 
-        // Assert holding CapsLock + pressing the "x" key produces "..."
-        // (ellipsis), which is the level 3 character on that key in Neo 2.
         assert_eq!(key_event_state.key_get_utf8(keycode), "\u{2026}");
     }
 
-    // https://github.com/zed-industries/zed/issues/14282
     #[test]
     fn neo2_latched_mod5_preserved() {
-        // Neo 2 also supports "latching" the level 3 modifier (via Caps+Tab),
-        // which activates it for only the next keypress and then deactivates.
         let keymap = test_keymap_with_variant("de", "neo");
         let mut server_state = xkbc::State::new(&keymap);
         let keycode = keymap
             .key_by_name("AD01")
             .expect("test key should exist in the keymap");
 
-        // Simulate the level 3 modifier being latched (one-shot active).
         let mod5 = u16::from(xproto::KeyButMask::MOD5) as xkbc::ModMask;
         server_state.update_mask(0, mod5, 0, 0, 0, 0);
 
         let key_event_state = xkb_state_for_key_event(&server_state, xproto::KeyButMask::MOD5);
 
-        // Assert the modifier stays classified as "latched" (one-shot) rather
-        // than being reclassified as "depressed" (held down). This matters
-        // because latched modifiers auto-deactivate after one keypress.
         assert_eq!(
             key_event_state.serialize_mods(xkbc::STATE_MODS_LATCHED) & mod5,
             mod5,
         );
-        // Assert the latched level 3 still produces the ellipsis character.
         assert_eq!(key_event_state.key_get_utf8(keycode), "\u{2026}");
     }
 
-    // https://github.com/zed-industries/zed/pull/31193
     #[test]
     fn german_layout_correct_key_resolution() {
-        // Standard German keyboard layout.
         let keymap = test_keymap("de");
         let server_state = xkbc::State::new(&keymap);
-        // The "7" key on the number row.
         let keycode = keymap
             .key_by_name("AE07")
             .expect("'7' key should exist in the keymap");
 
         let key_event_state = xkb_state_for_key_event(&server_state, xproto::KeyButMask::default());
 
-        // Assert pressing the "7" key on a German layout produces "7".
         assert_eq!(key_event_state.key_get_utf8(keycode), "7");
     }
 
-    // https://github.com/zed-industries/zed/issues/26468
-    // https://github.com/zed-industries/zed/issues/16667
     #[test]
     fn space_works_with_cyrillic_layout_active() {
-        // US + Russian dual-layout keyboard.
         let keymap = test_keymap("us,ru");
         let mut server_state = xkbc::State::new(&keymap);
         let space = keymap
             .key_by_name("SPCE")
             .expect("space key should exist in the keymap");
 
-        // Simulate the user having switched to the Russian layout
-        // (e.g. via a keyboard shortcut like Super+Space).
         server_state.update_mask(0, 0, 0, 0, 0, 1);
 
         let key_event_state = xkb_state_for_key_event(&server_state, xproto::KeyButMask::default());
 
-        // Assert the Russian layout is still active after constructing the
-        // key event state (not accidentally reset to US).
         assert_eq!(key_event_state.serialize_layout(STATE_LAYOUT_EFFECTIVE), 1);
-        // Assert pressing space while on the Russian layout still types a space.
         assert_eq!(key_event_state.key_get_utf8(space), " ");
     }
 
-    // https://github.com/zed-industries/zed/issues/40678
     #[test]
     fn macro_shift_bracket_produces_brace() {
         let keymap = test_keymap("us");
         let server_state = xkbc::State::new(&keymap);
-        // The "]" key on a US keyboard.
         let bracket = keymap
             .key_by_name("AD12")
             .expect("']' key should exist in the keymap");
 
-        // Simulate a keyboard macro (e.g. from a ZMK/QMK firmware keyboard)
-        // that sends Shift + "]" very rapidly. The modifier state notification
-        // for Shift hasn't reached us yet, so the server state has no
-        // modifiers. But the key event itself carries the correct Shift state.
         assert_eq!(server_state.serialize_mods(xkbc::STATE_MODS_EFFECTIVE), 0);
         let key_event_state = xkb_state_for_key_event(&server_state, xproto::KeyButMask::SHIFT);
 
-        // Assert Shift+"]" produces "}" even when the Shift notification
-        // arrived late.
         assert_eq!(key_event_state.key_get_utf8(bracket), "}");
     }
 
-    // https://github.com/zed-industries/zed/issues/49329
     #[test]
     fn sequential_key_events_do_not_corrupt_state() {
         let keymap = test_keymap("us");
         let server_state = xkbc::State::new(&keymap);
 
-        // Simulate typing "a s d" with spaces in between, all without any
-        // modifier keys held.
         let keys: &[(&str, &str)] = &[
             ("AC01", "a"),
             ("SPCE", " "),
@@ -3118,8 +2970,6 @@ mod tests {
             let key_event_state =
                 xkb_state_for_key_event(&server_state, xproto::KeyButMask::default());
 
-            // Assert each key in the sequence produces the expected character
-            // (no dropped or garbled input from state corruption).
             assert_eq!(
                 key_event_state.key_get_utf8(keycode),
                 expected_utf8,
@@ -3127,28 +2977,22 @@ mod tests {
             );
         }
 
-        // Assert the server state is completely untouched after processing
-        // all key events.
         assert_eq!(server_state.serialize_mods(xkbc::STATE_MODS_EFFECTIVE), 0);
         assert_eq!(server_state.serialize_layout(STATE_LAYOUT_EFFECTIVE), 0);
     }
 
-    // https://github.com/zed-industries/zed/issues/26468
     #[test]
     fn space_works_with_czech_layout_active() {
-        // US + Czech dual-layout keyboard.
         let keymap = test_keymap("us,cz");
         let mut server_state = xkbc::State::new(&keymap);
         let space = keymap
             .key_by_name("SPCE")
             .expect("space key should exist in the keymap");
 
-        // Simulate the user having switched to the Czech layout.
         server_state.update_mask(0, 0, 0, 0, 0, 1);
 
         let key_event_state = xkb_state_for_key_event(&server_state, xproto::KeyButMask::default());
 
-        // Assert pressing space while on the Czech layout still types a space.
         assert_eq!(key_event_state.key_get_utf8(space), " ");
     }
 }

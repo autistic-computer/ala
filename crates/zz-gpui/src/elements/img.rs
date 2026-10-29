@@ -28,25 +28,15 @@ use thiserror::Error;
 
 use super::{Stateful, StatefulInteractiveElement};
 
-/// The delay before showing the loading state.
 pub const LOADING_DELAY: Duration = Duration::from_millis(200);
 
-/// A type alias to the resource loader that the `img()` element uses.
-///
-/// Note: that this is only for Resources, like URLs or file paths.
-/// Custom loaders, or external images will not use this asset loader
 pub type ImgResourceLoader = AssetLogger<ImageAssetLoader>;
 
-/// A source of image content.
 #[derive(Clone)]
 pub enum ImageSource {
-    /// The image content will be loaded from some resource location
     Resource(Resource),
-    /// Cached image data
     Render(Arc<RenderImage>),
-    /// Cached image data
     Image(Arc<Image>),
-    /// A custom loading function to use
     Custom(Arc<dyn Fn(&mut Window, &mut App) -> Option<Result<Arc<RenderImage>, ImageCacheError>>>),
 }
 
@@ -125,7 +115,6 @@ where
     }
 }
 
-/// The style of an image element.
 pub struct ImageStyle {
     grayscale: bool,
     object_fit: ObjectFit,
@@ -144,32 +133,24 @@ impl Default for ImageStyle {
     }
 }
 
-/// Style an image element.
 pub trait StyledImage: Sized {
-    /// Get a mutable [ImageStyle] from the element.
     fn image_style(&mut self) -> &mut ImageStyle;
 
-    /// Set the image to be displayed in grayscale.
     fn grayscale(mut self, grayscale: bool) -> Self {
         self.image_style().grayscale = grayscale;
         self
     }
 
-    /// Set the object fit for the image.
     fn object_fit(mut self, object_fit: ObjectFit) -> Self {
         self.image_style().object_fit = object_fit;
         self
     }
 
-    /// Set a fallback function that will be invoked to render an error view should
-    /// the image fail to load.
     fn with_fallback(mut self, fallback: impl Fn() -> AnyElement + 'static) -> Self {
         self.image_style().fallback = Some(Box::new(fallback));
         self
     }
 
-    /// Set a fallback function that will be invoked to render a view while the image
-    /// is still being loaded.
     fn with_loading(mut self, loading: impl Fn() -> AnyElement + 'static) -> Self {
         self.image_style().loading = Some(Box::new(loading));
         self
@@ -188,7 +169,6 @@ impl StyledImage for Stateful<Img> {
     }
 }
 
-/// An image element.
 pub struct Img {
     interactivity: Interactivity,
     source: ImageSource,
@@ -196,7 +176,6 @@ pub struct Img {
     image_cache: Option<AnyImageCache>,
 }
 
-/// Create a new image element.
 #[track_caller]
 pub fn img(source: impl Into<ImageSource>) -> Img {
     Img {
@@ -208,24 +187,13 @@ pub fn img(source: impl Into<ImageSource>) -> Img {
 }
 
 impl Img {
-    /// A list of all format extensions currently supported by this img element
     pub fn extensions() -> &'static [&'static str] {
-        // This is the list in [image::ImageFormat::from_extension] + `svg`
         &[
             "avif", "jpg", "jpeg", "png", "gif", "webp", "tif", "tiff", "tga", "dds", "bmp", "ico",
             "hdr", "exr", "pbm", "pam", "ppm", "pgm", "ff", "farbfeld", "qoi", "svg",
         ]
     }
 
-    /// Sets the image cache for the current node.
-    ///
-    /// If the `image_cache` is not explicitly provided, the function will determine the image cache by:
-    ///
-    /// 1. Checking if any ancestor node of the current node contains an `ImageCacheElement`, If such a node exists, the image cache specified by that ancestor will be used.
-    /// 2. If no ancestor node contains an `ImageCacheElement`, the global image cache will be used as a fallback.
-    ///
-    /// This mechanism provides a flexible way to manage image caching, allowing precise control when needed,
-    /// while ensuring a default behavior when no cache is explicitly specified.
     #[inline]
     pub fn image_cache<I: ImageCache>(self, image_cache: &Entity<I>) -> Self {
         Self {
@@ -249,14 +217,12 @@ impl DerefMut for Stateful<Img> {
     }
 }
 
-/// The image state between frames
 struct ImgState {
     frame_index: usize,
     last_frame_time: Option<Instant>,
     started_loading: Option<(Instant, Task<()>)>,
 }
 
-/// The image layout state between frames
 pub struct ImgLayoutState {
     frame_index: usize,
     replacement: Option<AnyElement>,
@@ -573,7 +539,6 @@ impl ImageSource {
         }
     }
 
-    /// Remove this image source from the asset system
     pub fn remove_asset(&self, cx: &mut App) {
         match self {
             ImageSource::Resource(resource) => {
@@ -584,8 +549,6 @@ impl ImageSource {
         }
     }
 
-    /// Check whether this image source is present in the asset system (loading
-    /// or loaded), without fetching it.
     #[cfg(any(test, feature = "test-support"))]
     pub fn is_asset_cached(&self, cx: &App) -> bool {
         match self {
@@ -612,7 +575,6 @@ impl Asset for ImageDecoder {
     }
 }
 
-/// An image loader for the GPUI asset system
 #[derive(Clone)]
 pub enum ImageAssetLoader {}
 
@@ -625,8 +587,6 @@ impl Asset for ImageAssetLoader {
         cx: &mut App,
     ) -> impl Future<Output = Self::Output> + Send + 'static {
         let client = cx.http_client();
-        // TODO: Can we make SVGs always rescale?
-        // let scale_factor = cx.scale_factor();
         let svg_renderer = cx.svg_renderer();
         let asset_source = cx.asset_source().clone();
         async move {
@@ -675,7 +635,6 @@ impl Asset for ImageAssetLoader {
                         for frame in decoder.into_frames() {
                             match frame {
                                 Ok(mut frame) => {
-                                    // Convert from RGBA to BGRA.
                                     for pixel in frame.buffer_mut().chunks_exact_mut(4) {
                                         pixel.swap(0, 2);
                                     }
@@ -707,7 +666,6 @@ impl Asset for ImageAssetLoader {
                             for frame in decoder.into_frames() {
                                 match frame {
                                     Ok(mut frame) => {
-                                        // Convert from RGBA to BGRA.
                                         for pixel in frame.buffer_mut().chunks_exact_mut(4) {
                                             pixel.swap(0, 2);
                                         }
@@ -745,32 +703,22 @@ impl Asset for ImageAssetLoader {
     }
 }
 
-/// An error that can occur when interacting with the image cache.
 #[derive(Debug, Error, Clone)]
 pub enum ImageCacheError {
-    /// Some other kind of error occurred
     #[error("error: {0}")]
     Other(#[from] Arc<anyhow::Error>),
-    /// An error that occurred while reading the image from disk.
     #[error("IO error: {0}")]
     Io(Arc<std::io::Error>),
-    /// An error that occurred while processing an image.
     #[error("unexpected http status for {uri}: {status}, body: {body}")]
     BadStatus {
-        /// The URI of the image.
         uri: SharedUri,
-        /// The HTTP status code.
         status: crate::http_client::StatusCode,
-        /// The HTTP response body.
         body: String,
     },
-    /// An error that occurred while processing an asset.
     #[error("asset error: {0}")]
     Asset(SharedString),
-    /// An error that occurred while processing an image.
     #[error("image error: {0}")]
     Image(Arc<ImageError>),
-    /// An error that occurred while processing an SVG.
     #[error("svg error: {0}")]
     Usvg(Arc<usvg::Error>),
 }
@@ -819,7 +767,6 @@ mod tests {
         Arc::new(RenderImage::new(SmallVec::from_elem(frame, 1)))
     }
 
-    /// Overwrites the cached `frame_index` of the sibling `img` during paint.
     fn seed_frame_index(frame_index: usize) -> impl IntoElement {
         canvas(
             |_, _, _| (),
@@ -902,7 +849,6 @@ mod tests {
     fn explicit_aspect_ratio_is_not_overridden_by_intrinsic_ratio(cx: &mut TestAppContext) {
         let window = cx.add_empty_window();
 
-        // A portrait image in a square container
         window.draw(point(px(0.), px(0.)), size(px(100.), px(100.)), |_, _| {
             div()
                 .size(px(100.))
@@ -926,7 +872,6 @@ mod tests {
             (sprite.bounds, window.scale_factor())
         });
 
-        // The element stays 100x100, so the image is letterboxed horizontally
         assert_eq!(
             rendered_bounds,
             Bounds {
@@ -965,9 +910,6 @@ mod tests {
     fn stale_frame_index_is_clamped_when_image_changes(cx: &mut TestAppContext) {
         let window = cx.add_empty_window();
 
-        // Assert that a cached frame_index from a previous multi-frame image
-        // does not cause an out-of-bounds panic when the image is replaced
-        // with one that has fewer frames.
         window.draw(point(px(0.), px(0.)), size(px(100.), px(100.)), |_, _| {
             div()
                 .child(img(ImageSource::Render(test_image(5))).id(TEST_IMG_ID))

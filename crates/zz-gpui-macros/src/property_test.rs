@@ -91,9 +91,6 @@ struct Args {
 }
 
 impl Args {
-    /// By default, proptest uses random seeds unless `$PROPTEST_SEED` is set.
-    /// Rather than managing both `$SEED` and `$PROPTEST_SEED`, we intercept
-    /// `config = ...` tokens and add a call to `zz_gpui::apply_seed_to_config`.
     fn render(&self) -> TokenStream {
         let user_provided_config = match &self.config {
             None => quote! { ::zz_gpui::proptest::prelude::ProptestConfig::default() },
@@ -148,9 +145,7 @@ struct ParsedArgs {
     proptest_args: TokenStream,
     errors: TokenStream,
 
-    // exprs passed at the call-site
     inner_fn_args: TokenStream,
-    // args in the declaration
     inner_fn_decl_args: TokenStream,
 }
 
@@ -162,7 +157,6 @@ fn parse_args(args: Punctuated<FnArg, Comma>, test_name: &Ident) -> ParsedArgs {
     remove_std_rng(&mut parsed, &mut args);
     remove_background_executor(&mut parsed, &mut args);
 
-    // all remaining args forwarded to proptest's macro
     parsed.proptest_args = quote!( #(#args),* );
 
     parsed
@@ -229,7 +223,6 @@ fn remove_background_executor(parsed: &mut ParsedArgs, args: &mut Vec<FnArg>) {
     });
 }
 
-// Matches `&TestAppContext` or `&foo::bar::baz::TestAppContext`
 fn is_test_cx(arg: &FnArg) -> bool {
     let FnArg::Typed(arg) = arg else {
         return false;

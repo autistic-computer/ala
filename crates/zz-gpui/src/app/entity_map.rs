@@ -25,7 +25,6 @@ use crate::collections::HashMap;
 use crate::util::atomic_incr_if_not_zero;
 
 slotmap::new_key_type! {
-    /// A unique identifier for a entity across the application.
     pub struct EntityId;
 }
 
@@ -36,12 +35,10 @@ impl From<u64> for EntityId {
 }
 
 impl EntityId {
-    /// Converts this entity id to a [NonZeroU64]
     pub fn as_non_zero_u64(self) -> NonZeroU64 {
         NonZeroU64::new(self.0.as_ffi()).unwrap()
     }
 
-    /// Converts this entity id to a [u64]
     pub fn as_u64(self) -> u64 {
         self.0.as_ffi()
     }
@@ -93,19 +90,11 @@ impl EntityMap {
         self.ref_counts.clone()
     }
 
-    /// Captures a snapshot of all entities that currently have alive handles.
-    ///
-    /// The returned [`LeakDetectorSnapshot`] can later be passed to
-    /// [`assert_no_new_leaks`](Self::assert_no_new_leaks) to verify that no
-    /// entities created after the snapshot are still alive.
     #[cfg(any(test, feature = "leak-detection"))]
     pub fn leak_detector_snapshot(&self) -> LeakDetectorSnapshot {
         self.ref_counts.read().leak_detector.snapshot()
     }
 
-    /// Asserts that no entities created after `snapshot` still have alive handles.
-    ///
-    /// See [`LeakDetector::assert_no_new_leaks`] for details.
     #[cfg(any(test, feature = "leak-detection"))]
     pub fn assert_no_new_leaks(&self, snapshot: &LeakDetectorSnapshot) {
         self.ref_counts
@@ -114,13 +103,11 @@ impl EntityMap {
             .assert_no_new_leaks(snapshot)
     }
 
-    /// Reserve a slot for an entity, which you can subsequently use with `insert`.
     pub fn reserve<T: 'static>(&self) -> Slot<T> {
         let id = self.ref_counts.write().counts.insert(1.into());
         Slot(Entity::new(id, Arc::downgrade(&self.ref_counts)))
     }
 
-    /// Insert an entity into a slot obtained by calling `reserve`.
     pub fn insert<T>(&mut self, slot: Slot<T>, entity: T) -> Entity<T>
     where
         T: 'static,
@@ -133,7 +120,6 @@ impl EntityMap {
         handle
     }
 
-    /// Move an entity to the stack.
     #[track_caller]
     pub fn lease<T>(&mut self, pointer: &Entity<T>) -> Lease<T> {
         Lease {
@@ -143,7 +129,6 @@ impl EntityMap {
         }
     }
 
-    /// Returns an entity after moving it to the stack.
     pub fn end_lease<T>(&mut self, lease: Lease<T>) {
         self.end_lease_erased(lease.id, lease.inner);
     }
@@ -201,8 +186,6 @@ impl EntityMap {
                     "dropped an entity that was referenced"
                 );
                 accessed_entities.remove(&entity_id);
-                // If the EntityId was allocated with `Context::reserve`,
-                // the entity may not have been inserted.
                 Some((entity_id, self.entities.remove(entity_id)?))
             })
             .collect()
@@ -263,7 +246,6 @@ impl Drop for LeaseInner {
 #[derive(Deref, DerefMut)]
 pub(crate) struct Slot<T>(Entity<T>);
 
-/// A dynamically typed reference to a entity, which can be downcast into a `Entity<T>`.
 pub struct AnyEntity {
     pub(crate) entity_id: EntityId,
     pub(crate) entity_type: TypeId,
@@ -294,19 +276,16 @@ impl AnyEntity {
         }
     }
 
-    /// Returns the id associated with this entity.
     #[inline]
     pub fn entity_id(&self) -> EntityId {
         self.entity_id
     }
 
-    /// Returns the [TypeId] associated with this entity.
     #[inline]
     pub fn entity_type(&self) -> TypeId {
         self.entity_type
     }
 
-    /// Converts this entity handle into a weak variant, which does not prevent it from being released.
     pub fn downgrade(&self) -> AnyWeakEntity {
         AnyWeakEntity {
             entity_id: self.entity_id,
@@ -315,8 +294,6 @@ impl AnyEntity {
         }
     }
 
-    /// Converts this entity handle into a strongly-typed entity handle of the given type.
-    /// If this entity handle is not of the specified type, returns itself as an error variant.
     pub fn downcast<T: 'static>(self) -> Result<Entity<T>, AnyEntity> {
         if TypeId::of::<T>() == self.entity_type {
             Ok(Entity {
@@ -368,7 +345,6 @@ impl Drop for AnyEntity {
             let prev_count = count.fetch_sub(1, SeqCst);
             assert_ne!(prev_count, 0, "Detected over-release of a entity.");
             if prev_count == 1 {
-                // We were the last reference to this entity, so we can remove it.
                 let mut entity_map = RwLockUpgradableReadGuard::upgrade(entity_map);
                 entity_map.dropped_entity_ids.push(self.entity_id);
             }
@@ -429,8 +405,6 @@ impl std::fmt::Debug for AnyEntity {
     }
 }
 
-/// A strong, well-typed reference to a struct which is managed
-/// by GPUI
 #[derive(Deref, DerefMut)]
 pub struct Entity<T> {
     #[deref]
@@ -459,13 +433,11 @@ impl<T: 'static> Entity<T> {
         }
     }
 
-    /// Get the entity ID associated with this entity
     #[inline]
     pub fn entity_id(&self) -> EntityId {
         self.any_entity.entity_id
     }
 
-    /// Downgrade this entity pointer to a non-retaining weak pointer
     #[inline]
     pub fn downgrade(&self) -> WeakEntity<T> {
         WeakEntity {
@@ -474,25 +446,21 @@ impl<T: 'static> Entity<T> {
         }
     }
 
-    /// Convert this into a dynamically typed entity.
     #[inline]
     pub fn into_any(self) -> AnyEntity {
         self.any_entity
     }
 
-    /// Grab a reference to this entity from the context.
     #[inline]
     pub fn read<'a>(&self, cx: &'a App) -> &'a T {
         cx.entities.read(self)
     }
 
-    /// Read the entity referenced by this handle with the given function.
     #[inline]
     pub fn read_with<R, C: AppContext>(&self, cx: &C, f: impl FnOnce(&T, &App) -> R) -> R {
         cx.read_entity(self, f)
     }
 
-    /// Updates the entity referenced by this handle with the given function.
     #[inline]
     pub fn update<R, C: AppContext>(
         &self,
@@ -502,13 +470,11 @@ impl<T: 'static> Entity<T> {
         cx.update_entity(self, update)
     }
 
-    /// Updates the entity referenced by this handle with the given function.
     #[inline]
     pub fn as_mut<'a, C: AppContext>(&self, cx: &'a mut C) -> GpuiBorrow<'a, T> {
         cx.as_mut(self)
     }
 
-    /// Updates the entity referenced by this handle with the given function.
     pub fn write<C: AppContext>(&self, cx: &mut C, value: T) {
         self.update(cx, |entity, cx| {
             *entity = value;
@@ -516,9 +482,6 @@ impl<T: 'static> Entity<T> {
         })
     }
 
-    /// Updates the entity referenced by this handle with the given function if
-    /// the referenced entity still exists, within a visual context that has a window.
-    /// Returns an error if the window has been closed.
     #[inline]
     pub fn update_in<R, C: VisualContext>(
         &self,
@@ -585,7 +548,6 @@ impl<T: 'static> PartialOrd for Entity<T> {
     }
 }
 
-/// A type erased, weak reference to a entity.
 #[derive(Clone)]
 pub struct AnyWeakEntity {
     pub(crate) entity_id: EntityId,
@@ -594,13 +556,11 @@ pub struct AnyWeakEntity {
 }
 
 impl AnyWeakEntity {
-    /// Get the entity ID associated with this weak reference.
     #[inline]
     pub fn entity_id(&self) -> EntityId {
         self.entity_id
     }
 
-    /// Check if this weak handle can be upgraded, or if the entity has already been dropped
     pub fn is_upgradable(&self) -> bool {
         let ref_count = self
             .entity_ref_counts
@@ -610,14 +570,12 @@ impl AnyWeakEntity {
         ref_count > 0
     }
 
-    /// Upgrade this weak entity reference to a strong reference.
     pub fn upgrade(&self) -> Option<AnyEntity> {
         let ref_counts = &self.entity_ref_counts.upgrade()?;
         let ref_counts = ref_counts.read();
         let ref_count = ref_counts.counts.get(self.entity_id)?;
 
         if atomic_incr_if_not_zero(ref_count) == 0 {
-            // entity_id is in dropped_entity_ids
             return None;
         }
         drop(ref_counts);
@@ -637,33 +595,6 @@ impl AnyWeakEntity {
         })
     }
 
-    /// Asserts that the entity referenced by this weak handle has been fully released.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let entity = cx.new(|_| MyEntity::new());
-    /// let weak = entity.downgrade();
-    /// drop(entity);
-    ///
-    /// // Verify the entity was released
-    /// weak.assert_released();
-    /// ```
-    ///
-    /// # Debugging Leaks
-    ///
-    /// If this method panics due to leaked handles, set the `LEAK_BACKTRACE` environment
-    /// variable to see where the leaked handles were allocated:
-    ///
-    /// ```bash
-    /// LEAK_BACKTRACE=1 cargo test my_test
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// - Panics if any strong handles to the entity are still alive.
-    /// - Panics if the entity was recently dropped but cleanup hasn't completed yet
-    ///   (resources are retained until the end of the effect cycle).
     #[cfg(any(test, feature = "leak-detection"))]
     pub fn assert_released(&self) {
         self.entity_ref_counts
@@ -685,24 +616,11 @@ impl AnyWeakEntity {
         }
     }
 
-    /// Creates a weak entity that can never be upgraded.
     pub fn new_invalid() -> Self {
-        /// To hold the invariant that all ids are unique, and considering that slotmap
-        /// increases their IDs from `0`, we can decrease ours from `u64::MAX` so these
-        /// two will never conflict (u64 is way too large).
         static UNIQUE_NON_CONFLICTING_ID_GENERATOR: AtomicU64 = AtomicU64::new(u64::MAX);
         let entity_id = UNIQUE_NON_CONFLICTING_ID_GENERATOR.fetch_sub(1, SeqCst);
 
         Self {
-            // Safety:
-            //   Docs say this is safe but can be unspecified if slotmap changes the representation
-            //   after `1.0.7`, that said, providing a valid entity_id here is not necessary as long
-            //   as we guarantee that `entity_id` is never used if `entity_ref_counts` equals
-            //   to `Weak::new()` (that is, it's unable to upgrade), that is the invariant that
-            //   actually needs to be hold true.
-            //
-            //   And there is no sane reason to read an entity slot if `entity_ref_counts` can't be
-            //   read in the first place, so we're good!
             entity_id: entity_id.into(),
             entity_type: TypeId::of::<()>(),
             entity_ref_counts: Weak::new(),
@@ -756,7 +674,6 @@ impl PartialOrd for AnyWeakEntity {
     }
 }
 
-/// A weak reference to a entity of the given type.
 #[derive(Deref, DerefMut)]
 pub struct WeakEntity<T> {
     #[deref]
@@ -784,7 +701,6 @@ impl<T> Clone for WeakEntity<T> {
 }
 
 impl<T: 'static> WeakEntity<T> {
-    /// Upgrade this weak entity reference into a strong entity reference
     pub fn upgrade(&self) -> Option<Entity<T>> {
         Some(Entity {
             any_entity: self.any_entity.upgrade()?,
@@ -792,9 +708,6 @@ impl<T: 'static> WeakEntity<T> {
         })
     }
 
-    /// Updates the entity referenced by this handle with the given function if
-    /// the referenced entity still exists. Returns an error if the entity has
-    /// been released.
     #[inline(always)]
     pub fn update<C, R>(
         &self,
@@ -808,9 +721,6 @@ impl<T: 'static> WeakEntity<T> {
         Ok(cx.update_entity(&entity, update))
     }
 
-    /// Updates the entity referenced by this handle with the given function if
-    /// the referenced entity still exists, within a visual context that has a window.
-    /// Returns an error if the entity has been released.
     #[inline(always)]
     pub fn update_in<C, R>(
         &self,
@@ -827,9 +737,6 @@ impl<T: 'static> WeakEntity<T> {
         .context("entity has no current window")
     }
 
-    /// Reads the entity referenced by this handle with the given function if
-    /// the referenced entity still exists. Returns an error if the entity has
-    /// been released.
     #[inline(always)]
     pub fn read_with<C, R>(&self, cx: &C, read: impl FnOnce(&T, &App) -> R) -> Result<R>
     where
@@ -839,7 +746,6 @@ impl<T: 'static> WeakEntity<T> {
         Ok(cx.read_entity(&entity, read))
     }
 
-    /// Create a new weak entity that can never be upgraded.
     #[inline]
     pub fn new_invalid() -> Self {
         Self {
@@ -886,84 +792,22 @@ impl<T: 'static> PartialOrd for WeakEntity<T> {
     }
 }
 
-/// Controls whether backtraces are captured when entity handles are created.
-///
-/// Set the `LEAK_BACKTRACE` environment variable to any non-empty value to enable
-/// backtrace capture. This helps identify where leaked handles were allocated.
 #[cfg(any(test, feature = "leak-detection"))]
 static LEAK_BACKTRACE: std::sync::LazyLock<bool> =
     std::sync::LazyLock::new(|| std::env::var("LEAK_BACKTRACE").is_ok_and(|b| !b.is_empty()));
 
-/// Unique identifier for a specific entity handle instance.
-///
-/// This is distinct from `EntityId` - while multiple handles can point to the same
-/// entity (same `EntityId`), each handle has its own unique `HandleId`.
 #[cfg(any(test, feature = "leak-detection"))]
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
 pub(crate) struct HandleId {
     id: u64,
 }
 
-/// Tracks entity handle allocations to detect leaks.
-///
-/// The leak detector is enabled in tests and when the `leak-detection` feature is active.
-/// It tracks every `Entity<T>` and `AnyEntity` handle that is created and released,
-/// allowing you to verify that all handles to an entity have been properly dropped.
-///
-/// # How do leaks happen?
-///
-/// Entities are reference-counted structures that can own other entities
-/// allowing to form cycles. If such a strong-reference counted cycle is
-/// created, all participating strong entities in this cycle will effectively
-/// leak as they cannot be released anymore.
-///
-/// Cycles can also happen if an entity owns a task or subscription that it
-/// itself owns a strong reference to the entity again.
-///
-/// # Usage
-///
-/// You can use `WeakEntity::assert_released` or `AnyWeakEntity::assert_released`
-/// to verify that an entity has been fully released:
-///
-/// ```ignore
-/// let entity = cx.new(|_| MyEntity::new());
-/// let weak = entity.downgrade();
-/// drop(entity);
-///
-/// // This will panic if any handles to the entity are still alive
-/// weak.assert_released();
-/// ```
-///
-/// # Debugging Leaks
-///
-/// When a leak is detected, the detector will panic with information about the leaked
-/// handles. To see where the leaked handles were allocated, set the `LEAK_BACKTRACE`
-/// environment variable:
-///
-/// ```bash
-/// LEAK_BACKTRACE=1 cargo test my_test
-/// ```
-///
-/// This will capture and display backtraces for each leaked handle, helping you
-/// identify where leaked handles were created.
-///
-/// # How It Works
-///
-/// - When an entity handle is created (via `Entity::new`, `Entity::clone`, or
-///   `WeakEntity::upgrade`), `handle_created` is called to register the handle.
-/// - When a handle is dropped, `handle_released` removes it from tracking.
-/// - `assert_released` verifies that no handles remain for a given entity.
 #[cfg(any(test, feature = "leak-detection"))]
 pub(crate) struct LeakDetector {
     next_handle_id: u64,
     entity_handles: HashMap<EntityId, EntityLeakData>,
 }
 
-/// A snapshot of the set of alive entities at a point in time.
-///
-/// Created by [`LeakDetector::snapshot`]. Can later be passed to
-/// [`LeakDetector::assert_no_new_leaks`] to verify that no new entity
-/// handles remain between the snapshot and the current state.
 #[cfg(any(test, feature = "leak-detection"))]
 pub struct LeakDetectorSnapshot {
     entity_ids: crate::collections::HashSet<EntityId>,
@@ -977,11 +821,6 @@ struct EntityLeakData {
 
 #[cfg(any(test, feature = "leak-detection"))]
 impl LeakDetector {
-    /// Records that a new handle has been created for the given entity.
-    ///
-    /// Returns a unique `HandleId` that must be passed to `handle_released` when
-    /// the handle is dropped. If `LEAK_BACKTRACE` is set, captures a backtrace
-    /// at the allocation site.
     #[track_caller]
     pub fn handle_created(
         &mut self,
@@ -1004,10 +843,6 @@ impl LeakDetector {
         handle_id
     }
 
-    /// Records that a handle has been released (dropped).
-    ///
-    /// This removes the handle from tracking. The `handle_id` should be the same
-    /// one returned by `handle_created` when the handle was allocated.
     pub fn handle_released(&mut self, entity_id: EntityId, handle_id: HandleId) {
         if let std::collections::hash_map::Entry::Occupied(mut data) =
             self.entity_handles.entry(entity_id)
@@ -1019,13 +854,6 @@ impl LeakDetector {
         }
     }
 
-    /// Asserts that all handles to the given entity have been released.
-    ///
-    /// # Panics
-    ///
-    /// Panics if any handles to the entity are still alive. The panic message
-    /// includes backtraces for each leaked handle if `LEAK_BACKTRACE` is set,
-    /// otherwise it suggests setting the environment variable to get more info.
     pub fn assert_released(&mut self, entity_id: EntityId) {
         use std::fmt::Write as _;
 
@@ -1048,28 +876,12 @@ impl LeakDetector {
         }
     }
 
-    /// Captures a snapshot of all entity IDs that currently have alive handles.
-    ///
-    /// The returned [`LeakDetectorSnapshot`] can later be passed to
-    /// [`assert_no_new_leaks`](Self::assert_no_new_leaks) to verify that no
-    /// entities created after the snapshot are still alive.
     pub fn snapshot(&self) -> LeakDetectorSnapshot {
         LeakDetectorSnapshot {
             entity_ids: self.entity_handles.keys().copied().collect(),
         }
     }
 
-    /// Asserts that no entities created after `snapshot` still have alive handles.
-    ///
-    /// Entities that were already tracked at the time of the snapshot are ignored,
-    /// even if they still have handles. Only *new* entities (those whose
-    /// `EntityId` was not present in the snapshot) are considered leaks.
-    ///
-    /// # Panics
-    ///
-    /// Panics if any new entity handles exist. The panic message lists every
-    /// leaked entity with its type name, and includes allocation-site backtraces
-    /// when `LEAK_BACKTRACE` is set.
     pub fn assert_no_new_leaks(&self, snapshot: &LeakDetectorSnapshot) {
         use std::fmt::Write as _;
 
@@ -1155,10 +967,6 @@ impl fmt::Debug for BacktraceFormatter {
             PrintFmt::Short
         };
 
-        // When printing paths we try to strip the cwd if it exists, otherwise
-        // we just print the path as-is. Note that we also only do this for the
-        // short format, because if it's full we presumably want to print
-        // everything.
         let cwd = std::env::current_dir();
         let mut print_path = move |fmt: &mut fmt::Formatter<'_>, path: BytesOrWideString<'_>| {
             let path = path.into_path_buf();
@@ -1216,7 +1024,6 @@ mod test {
 
     #[test]
     fn test_entity_map_slot_assignment_before_cleanup() {
-        // Tests that slots are not re-used before take_dropped.
         let mut entity_map = EntityMap::new();
 
         let slot = entity_map.reserve::<TestEntity>();
@@ -1239,7 +1046,6 @@ mod test {
 
     #[test]
     fn test_entity_map_weak_upgrade_before_cleanup() {
-        // Tests that weak handles are not upgraded before take_dropped
         let mut entity_map = EntityMap::new();
 
         let slot = entity_map.reserve::<TestEntity>();
@@ -1293,7 +1099,6 @@ mod test {
         let slot = entity_map.reserve::<TestEntity>();
         let leaked = entity_map.insert(slot, TestEntity { i: 2 });
 
-        // `leaked` is still alive, so this should panic.
         entity_map.assert_no_new_leaks(&snapshot);
 
         drop(pre_existing);

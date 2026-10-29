@@ -20,10 +20,6 @@ use std::{
     time::Duration,
 };
 
-/// A production implementation of [`Scheduler`] that wraps a [`PlatformDispatcher`].
-///
-/// This allows GPUI to use the scheduler crate's executor types with the platform's
-/// native dispatch mechanisms (e.g., Grand Central Dispatch on macOS).
 pub struct PlatformScheduler {
     dispatcher: Arc<dyn PlatformDispatcher>,
     clock: Arc<PlatformClock>,
@@ -86,8 +82,6 @@ impl Scheduler for PlatformScheduler {
         }
 
         let park_deadline = |deadline: Instant| {
-            // Timer expirations are only delivered every ~15.6 milliseconds by default on Windows.
-            // We increase the resolution during this wait so that short timeouts stay reasonably short.
             let _timer_guard = self.dispatcher.increase_timer_resolution();
             parker.park_deadline(deadline)
         };
@@ -130,7 +124,6 @@ impl Scheduler for PlatformScheduler {
         let (tx, rx) = oneshot::channel();
         let dispatcher = self.dispatcher.clone();
 
-        // Create a runnable that will send the completion signal
         let location = std::panic::Location::caller();
         let (runnable, _task) = async_task::Builder::new()
             .metadata(RunnableMeta {
@@ -174,7 +167,6 @@ impl Scheduler for PlatformScheduler {
     }
 }
 
-/// A production clock that uses the platform dispatcher's time.
 struct PlatformClock {
     dispatcher: Arc<dyn PlatformDispatcher>,
 }
@@ -196,8 +188,6 @@ mod tests {
     use crate::scheduler::BackgroundExecutor;
     use std::time::Instant as StdInstant;
 
-    // `spawn_dedicated` shouldn't touch the platform dispatcher at all;
-    // panicking on every method ensures the test catches it if it does.
     struct SmokeDispatcher;
 
     impl PlatformDispatcher for SmokeDispatcher {
@@ -280,9 +270,6 @@ mod tests {
             BackgroundExecutor::new(Arc::new(PlatformScheduler::new(Arc::new(SmokeDispatcher))));
         let started = StdInstant::now();
         let task = background.spawn_dedicated(|_executor| async move {
-            // A genuine blocking syscall on the dedicated thread. If
-            // `spawn_dedicated` were running the future on any shared
-            // executor, this would stall that executor.
             let thread_id_before = std::thread::current().id();
             std::thread::sleep(Duration::from_millis(50));
             let thread_id_after = std::thread::current().id();
@@ -306,9 +293,6 @@ mod tests {
 
     #[test]
     fn spawn_dedicated_returns_not_send_future_output() {
-        // The whole point of `spawn_dedicated` is that the future can be
-        // `!Send`. Constructing one with `Rc<RefCell<_>>` ensures the
-        // signature actually permits it.
         use std::cell::RefCell;
         use std::rc::Rc;
 
@@ -340,12 +324,9 @@ mod tests {
         let task = {
             let observed_post_await_write = observed_post_await_write.clone();
             background.spawn_dedicated(move |_executor| async move {
-                // Announce that the future is live on the dedicated thread.
                 started_tx
                     .send(())
                     .expect("started signal must be received");
-                // Park forever. Dropping the `Task` must cancel us here so
-                // the code below this `await` never runs.
                 futures::future::pending::<()>().await;
                 *observed_post_await_write.lock() = true;
                 after_park_tx
@@ -354,16 +335,12 @@ mod tests {
             })
         };
 
-        // Wait until the dedicated future is actually parked at the await.
         started_rx
             .recv_timeout(Duration::from_secs(2))
             .expect("dedicated future failed to start");
 
-        // Drop the root Task: this must cancel the future.
         drop(task);
 
-        // If cancellation works, the future never advances past `pending`,
-        // so this recv must time out.
         assert!(
             after_park_rx
                 .recv_timeout(Duration::from_millis(100))
@@ -380,8 +357,6 @@ mod tests {
     fn spawn_dedicated_thread_tears_down_after_work_completes() {
         use std::sync::mpsc;
 
-        // Fires from `Drop` so we observe teardown of the dedicated future's
-        // captured state on whichever thread runs its destructor.
         struct DropSignal {
             tx: Option<mpsc::Sender<std::thread::ThreadId>>,
         }
@@ -399,15 +374,10 @@ mod tests {
         let (drop_tx, drop_rx) = mpsc::channel::<std::thread::ThreadId>();
 
         let task = background.spawn_dedicated(move |_executor| async move {
-            // Captured by the future's state. When the future completes and
-            // its state is dropped on the dedicated thread, this guard's
-            // `Drop` fires and reports the thread id it ran on.
             let _guard = DropSignal { tx: Some(drop_tx) };
             started_tx
                 .send(std::thread::current().id())
                 .expect("started signal must be received");
-            // Future returns immediately. The dedicated thread should then
-            // drop the future (firing _guard), exit the recv loop, and exit.
         });
 
         let dedicated_thread_id = started_rx
@@ -419,12 +389,8 @@ mod tests {
             "dedicated future ran on the test thread"
         );
 
-        // Drive the root task to completion so its body finishes.
         futures::executor::block_on(task);
 
-        // The guard's drop runs from the dedicated thread as it tears down
-        // the future's captured state. If the executor/recv-loop were
-        // keeping the future alive past task completion, this would hang.
         let drop_thread_id = drop_rx
             .recv_timeout(Duration::from_secs(2))
             .expect("dedicated future's captured state was not dropped after task completion");
@@ -441,19 +407,12 @@ mod tests {
         let background =
             BackgroundExecutor::new(Arc::new(PlatformScheduler::new(Arc::new(SmokeDispatcher))));
 
-        // `gate_rx` lets the detached child park until the test explicitly
-        // releases it — after we've already observed the root completing.
         let (gate_tx, gate_rx) = mpsc::channel::<()>();
         let (child_done_tx, child_done_rx) = mpsc::channel::<std::thread::ThreadId>();
 
         let task = background.spawn_dedicated(move |executor| async move {
             executor
                 .spawn(async move {
-                    // Blocking on `recv` is normally wrong inside an
-                    // executor, but the dedicated thread is exclusive to
-                    // this session, so blocking the only future on it is
-                    // fine — this is the property `spawn_dedicated` is
-                    // designed to provide.
                     gate_rx
                         .recv()
                         .expect("gate sender dropped before child resumed");
@@ -462,14 +421,10 @@ mod tests {
                         .expect("child_done receiver dropped");
                 })
                 .detach();
-            // Root finishes here. The detached child must keep the
-            // dedicated thread alive until it completes.
         });
 
         futures::executor::block_on(task);
 
-        // Negative assertion: the child has not finished, because the gate
-        // hasn't been released yet.
         assert!(
             child_done_rx
                 .recv_timeout(Duration::from_millis(50))
@@ -477,8 +432,6 @@ mod tests {
             "detached child finished before being released"
         );
 
-        // Release the gate. The detached child should now complete on the
-        // dedicated thread.
         gate_tx.send(()).expect("gate receiver dropped");
 
         let child_thread_id = child_done_rx

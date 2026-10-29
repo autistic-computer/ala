@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -26,53 +24,11 @@ mod platform;
 #[path = "windows.rs"]
 mod platform;
 
-/// The `Fallback` trait allows for configurable font fallback lists to be set during construction of the [`FontSystem`].
-///
-/// A custom fallback list can be added via the [`FontSystem::new_with_locale_and_db_and_fallback`] constructor.
-///
-/// A default implementation is provided by the [`PlatformFallback`] struct, which encapsulates the target platform's pre-configured fallback lists.
-///
-/// ```rust
-/// # use unicode_script::Script;
-/// # use cosmic_text::{Fallback, FontSystem};
-/// struct MyFallback;
-/// impl Fallback for MyFallback {
-///     fn common_fallback(&self) -> &[&'static str] {
-///         &[
-///             "Segoe UI",
-///             "Segoe UI Emoji",
-///             "Segoe UI Symbol",
-///             "Segoe UI Historic",
-///         ]
-///     }
-///
-///     fn forbidden_fallback(&self) -> &[&'static str] {
-///         &[]
-///     }
-///
-///     fn script_fallback(&self, script: Script, locale: &str) -> &[&'static str] {
-///         match script {
-///             Script::Adlam => &["Ebrima"],
-///             Script::Bengali => &["Nirmala UI"],
-///             Script::Canadian_Aboriginal => &["Gadugi"],
-///             // ...
-///             _ => &[],
-///        }
-///     }
-/// }
-///
-/// let locale = "en-US".to_string();
-/// let db = fontdb::Database::new();
-/// let font_system = FontSystem::new_with_locale_and_db_and_fallback(locale, db, MyFallback);
-/// ```
 pub trait Fallback: Send + Sync {
-    /// Fallbacks to use after any script specific fallbacks
     fn common_fallback(&self) -> &[&'static str];
 
-    /// Fallbacks to never use
     fn forbidden_fallback(&self) -> &[&'static str];
 
-    /// Fallbacks to use per script
     fn script_fallback(&self, script: Script, locale: &str) -> &[&'static str];
 }
 
@@ -81,7 +37,6 @@ pub struct Fallbacks {
     lists: Vec<&'static str>,
     common_fallback_range: Range<usize>,
     forbidden_fallback_range: Range<usize>,
-    // PERF: Consider using NoHashHasher since Script is just an integer
     script_fallback_ranges: HashMap<Script, Range<usize>>,
     locale: String,
 }
@@ -170,9 +125,6 @@ use log::debug as missing_warn;
 #[cfg(feature = "warn_on_missing_glyphs")]
 use log::warn as missing_warn;
 
-// Match on lowest font_weight_diff, then script_non_matches, then font_weight
-// Default font gets None for both `weight_offset` and `script_non_matches`, and thus, it is
-// always the first to be popped from the set.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MonospaceFallbackInfo {
     font_weight_diff: Option<u16>,
@@ -347,12 +299,9 @@ impl<'a> FontFallbackIter<'a> {
                 }
                 (true, None) => (),
                 (true, Some(m_key)) => {
-                    // Default Monospace font
                     if let Some(mut fallback_info) = mk_mono_fallback_info!(m_key) {
                         fallback_info.font_weight_diff = None;
 
-                        // Return early if default Monospace font supports all word codepoints.
-                        // Otherewise, add to fallbacks set
                         if fallback_info.codepoint_non_matches == Some(0) {
                             if let Some(font) =
                                 self.font_system.get_font(m_key.id, self.ideal_weight)
@@ -412,7 +361,6 @@ impl<'a> FontFallbackIter<'a> {
                     }
                 }
             }
-            // If default family is Monospace fallback to first monospaced font
             if let Some(fallback_info) = self.font_system.monospace_fallbacks_buffer.pop_first() {
                 if let Some(font) = self
                     .font_system
@@ -464,8 +412,6 @@ impl<'a> FontFallbackIter<'a> {
             log::debug!("failed to find family '{common_family}'");
         }
 
-        //TODO: do we need to do this?
-        //TODO: do not evaluate fonts more than once!
         let forbidden_families = fallbacks.forbidden_fallback();
         while self.other_i < self.font_match_keys.len() {
             let id = self.font_match_keys[self.other_i].id;

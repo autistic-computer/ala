@@ -6,26 +6,18 @@ use zz_gpui::{
     WindowCornerMask, glass_level_size, plan_glass,
 };
 
-/// Pipelines and scratch textures for [`Glass`], built from the same WGSL the
-/// wgpu renderer runs, translated to MSL by naga when a scene first paints
-/// glass.
 pub(crate) struct MetalGlass {
     glass_pipeline: metal::RenderPipelineState,
-    /// For glass that reads its backdrop, which writes its pixels itself.
     reading_pipeline: metal::RenderPipelineState,
     down_pipeline: metal::RenderPipelineState,
     up_pipeline: metal::RenderPipelineState,
     copy_pipeline: metal::RenderPipelineState,
     sampler: metal::SamplerState,
     levels: Vec<metal::Texture>,
-    /// Bound in place of the chain for glass that reads no backdrop.
     placeholder: metal::Texture,
-    /// The largest chain any run needed this frame, in level 0 texels.
     peak: Size<i32>,
 }
 
-/// The chain grows in steps of this many level 0 texels, so a glass that
-/// moves or springs does not reallocate it every frame.
 const CHAIN_STEP: u32 = 256;
 
 impl MetalGlass {
@@ -171,7 +163,6 @@ impl MetalGlass {
         self.peak = Size::default();
     }
 
-    /// Frees a chain the frame did not use, or used little of.
     pub(crate) fn end_frame(&mut self) {
         if let Some(level) = self.levels.first() {
             let area = level.width() as i64 * level.height() as i64;
@@ -182,7 +173,6 @@ impl MetalGlass {
         }
     }
 
-    /// Makes the chain span `extent` level 0 texels and reach `depth` levels.
     fn ensure_chain(&mut self, device: &metal::DeviceRef, extent: Size<i32>, depth: u32) {
         self.peak = Size {
             width: self.peak.width.max(extent.width),
@@ -196,9 +186,6 @@ impl MetalGlass {
             Some(current) if current.width >= extent.width && current.height >= extent.height => {
                 current
             }
-            // Grow each side to the larger of what is there and what is
-            // asked, so a tall run and a wide one do not trade the chain back
-            // and forth every frame.
             current => {
                 self.levels.clear();
                 let current = current.unwrap_or_default();
@@ -224,13 +211,6 @@ impl MetalGlass {
         }
     }
 
-    /// Draws a batch of glass over `target`. The caller ends its encoder
-    /// first. Every run but the last draws in an encoder of its own; the last
-    /// run's draws come back, for the caller to issue with
-    /// [`Self::draw_pending`] in the encoder that resumes the scene, which
-    /// saves the tiled GPU a load and store of the whole target. A batch in
-    /// which no glass reads its backdrop needs none of this: issue
-    /// [`Self::draws_in_place`] in the scene's own encoder instead.
     pub(crate) fn draw(
         &mut self,
         device: &metal::DeviceRef,
@@ -287,8 +267,6 @@ impl MetalGlass {
         pending
     }
 
-    /// The draws of a batch in which no glass reads its backdrop, in order,
-    /// for [`Self::draw_pending`] in the encoder already drawing the scene.
     pub(crate) fn draws_in_place(
         glasses: &[Glass],
         viewport: Size<i32>,
@@ -300,8 +278,6 @@ impl MetalGlass {
             .collect()
     }
 
-    /// Issues a run's glass draws into `encoder`, an encoder over the
-    /// target, and gives it back its full scissor.
     pub(crate) fn draw_pending(
         &self,
         encoder: &metal::RenderCommandEncoderRef,
@@ -353,8 +329,6 @@ impl MetalGlass {
             width: target.width() as i32,
             height: target.height() as i32,
         };
-        // A down pass writes every texel a later pass reads, so on a tiled GPU
-        // its level never needs loading.
         let load = if pass.down {
             metal::MTLLoadAction::DontCare
         } else {
@@ -392,7 +366,6 @@ fn render_encoder<'a>(
     command_buffer.new_render_command_encoder(descriptor)
 }
 
-/// Scissors to `rect` within a target of `size`; false when nothing is left.
 fn set_scissor(
     encoder: &metal::RenderCommandEncoderRef,
     rect: Bounds<i32>,
@@ -414,7 +387,6 @@ fn set_scissor(
     true
 }
 
-/// Whether a scene paints glass, its shader layers' included.
 pub(crate) fn scene_has_glass(scene: &zz_gpui::Scene) -> bool {
     !scene.glasses.is_empty()
         || scene

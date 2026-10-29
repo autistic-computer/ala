@@ -39,12 +39,10 @@ pub struct TestScheduler {
 }
 
 impl TestScheduler {
-    /// Run a test once with default configuration (seed 0)
     pub fn once<R>(f: impl AsyncFnOnce(Arc<TestScheduler>) -> R) -> R {
         Self::with_seed(0, f)
     }
 
-    /// Run a test multiple times with sequential seeds (0, 1, 2, ...)
     pub fn many<R>(
         default_iterations: usize,
         mut f: impl AsyncFnMut(Arc<TestScheduler>) -> R,
@@ -86,7 +84,7 @@ impl TestScheduler {
         let mut future = std::pin::pin!(future);
         scheduler.block_until(None, future.as_mut(), None);
         let result = output.take().expect("test future did not complete");
-        scheduler.run(); // Ensure spawned tasks finish up before returning in tests
+        scheduler.run();
         result
     }
 
@@ -142,8 +140,6 @@ impl TestScheduler {
             let awoken = awoken.swap(false, SeqCst);
             if !stepped && !awoken {
                 let parking_allowed = self.state.lock().allow_parking;
-                // In deterministic mode (parking forbidden), instantly jump to the next timer.
-                // In non-deterministic mode (parking allowed), let real time pass instead.
                 let advanced_to_timer = !parking_allowed && self.advance_clock_to_next_timer();
                 if !advanced_to_timer && !self.park(deadline) {
                     break;
@@ -187,7 +183,6 @@ impl TestScheduler {
         let mut state = self.state.lock();
         if let Some((message, backtrace)) = &state.non_determinism_error {
             if cfg!(miri) {
-                // miri cannot debug print backtraces with `miri-disable-isolation` enabled
                 panic!("{}", message)
             } else {
                 panic!("{}\n{:?}", message, backtrace)
@@ -232,7 +227,6 @@ impl TestScheduler {
         state.next_session_id
     }
 
-    /// Create a local executor for this scheduler.
     pub fn foreground(self: &Arc<Self>) -> LocalExecutor {
         let session_id = self.allocate_session_id();
         LocalExecutor::new(
@@ -242,7 +236,6 @@ impl TestScheduler {
         )
     }
 
-    /// Create a background executor for this scheduler
     pub fn background(self: &Arc<Self>) -> BackgroundExecutor {
         BackgroundExecutor::new(self.clone())
     }
@@ -257,39 +250,26 @@ impl TestScheduler {
     }
 
     pub fn run(&self) {
-        while self.step() {
-            // Continue until no work remains
-        }
+        while self.step() {}
     }
 
     pub fn run_with_clock_advancement(&self) {
-        while self.step() || self.advance_clock_to_next_timer() {
-            // Continue until no work remains
-        }
+        while self.step() || self.advance_clock_to_next_timer() {}
     }
 
-    /// Execute one tick of the scheduler, processing expired timers and running
-    /// at most one task. Returns true if any work was done.
-    ///
-    /// This is the public interface for GPUI's TestDispatcher to drive task execution.
     pub fn tick(&self) -> bool {
         self.step_filtered(false)
     }
 
-    /// Execute one tick, but only run background tasks (no foreground/session tasks).
-    /// Returns true if any work was done.
     pub fn tick_background_only(&self) -> bool {
         self.step_filtered(true)
     }
 
-    /// Check if there are any pending tasks or timers that could run.
     pub fn has_pending_tasks(&self) -> bool {
         let state = self.state.lock();
         !state.runnables.is_empty() || !state.timers.is_empty()
     }
 
-    /// Returns counts of (foreground_tasks, background_tasks) currently queued.
-    /// Foreground tasks are those with a session_id, background tasks have none.
     pub fn pending_task_counts(&self) -> (usize, usize) {
         let state = self.state.lock();
         let foreground = state
@@ -319,7 +299,6 @@ impl TestScheduler {
             let count = elapsed.len();
             let runnables = state.runnables.len();
             drop(state);
-            // Dropping elapsed timers here wakes the waiting futures
             drop(elapsed);
             (count, runnables)
         };
@@ -341,12 +320,6 @@ impl TestScheduler {
         let runnable = {
             let state = &mut *self.state.lock();
 
-            // Find candidate tasks:
-            // - For foreground tasks (with session_id), only the first task from each session
-            //   is a candidate (to preserve intra-session ordering)
-            // - For background tasks (no session_id), all are candidates
-            // - Tasks from blocked sessions are excluded
-            // - If background_only is true, skip foreground tasks entirely
             let mut seen_sessions = HashSet::new();
             let candidate_indices: Vec<usize> = state
                 .runnables
@@ -354,18 +327,14 @@ impl TestScheduler {
                 .enumerate()
                 .filter(|(_, runnable)| {
                     if let Some(session_id) = runnable.session_id {
-                        // Skip foreground tasks if background_only mode
                         if background_only {
                             return false;
                         }
-                        // Exclude tasks from blocked sessions
                         if state.blocked_sessions.contains(&session_id) {
                             return false;
                         }
-                        // Only include first task from each session (insert returns true if new)
                         seen_sessions.insert(session_id)
                     } else {
-                        // Background tasks are always candidates
                         true
                     }
                 })
@@ -375,7 +344,6 @@ impl TestScheduler {
             if candidate_indices.is_empty() {
                 None
             } else if state.randomize_order {
-                // Use priority-weighted random selection
                 let weights: Vec<u32> = candidate_indices
                     .iter()
                     .map(|&ix| state.runnables[ix].priority.weight())
@@ -383,7 +351,6 @@ impl TestScheduler {
                 let total_weight: u32 = weights.iter().sum();
 
                 if total_weight == 0 {
-                    // Fallback to uniform random if all weights are zero
                     let choice = self.rng.lock().random_range(0..candidate_indices.len());
                     state.runnables.remove(candidate_indices[choice])
                 } else {
@@ -399,7 +366,6 @@ impl TestScheduler {
                     state.runnables.remove(candidate_indices[selected_idx])
                 }
             } else {
-                // Non-randomized: just take the first candidate task
                 state.runnables.remove(candidate_indices[0])
             }
         };
@@ -416,15 +382,7 @@ impl TestScheduler {
         false
     }
 
-    /// Drops all runnable tasks from the scheduler.
-    ///
-    /// This is used by the leak detector to ensure that all tasks have been dropped as tasks may keep entities alive otherwise.
-    /// Why do we even have tasks left when tests finish you may ask. The reason for that is simple, the scheduler itself is the executor and it retains the scheduled runnables.
-    /// A lot of tasks, including every foreground task contain an executor handle that keeps the test scheduler alive, causing a reference cycle, thus the need for this function right now.
     pub fn drain_tasks(&self) {
-        // dropping runnables may reschedule tasks
-        // due to drop impls with executors in them
-        // so drop until we reach a fixpoint
         loop {
             let mut state = self.state.lock();
             if state.runnables.is_empty() && state.timers.is_empty() {
@@ -488,27 +446,22 @@ impl TestScheduler {
     fn park(&self, deadline: Option<Instant>) -> bool {
         if self.state.lock().allow_parking {
             let start = Instant::now();
-            // Enforce a hard timeout to prevent tests from hanging indefinitely
             let hard_deadline = start + Duration::from_secs(15);
 
-            // Use the earlier of the provided deadline or the hard timeout deadline
             let effective_deadline = deadline
                 .map(|d| d.min(hard_deadline))
                 .unwrap_or(hard_deadline);
 
-            // Park in small intervals to allow checking both deadlines
             const PARK_INTERVAL: Duration = Duration::from_millis(100);
             loop {
                 let now = Instant::now();
                 if now >= effective_deadline {
-                    // Check if we hit the hard timeout
                     if now >= hard_deadline {
                         panic!(
                             "Test timed out after 15 seconds while parking. \
                             This may indicate a deadlock or missing waker.",
                         );
                     }
-                    // Hit the provided deadline
                     return false;
                 }
 
@@ -518,11 +471,8 @@ impl TestScheduler {
                 thread::park_timeout(park_duration);
                 let elapsed = before_park.elapsed();
 
-                // Advance the test clock by the real elapsed time while parking
                 self.clock.advance(elapsed);
 
-                // Check if any timers have expired after advancing the clock.
-                // If so, return so the caller can process them.
                 if self
                     .state
                     .lock()
@@ -533,10 +483,6 @@ impl TestScheduler {
                     return true;
                 }
 
-                // Check if we were woken up by a different thread.
-                // We use a flag because timing-based detection is unreliable:
-                // OS scheduling delays can cause elapsed >= park_duration even when
-                // we were woken early by unpark().
                 if std::mem::take(&mut self.state.lock().unparked) {
                     return true;
                 }
@@ -544,7 +490,6 @@ impl TestScheduler {
         } else if deadline.is_some() {
             false
         } else if cfg!(miri) {
-            // miri cannot debug print backtraces with `miri-disable-isolation` enabled
             panic!("Parking forbidden.");
         } else if self.state.lock().capture_pending_traces {
             let mut pending_traces = String::new();
@@ -586,13 +531,6 @@ fn assert_correct_thread(expected: &Thread, state: &Arc<Mutex<SchedulerState>>) 
 }
 
 impl Scheduler for TestScheduler {
-    /// Block until the given future completes, with an optional timeout. If the
-    /// future is unable to make progress at any moment before the timeout and
-    /// no other tasks or timers remain, we panic unless parking is allowed. If
-    /// parking is allowed, we block up to the timeout or indefinitely if none
-    /// is provided. This is to allow testing a mix of deterministic and
-    /// non-deterministic async behavior, such as when interacting with I/O in
-    /// an otherwise deterministic test.
     #[cfg(not(target_family = "wasm"))]
     fn block(
         &self,
@@ -678,10 +616,6 @@ impl Scheduler for TestScheduler {
         self.clock.clone()
     }
 
-    /// In the test world, dedicated work is just a fresh local session driven
-    /// by the test scheduler's run loop alongside everything else. No real
-    /// thread is spawned, so determinism under `TestScheduler::many` is
-    /// preserved.
     fn spawn_dedicated(
         self: Arc<Self>,
         f: Box<
@@ -700,13 +634,6 @@ impl Scheduler for TestScheduler {
             self,
             schedule_local_dispatch(weak_scheduler.clone(), session_id),
         );
-        // The dedicated future sits in this scheduler's own queue until its
-        // first poll. A `LocalExecutor` holds the scheduler strongly, so
-        // capturing one here would create a reference cycle
-        // (scheduler -> queued runnable -> future -> executor -> scheduler)
-        // that leaks both if the scheduler is dropped before ever being run.
-        // Construct the executor lazily at first poll, when the runnable is
-        // already out of the queue.
         spawner.spawn(async move {
             let scheduler = weak_scheduler
                 .upgrade()
@@ -725,8 +652,6 @@ impl Scheduler for TestScheduler {
     }
 }
 
-/// Dispatch closure for `LocalExecutor`s backed by a `TestScheduler`. Holds
-/// the scheduler weakly so queued runnables don't keep it alive.
 fn schedule_local_dispatch(
     scheduler: Weak<TestScheduler>,
     session_id: SessionId,
@@ -897,19 +822,14 @@ impl TracingWaker {
 
 pub struct Yield(usize);
 
-/// A wrapper around `Arc<Mutex<StdRng>>` that provides convenient methods
-/// for random number generation without requiring explicit locking.
 #[derive(Clone)]
 pub struct SharedRng(Arc<Mutex<StdRng>>);
 
 impl SharedRng {
-    /// Lock the inner RNG for direct access. Use this when you need multiple
-    /// random operations without re-locking between each one.
     pub fn lock(&self) -> MutexGuard<'_, StdRng> {
         self.0.lock()
     }
 
-    /// Generate a random value in the given range.
     pub fn random_range<T, R>(&self, range: R) -> T
     where
         T: SampleUniform,
@@ -918,12 +838,10 @@ impl SharedRng {
         self.0.lock().random_range(range)
     }
 
-    /// Generate a random boolean with the given probability of being true.
     pub fn random_bool(&self, p: f64) -> bool {
         self.0.lock().random_bool(p)
     }
 
-    /// Generate a random value of the given type.
     pub fn random<T>(&self) -> T
     where
         StandardUniform: Distribution<T>,
@@ -931,7 +849,6 @@ impl SharedRng {
         self.0.lock().random()
     }
 
-    /// Generate a random ratio - true with probability `numerator/denominator`.
     pub fn random_ratio(&self, numerator: u32, denominator: u32) -> bool {
         self.0.lock().random_ratio(numerator, denominator)
     }

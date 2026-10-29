@@ -1,12 +1,3 @@
-//! GPUI's browser platform. Each window draws into its own canvas: either the whole page, or a
-//! page element named by `WindowOptions::mount`, so one page can host several windows among its
-//! own content. Browser WebGPU is preferred by default, with an automatic WebGL2 fallback;
-//! WebGL2 can draw only the first window. Applications can force either backend with
-//! `WebBackendPreference`.
-//!
-//! Every window can mirror its accessibility tree into the page, and `globalThis.zzGpui` lets
-//! agents and tests find, click and capture windows; see the `automation` module.
-
 pub mod canvas_fallback;
 
 #[cfg(target_family = "wasm")]

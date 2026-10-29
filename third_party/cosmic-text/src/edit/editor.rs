@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 #[cfg(not(feature = "std"))]
 use alloc::{
     string::{String, ToString},
@@ -15,7 +13,6 @@ use crate::{
     Selection, Shaping,
 };
 
-/// A wrapper of [`Buffer`] for easy editing
 #[derive(Debug, Clone)]
 pub struct Editor<'buffer> {
     buffer_ref: BufferRef<'buffer>,
@@ -33,7 +30,6 @@ fn cursor_position(cursor: &Cursor, run: &LayoutRun) -> Option<(i32, i32)> {
 }
 
 impl<'buffer> Editor<'buffer> {
-    /// Create a new [`Editor`] with the provided [`Buffer`]
     pub fn new(buffer: impl Into<BufferRef<'buffer>>) -> Self {
         Self {
             buffer_ref: buffer.into(),
@@ -46,9 +42,6 @@ impl<'buffer> Editor<'buffer> {
         }
     }
 
-    /// Draw the editor
-    ///
-    /// Automatically resolves any pending dirty state before drawing.
     #[cfg(feature = "swash")]
     #[allow(clippy::too_many_arguments)]
     pub fn draw<F>(
@@ -78,10 +71,6 @@ impl<'buffer> Editor<'buffer> {
         );
     }
 
-    /// Render the editor using the provided renderer.
-    ///
-    /// The caller is responsible for calling [`Edit::shape_as_needed`] first
-    /// to ensure layout is up to date.
     pub fn render<R: Renderer>(
         &self,
         renderer: &mut R,
@@ -98,13 +87,11 @@ impl<'buffer> Editor<'buffer> {
                 let line_top = run.line_top;
                 let line_height = run.line_height;
 
-                // Highlight selection
                 if let Some((start, end)) = selection_bounds {
                     if line_i >= start.line && line_i <= end.line {
                         let highlights: Vec<(f32, f32)> = run.highlight(start, end).collect();
 
                         if highlights.is_empty() && run.glyphs.is_empty() && end.line > line_i {
-                            // Highlight all of internal empty lines
                             let max = buffer.size().0.unwrap_or(0.0) as i32;
                             renderer.rectangle(
                                 0,
@@ -119,8 +106,6 @@ impl<'buffer> Editor<'buffer> {
                                 let mut min = x as i32;
                                 let mut max = (x + width) as i32;
 
-                                // Extend the last rect to the line edge for
-                                // multi-line selections
                                 if idx == len - 1 && end.line > line_i {
                                     if run.rtl {
                                         min = 0;
@@ -141,7 +126,6 @@ impl<'buffer> Editor<'buffer> {
                     }
                 }
 
-                // Draw cursor
                 if let Some((x, y)) = cursor_position(&self.cursor, &run) {
                     renderer.rectangle(x, y, 1, line_height as u32, cursor_color);
                 }
@@ -230,15 +214,11 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
 
     fn delete_range(&mut self, start: Cursor, end: Cursor) {
         let change_item = self.with_buffer_mut(|buffer| {
-            // Collect removed data for change tracking
             let mut change_lines = Vec::new();
 
-            // Delete the selection from the last line
             let end_line_opt = if end.line > start.line {
-                // Get part of line after selection
                 let after = buffer.lines[end.line].split_off(end.index);
 
-                // Remove end line
                 let removed = buffer.lines.remove(end.line);
                 change_lines.insert(0, removed);
 
@@ -247,35 +227,28 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                 None
             };
 
-            // Delete interior lines (in reverse for safety)
             for line_i in (start.line + 1..end.line).rev() {
                 let removed = buffer.lines.remove(line_i);
                 change_lines.insert(0, removed);
             }
 
-            // Delete the selection from the first line
             {
                 let line = &mut buffer.lines[start.line];
 
-                // Get part after selection if start line is also end line
                 let after_opt = if start.line == end.line {
                     Some(line.split_off(end.index))
                 } else {
                     None
                 };
 
-                // Delete selected part of line
                 let removed = line.split_off(start.index);
                 change_lines.insert(0, removed);
 
-                // Re-add part of line after selection
                 if let Some(after) = after_opt {
                     line.append(&after);
                 }
 
-                // Re-add valid parts of end line
                 if let Some(mut end_line) = end_line_opt {
-                    // Preserve line ending of original line
                     if end_line.ending() == LineEnding::None {
                         end_line.set_ending(line.ending());
                     }
@@ -318,16 +291,12 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
         }
 
         let change_item = self.with_buffer_mut(|buffer| {
-            // Save cursor for change tracking
             let start = cursor;
 
-            // Ensure there are enough lines in the buffer to handle this cursor
             while cursor.line >= buffer.lines.len() {
-                // Get last line ending
                 let mut last_ending = LineEnding::None;
                 if let Some(last_line) = buffer.lines.last_mut() {
                     last_ending = last_line.ending();
-                    // Ensure a valid line ending is always set on interior lines
                     if last_ending == LineEnding::None {
                         last_line.set_ending(LineEnding::default());
                     }
@@ -352,24 +321,19 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
             let line: &mut BufferLine = &mut buffer.lines[cursor.line];
             let insert_line = cursor.line + 1;
 
-            // Collect text after insertion as a line
             let after: BufferLine = line.split_off(cursor.index);
             let after_len = after.text().len();
 
-            // Collect attributes
             let mut final_attrs = attrs_list.unwrap_or_else(|| {
                 AttrsList::new(&line.attrs_list().get_span(cursor.index.saturating_sub(1)))
             });
 
-            // Append the inserted text, line by line
             let mut lines: Vec<_> = LineIter::new(data).collect();
-            // Ensure there is always an ending line with no line ending
             if lines.last().map(|line| line.1).unwrap_or(LineEnding::None) != LineEnding::None {
                 lines.push((Default::default(), LineEnding::None));
             }
             let mut lines_iter = lines.into_iter();
 
-            // Add first line
             if let Some((range, ending)) = lines_iter.next() {
                 let data_line = &data[range];
                 let mut these_attrs = final_attrs.split_off(data_line.len());
@@ -382,7 +346,6 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                     Shaping::Advanced,
                 ));
             }
-            // Add last line
             if let Some((range, ending)) = lines_iter.next_back() {
                 let data_line = &data[range];
                 remaining_split_len -= data_line.len() + ending.as_str().len();
@@ -398,7 +361,6 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
             } else {
                 line.append(&after);
             }
-            // Add middle lines
             for (range, ending) in lines_iter.rev() {
                 let data_line = &data[range];
                 remaining_split_len -= data_line.len() + ending.as_str().len();
@@ -414,7 +376,6 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
 
             assert_eq!(remaining_split_len, 0);
 
-            // Append the text after insertion
             cursor.index = buffer.lines[cursor.line].text().len() - after_len;
 
             ChangeItem {
@@ -436,9 +397,7 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
         let (start, end) = self.selection_bounds()?;
         self.with_buffer(|buffer| {
             let mut selection = String::new();
-            // Take the selection from the first line
             {
-                // Add selected part of line to string
                 if start.line == end.line {
                     selection.push_str(&buffer.lines[start.line].text()[start.index..end.index]);
                 } else {
@@ -447,15 +406,12 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                 }
             }
 
-            // Take the selection from all interior lines (if they exist)
             for line_i in start.line + 1..end.line {
                 selection.push_str(buffer.lines[line_i].text());
                 selection.push('\n');
             }
 
-            // Take the selection from the last line
             if end.line > start.line {
-                // Add selected part of line to string
                 selection.push_str(&buffer.lines[end.line].text()[..end.index]);
             }
 
@@ -468,23 +424,18 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
             return false;
         };
 
-        // Reset cursor to start of selection
         self.cursor = start;
 
-        // Reset selection to None
         self.selection = Selection::None;
 
-        // Delete from start to end of selection
         self.delete_range(start, end);
 
         true
     }
 
     fn apply_change(&mut self, change: &Change) -> bool {
-        // Cannot apply changes if there is a pending change
         if let Some(pending) = self.change.take() {
             if !pending.items.is_empty() {
-                //TODO: is this a good idea?
                 log::warn!("pending change caused apply_change to be ignored!");
                 self.change = Some(pending);
                 return false;
@@ -492,7 +443,6 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
         }
 
         for item in &change.items {
-            //TODO: edit cursor if needed?
             if item.insert {
                 self.cursor = self.insert_at(item.start, &item.text, None);
             } else {
@@ -536,7 +486,6 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
             }
             Action::Insert(character) => {
                 if character.is_control() && !['\t', '\n', '\u{92}'].contains(&character) {
-                    // Filter out special chars (except for tab), use Action instead
                     log::debug!("Refusing to insert control character {character:?}");
                 } else if character == '\n' {
                     self.action(font_system, Action::Enter);
@@ -547,7 +496,6 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                 }
             }
             Action::Enter => {
-                //TODO: what about indenting more after opening brackets or parentheses?
                 if self.auto_indent {
                     let mut string = String::from("\n");
                     self.with_buffer(|buffer| {
@@ -566,7 +514,6 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                     self.insert_string("\n", None);
                 }
 
-                // Ensure line is properly shaped and laid out (for potential immediate commands)
                 let line_i = self.cursor.line;
                 self.with_buffer_mut(|buffer| {
                     buffer.line_layout(font_system, line_i);
@@ -574,13 +521,10 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
             }
             Action::Backspace => {
                 if self.delete_selection() {
-                    // Deleted selection
                 } else {
-                    // Save current cursor as end
                     let end = self.cursor;
 
                     if self.cursor.index > 0 {
-                        // Move cursor to previous character index
                         self.cursor.index = self.with_buffer(|buffer| {
                             buffer.lines[self.cursor.line].text()[..self.cursor.index]
                                 .char_indices()
@@ -588,23 +532,19 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                                 .map_or(0, |(i, _)| i)
                         });
                     } else if self.cursor.line > 0 {
-                        // Move cursor to previous line
                         self.cursor.line -= 1;
                         self.cursor.index =
                             self.with_buffer(|buffer| buffer.lines[self.cursor.line].text().len());
                     }
 
                     if self.cursor != end {
-                        // Delete range
                         self.delete_range(self.cursor, end);
                     }
                 }
             }
             Action::Delete => {
                 if self.delete_selection() {
-                    // Deleted selection
                 } else {
-                    // Save current cursor as start and end
                     let mut start = self.cursor;
                     let mut end = self.cursor;
 
@@ -636,16 +576,13 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                 }
             }
             Action::Indent => {
-                // Get start and end of selection
                 let (start, end) = match self.selection_bounds() {
                     Some(some) => some,
                     None => (self.cursor, self.cursor),
                 };
 
-                // For every line in selection
                 let tab_width: usize = self.tab_width().into();
                 for line_i in start.line..=end.line {
-                    // Determine indexes of last indent and first character after whitespace
                     let mut after_whitespace = 0;
                     let mut required_indent = 0;
                     self.with_buffer(|buffer| {
@@ -653,20 +590,17 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                         let text = line.text();
 
                         if self.selection == Selection::None {
-                            //Selection::None counts whitespace from the cursor backwards
                             let whitespace_length = match line.text()[0..self.cursor.index]
                                 .chars()
                                 .rev()
                                 .position(|c| !c.is_whitespace())
                             {
                                 Some(length) => length,
-                                // The whole line is whitespace
                                 None => self.cursor.index,
                             };
                             required_indent = tab_width - (whitespace_length % tab_width);
                             after_whitespace = self.cursor.index;
                         } else {
-                            // Other selections count whitespace from  the start of the line
                             for (count, (index, c)) in text.char_indices().enumerate() {
                                 if !c.is_whitespace() {
                                     after_whitespace = index;
@@ -683,16 +617,13 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                         None,
                     );
 
-                    // Adjust cursor
                     if self.cursor.line == line_i {
-                        //TODO: should we be forcing cursor index to current indent location?
                         if self.cursor.index < after_whitespace {
                             self.cursor.index = after_whitespace;
                         }
                         self.cursor.index += required_indent;
                     }
 
-                    // Adjust selection
                     match self.selection {
                         Selection::None => {}
                         Selection::Normal(ref mut select)
@@ -703,27 +634,22 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                             }
                         }
                     }
-                    // Request redraw
                     self.with_buffer_mut(|buffer| buffer.set_redraw(true));
                 }
             }
             Action::Unindent => {
-                // Get start and end of selection
                 let (start, end) = match self.selection_bounds() {
                     Some(some) => some,
                     None => (self.cursor, self.cursor),
                 };
 
-                // For every line in selection
                 let tab_width: usize = self.tab_width().into();
                 for line_i in start.line..=end.line {
-                    // Determine indexes of last indent and first character after whitespace
                     let mut last_indent = 0;
                     let mut after_whitespace = 0;
                     self.with_buffer(|buffer| {
                         let line = &buffer.lines[line_i];
                         let text = line.text();
-                        // Default to end of line if no non-whitespace found
                         after_whitespace = text.len();
                         for (count, (index, c)) in text.char_indices().enumerate() {
                             if !c.is_whitespace() {
@@ -736,23 +662,19 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                         }
                     });
 
-                    // No de-indent required
                     if last_indent == after_whitespace {
                         continue;
                     }
 
-                    // Delete one indent
                     self.delete_range(
                         Cursor::new(line_i, last_indent),
                         Cursor::new(line_i, after_whitespace),
                     );
 
-                    // Adjust cursor
                     if self.cursor.line == line_i && self.cursor.index > last_indent {
                         self.cursor.index -= after_whitespace - last_indent;
                     }
 
-                    // Adjust selection
                     match self.selection {
                         Selection::None => {}
                         Selection::Normal(ref mut select)
@@ -764,7 +686,6 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
                         }
                     }
 
-                    // Request redraw
                     self.with_buffer_mut(|buffer| buffer.set_redraw(true));
                 }
             }
@@ -829,7 +750,6 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
             Action::Scroll { pixels } => {
                 self.with_buffer_mut(|buffer| {
                     let mut scroll = buffer.scroll();
-                    //TODO: align to layout lines
                     scroll.vertical += pixels;
                     buffer.set_scroll(scroll);
                 });
@@ -839,22 +759,6 @@ impl<'buffer> Edit<'buffer> for Editor<'buffer> {
         if old_cursor != self.cursor {
             self.cursor_moved = true;
             self.with_buffer_mut(|buffer| buffer.set_redraw(true));
-
-            /*TODO
-            if let Some(glyph) = run.glyphs.get(new_cursor_glyph) {
-                let font_opt = self.buffer.font_system().get_font(glyph.cache_key.font_id);
-                let text_glyph = &run.text[glyph.start..glyph.end];
-                log::debug!(
-                    "{}, {}: '{}' ('{}'): '{}' ({:?})",
-                    self.cursor.line,
-                    self.cursor.index,
-                    font_opt.as_ref().map_or("?", |font| font.info.family.as_str()),
-                    font_opt.as_ref().map_or("?", |font| font.info.post_script_name.as_str()),
-                    text_glyph,
-                    text_glyph
-                );
-            }
-            */
         }
     }
 

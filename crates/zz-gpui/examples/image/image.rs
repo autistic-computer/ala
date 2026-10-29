@@ -189,7 +189,6 @@ fn run_example() {
 
         cx.open_window(window_options, |_, cx| {
             cx.new(|_| ImageShowcase {
-                // Relative path to your root project path
                 local_resource: manifest_dir
                     .join("examples/image/exif-orientation-rotate-180.jpg")
                     .into(),

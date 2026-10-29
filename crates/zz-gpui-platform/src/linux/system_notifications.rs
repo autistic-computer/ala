@@ -1,6 +1,3 @@
-//! System notifications over the XDG notifications D-Bus interface, via
-//! `notify-rust`.
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -11,8 +8,6 @@ use zz_gpui::{
     ForegroundExecutor, SharedString, SystemNotification, SystemNotificationResponse, Task,
 };
 
-/// The XDG action key invoked when the user activates the notification body
-/// rather than a specific action button.
 const DEFAULT_ACTION: &str = "default";
 
 type ResponseCallback = Rc<RefCell<Option<Box<dyn FnMut(SystemNotificationResponse)>>>>;
@@ -54,15 +49,11 @@ impl SystemNotificationState {
 
         let sender = self.response_sender.clone();
         let tag = notification.tag.clone();
-        // `show` connects to the session bus and `wait_for_action` blocks
-        // until the notification closes, so both run off the UI thread.
         let spawn_result = std::thread::Builder::new()
             .name("system-notification".to_string())
             .spawn(move || match built.show() {
                 Ok(handle) => handle.wait_for_action(|action| {
                     let action_id = match action {
-                        // Sent by `notify-rust` when the notification closes
-                        // without being activated.
                         "__closed" => return,
                         transport_id => {
                             let Some(action_id) = response_action_id(transport_id, &action_ids)
@@ -86,11 +77,7 @@ impl SystemNotificationState {
         }
     }
 
-    pub(crate) fn dismiss(&self, _tag: &str) {
-        // The XDG notifications protocol only allows closing via the
-        // server-assigned id on a live handle, which `wait_for_action`
-        // consumes; stale notifications simply age out of the shade.
-    }
+    pub(crate) fn dismiss(&self, _tag: &str) {}
 
     pub(crate) fn on_response(
         &mut self,
@@ -99,14 +86,10 @@ impl SystemNotificationState {
     ) {
         *self.callback.borrow_mut() = Some(callback);
 
-        // Responses arrive from per-notification threads; this task hands
-        // them to the registered callback on the main thread.
         if let Some(mut receiver) = self.response_receiver.take() {
             let callback = self.callback.clone();
             self._response_task = Some(executor.spawn(async move {
                 while let Some(response) = receiver.next().await {
-                    // Take the callback out for the call: it may re-enter the
-                    // platform or replace itself.
                     let taken = callback.borrow_mut().take();
                     if let Some(mut taken) = taken {
                         taken(response);

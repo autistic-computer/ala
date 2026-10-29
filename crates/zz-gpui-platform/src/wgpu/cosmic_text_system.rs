@@ -58,13 +58,9 @@ struct CosmicTextSystemState {
     scratch: ShapeBuffer,
     swash_scale_context: ScaleContext,
     pending_glyph_images: HashMap<RenderGlyphParams, swash::scale::image::Image>,
-    /// Contains all already loaded fonts, including all faces. Indexed by `FontId`.
     loaded_fonts: Vec<LoadedFont>,
     loaded_font_ids_by_key: HashMap<LoadedFontKey, FontId>,
-    /// Caches the `FontId`s associated with a specific family to avoid iterating the font database
-    /// for every font face in a family.
     font_ids_by_family_cache: HashMap<FontKey, SmallVec<[FontId; 4]>>,
-    /// Instances of variable faces at a weight they do not default to.
     weighted_fonts: HashMap<(FontId, u16), FontId>,
     system_font_fallback: String,
     missing_glyph_sink: Option<Arc<dyn MissingGlyphSink>>,
@@ -74,10 +70,7 @@ struct LoadedFont {
     font: Arc<CosmicTextFont>,
     features: CosmicFontFeatures,
     is_known_emoji_font: bool,
-    /// resolved at load time so `layout_line` shares one chain across faces.
-    /// `Arc` keeps clone cheap on the per-run hot path.
     user_fallback_chain: Arc<[(FontId, SharedString)]>,
-    /// The `wght` a variable face is drawn at, when it is not the face's own.
     weight: Option<Weight>,
 }
 
@@ -105,7 +98,6 @@ impl FontMatchProperties {
 }
 
 impl CosmicTextSystem {
-    /// Returns the selected face's weight and style, which may differ from the request.
     pub fn font_weight_and_style(
         &self,
         font_id: FontId,
@@ -129,8 +121,6 @@ impl CosmicTextSystem {
         Ok((zz_gpui::FontWeight(weight.0 as f32), style))
     }
 
-    /// Builds reports for unresolved source indices after an outer text system
-    /// has applied its own fallback.
     pub fn missing_glyphs(
         &self,
         text: &str,
@@ -187,9 +177,6 @@ impl CosmicTextSystem {
 }
 
 impl CosmicTextSystem {
-    /// Resolves `.SystemUIFont` to the first installed family in `families`,
-    /// such as the desktop's interface font. Returns whether the mapping
-    /// changed.
     pub fn set_system_font_family<'a>(&self, families: impl IntoIterator<Item = &'a str>) -> bool {
         let mut state = self.0.write();
         let Some(family) = families.into_iter().find_map(|candidate| {
@@ -401,9 +388,6 @@ impl CosmicTextSystemState {
             fallbacks.cloned(),
         );
 
-        // recurse with `fallbacks = None` so a fallback family cannot pull in
-        // another chain. missing fallback families are dropped so a typo in
-        // settings still lets the primary family load.
         let user_fallback_chain: Arc<[(FontId, SharedString)]> = match fallbacks {
             Some(fallbacks) if !fallbacks.fallback_list().is_empty() => {
                 let mut chain: Vec<(FontId, SharedString)> = Vec::new();
@@ -465,11 +449,7 @@ impl CosmicTextSystemState {
                 .get_font(database_id, cosmic_text::Weight::NORMAL)
                 .context("Could not load font")?;
 
-            // HACK: To let the storybook run and render Windows caption icons. We should actually do better font fallback.
-            let allowed_bad_font_names = [
-                "SegoeFluentIcons", // NOTE: Segoe fluent icons postscript name is inconsistent
-                "Segoe Fluent Icons",
-            ];
+            let allowed_bad_font_names = ["SegoeFluentIcons", "Segoe Fluent Icons"];
 
             if font.as_swash().charmap().map('m') == 0
                 && !allowed_bad_font_names.contains(&postscript_name.as_str())
@@ -539,7 +519,6 @@ impl CosmicTextSystemState {
         let bitmap_size = glyph_bounds.size;
         match image.content {
             swash::scale::image::Content::Color | swash::scale::image::Content::SubpixelMask => {
-                // Convert from RGBA to BGRA.
                 for pixel in image.data.chunks_exact_mut(4) {
                     pixel.swap(0, 2);
                 }
@@ -547,7 +526,6 @@ impl CosmicTextSystemState {
             }
             swash::scale::image::Content::Mask => {
                 if params.subpixel_rendering {
-                    // We must always return RGBA data when subpixel rendering is requested.
                     let expanded = image.data.iter().flat_map(|&a| [a, a, a, a]).collect();
                     Ok((bitmap_size, expanded))
                 } else {
@@ -599,7 +577,6 @@ impl CosmicTextSystemState {
 
         let mut renderer = Render::new(sources);
         if params.subpixel_rendering {
-            // There seems to be a bug in Swash where the B and R values are swapped.
             renderer
                 .format(Format::subpixel_bgra())
                 .offset(subpixel_offset);
@@ -613,8 +590,6 @@ impl CosmicTextSystemState {
             .with_context(|| format!("unable to render glyph via swash for {params:?}"))
     }
 
-    /// The face `font_id` drawn at `weight`: itself unless it is a variable
-    /// face whose `wght` axis reaches a weight other than its own.
     fn weighted(&mut self, font_id: FontId, weight: zz_gpui::FontWeight) -> FontId {
         let loaded = &self.loaded_fonts[font_id.0];
         let Some(axis) = loaded.font.as_swash().variations().find_by_tag(WGHT) else {
@@ -648,14 +623,6 @@ impl CosmicTextSystemState {
         weighted
     }
 
-    /// This is used when cosmic_text has chosen a fallback font instead of using the requested
-    /// font, typically to handle some unicode characters. When this happens, `loaded_fonts` may not
-    /// yet have an entry for this fallback font, and so one is added.
-    ///
-    /// Note that callers shouldn't use this `FontId` somewhere that will retrieve the corresponding
-    /// `LoadedFont.features`, as it will have an arbitrarily chosen or empty value. The only
-    /// current use of this field is for the *input* of `layout_line`, and so it's fine to use
-    /// `font_id_for_cosmic_id` when computing the *output* of `layout_line`.
     fn font_id_for_cosmic_id(&mut self, id: cosmic_text::fontdb::ID) -> Result<FontId> {
         if let Some(ix) = self
             .loaded_fonts
@@ -849,7 +816,7 @@ impl CosmicTextSystemState {
         line.layout_to_buffer(
             &mut self.scratch,
             f32::from(font_size),
-            None, // We do our own wrapping
+            None,
             cosmic_text::Wrap::None,
             Ellipsize::None,
             None,
@@ -902,7 +869,6 @@ impl CosmicTextSystemState {
             }
             let is_emoji = loaded_font.is_known_emoji_font;
 
-            // HACK: Prevent crash caused by variation selectors.
             if glyph.glyph_id == 3 && is_emoji {
                 continue;
             }
@@ -1129,8 +1095,6 @@ fn find_best_match(
     Ok(best_index)
 }
 
-/// one contiguous slice of a `FontRun` that maps to a single slot. `slot` is
-/// `None` for the primary font and `Some(ix)` for `fallback_chain[ix]`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RunSpan {
     start: usize,
@@ -1139,9 +1103,6 @@ struct RunSpan {
     font_id: FontId,
 }
 
-/// walks `text[run_offset..run_offset + run_len]` and groups codepoints into
-/// spans. inheriting codepoints stay in the current span so shaping clusters
-/// like emoji zwj sequences and combining marks are not torn apart.
 fn compute_run_spans(
     text: &str,
     run_offset: usize,
@@ -1293,7 +1254,6 @@ fn face_info_into_properties(
 }
 
 fn check_is_known_emoji_font(postscript_name: &str) -> bool {
-    // TODO: Include other common emoji fonts
     postscript_name == "NotoColorEmoji"
 }
 
@@ -1348,8 +1308,6 @@ mod tests {
         include_bytes!("../../../zz-gpui/assets/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf");
     const LILEX: &[u8] = include_bytes!("../../../zz-gpui/assets/fonts/lilex/Lilex-Regular.ttf");
 
-    /// Every code point of `Bidi_Class=B`, each of which starts a new bidi
-    /// paragraph and so can split one line into mixed-direction paragraphs.
     const SEPARATORS: &[char] = &[
         '\u{000a}', '\u{000d}', '\u{001c}', '\u{001d}', '\u{001e}', '\u{0085}', '\u{2029}',
     ];
@@ -1417,8 +1375,6 @@ mod tests {
         Ok(text_system.layout_line(text, zz_gpui::px(14.0), &runs))
     }
 
-    /// Mirrors the original crash: mixed-direction text reaching the shaper
-    /// through `shape_text`, which only splits lines on `\n`.
     #[test]
     fn shape_text_with_mixed_direction_paragraphs() -> Result<()> {
         let platform_text_system = Arc::new(text_system()?);
@@ -1575,9 +1531,6 @@ mod tests {
         Ok(())
     }
 
-    /// Glyph indices must stay absolute and positions ordered across segment
-    /// boundaries, otherwise cursor placement and hit testing desync. Uses
-    /// single-direction text so visual order matches logical order.
     #[test]
     fn layout_line_keeps_indices_and_positions_ordered_across_paragraphs() -> Result<()> {
         let text_system = text_system()?;
@@ -1596,21 +1549,16 @@ mod tests {
             assert!(pair[0].position.x <= pair[1].position.x);
         }
 
-        // Every segment contributes width, so the whole line is wider than its
-        // leading paragraph alone.
         assert!(layout.width > layout_text(&text_system, "ab")?.width);
         Ok(())
     }
 
-    /// A font run boundary that does not line up with a paragraph boundary must
-    /// still be clipped to the right segments.
     #[test]
     fn layout_line_with_font_run_straddling_a_separator() -> Result<()> {
         let text_system = text_system()?;
         let font_id = text_system.font_id(&zz_gpui::font("IBM Plex Sans"))?;
         let text = "ab\u{001c}\u{05d0}\u{05d1}";
 
-        // The run boundary falls inside the trailing RTL paragraph.
         let runs = [
             FontRun {
                 len: "ab\u{001c}\u{05d0}".len(),
@@ -1628,8 +1576,6 @@ mod tests {
         Ok(())
     }
 
-    /// Lines with no separator take the fast path and must be shaped exactly as
-    /// they were before paragraph splitting existed.
     #[test]
     fn layout_line_without_separators_takes_fast_path() -> Result<()> {
         let text_system = text_system()?;
@@ -1648,11 +1594,6 @@ mod tests {
         Ok(())
     }
 
-    /// cosmic-text sums word widths to get a line's width but accumulates glyph
-    /// advances to position glyphs, so a trailing zero-advance glyph (here a
-    /// zero-width space) can land a few ulps past the width. When that glyph is a
-    /// wrap boundary, the row before it extends past the line's width, and hit
-    /// testing in that sliver used to panic (ZED-BW8, ZED-75K, ZED-81Z).
     #[test]
     fn index_for_position_past_line_width() -> Result<()> {
         let text_system = Arc::new(zz_gpui::TextSystem::new(Arc::new(text_system()?)));
@@ -1775,7 +1716,6 @@ mod tests {
     fn falls_through_chain_in_order() {
         let primary = fid(0);
         let fb = chain(&[1, 2, 3]);
-        // only fallback 2 at index 1 covers.
         let covers = |id: FontId, _: char| id == fid(2);
         assert_eq!(
             pick_covering_slot('字', None, primary, &fb, &covers),
@@ -1788,8 +1728,6 @@ mod tests {
         let primary = fid(0);
         let fb = chain(&[1, 2]);
         let covers = |_: FontId, _: char| false;
-        // nothing covers. return `None` so the `cosmic-text` built in script
-        // fallback can take over during shaping.
         assert_eq!(
             pick_covering_slot('\u{1F600}', Some(1), primary, &fb, &covers),
             None
@@ -1827,7 +1765,6 @@ mod tests {
     fn run_spans_use_byte_offsets_for_multibyte_chars() {
         let primary = fid(0);
         let fb = chain(&[1]);
-        // primary covers ascii. fallback covers cjk.
         let covers = |id: FontId, ch: char| {
             if id == primary {
                 ch.is_ascii()
@@ -1837,7 +1774,6 @@ mod tests {
         };
         let text = "a字b";
         let spans = compute_run_spans(text, 0, text.len(), primary, &fb, &covers);
-        // '字' is 3 bytes so split is at 1 then 4.
         assert_eq!(
             spans.as_slice(),
             &[
@@ -1859,7 +1795,6 @@ mod tests {
                 !ch.is_ascii()
             }
         };
-        // outer text has a prefix that is not part of this run.
         let text = "xx字y";
         let run_offset = 2;
         let run_len = text.len() - run_offset;
@@ -1874,9 +1809,6 @@ mod tests {
     fn run_spans_keep_combining_marks_with_base_in_fallback() {
         let primary = fid(0);
         let fb = chain(&[1]);
-        // primary covers ascii only. fallback covers the base char.
-        // combining mark must stay in the fallback span even when fallback
-        // does not advertise coverage of it.
         let covers = |id: FontId, ch: char| {
             if id == primary {
                 ch.is_ascii()
@@ -1884,7 +1816,6 @@ mod tests {
                 ch == '\u{0905}'
             }
         };
-        // \u{0905} devanagari short a + \u{0902} candrabindu mark.
         let text = "\u{0905}\u{0902}";
         let spans = compute_run_spans(text, 0, text.len(), primary, &fb, &covers);
         assert_eq!(spans.as_slice(), &[span(0, text.len(), Some(0), fid(1))]);
@@ -1894,9 +1825,7 @@ mod tests {
     fn run_spans_keep_zwj_inside_emoji_cluster() {
         let primary = fid(0);
         let fb = chain(&[1]);
-        // only fallback covers the emoji codepoints. zwj must not split.
         let covers = |id: FontId, ch: char| id == fid(1) && ch != '\u{200D}';
-        // family zwj sequence woman zwj girl.
         let text = "\u{1F469}\u{200D}\u{1F467}";
         let spans = compute_run_spans(text, 0, text.len(), primary, &fb, &covers);
         assert_eq!(spans.as_slice(), &[span(0, text.len(), Some(0), fid(1))]);

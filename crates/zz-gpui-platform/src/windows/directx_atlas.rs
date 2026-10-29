@@ -43,10 +43,6 @@ impl DirectXAtlas {
         })))
     }
 
-    /// Returns the view backing `id`, or `None` once every tile in it has been
-    /// removed. A scene can still reference such a texture when a cached view
-    /// replays a paint from before the image was dropped, so callers must skip
-    /// those sprites rather than assume the texture exists.
     pub(crate) fn get_texture_view(
         &self,
         id: AtlasTextureId,
@@ -169,8 +165,6 @@ impl DirectXAtlasTextures {
             width: DevicePixels(1024),
             height: DevicePixels(1024),
         };
-        // Max texture size for DirectX. See:
-        // https://learn.microsoft.com/en-us/windows/win32/direct3d11/overviews-direct3d-11-resources-limits
         const MAX_ATLAS_SIZE: Size<DevicePixels> = Size {
             width: DevicePixels(16384),
             height: DevicePixels(16384),
@@ -213,8 +207,6 @@ impl DirectXAtlasTextures {
         };
         let mut texture: Option<ID3D11Texture2D> = None;
         unsafe {
-            // This only returns None if the device is lost, which we will recreate later.
-            // So it's ok to return None here.
             self.device
                 .CreateTexture2D(&texture_desc, None, Some(&mut texture))
                 .ok()?;
@@ -286,11 +278,6 @@ impl DirectXAtlasTexture {
         bounds: Bounds<DevicePixels>,
         bytes: &[u8],
     ) {
-        // `UpdateSubresource` reads `row_pitch * height` bytes from `bytes` based on the
-        // `D3D11_BOX` below. If the caller hands us a slice shorter than that, the driver would
-        // over-read past the end of the source buffer (potentially by multiple megabytes), so bail
-        // out instead. This is a first-insert path rather than a per-frame one, so the check is
-        // effectively free.
         let row_bytes = bounds.size.width.to_bytes(self.bytes_per_pixel as u8) as usize;
         let expected = row_bytes * bounds.size.height.0.max(0) as usize;
         if bytes.len() < expected {

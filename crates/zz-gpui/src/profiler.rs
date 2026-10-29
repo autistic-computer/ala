@@ -102,7 +102,6 @@ pub struct ActiveTiming {
 }
 
 impl TaskTiming {
-    /// A task timing with a duration of zero. Any task will replace this in history.
     pub fn placeholder() -> Self {
         let now = Instant::now();
         Self {
@@ -135,7 +134,6 @@ pub struct ThreadTaskTimings {
 }
 
 impl ThreadTaskTimings {
-    /// Convert upgraded per-thread timings into their structured format.
     pub fn collect(
         timings: Vec<(ThreadId, Arc<GuardedTaskTimings>)>,
         included: TasksIncluded,
@@ -148,7 +146,7 @@ impl ThreadTaskTimings {
                 let total_pushed = timings.total_pushed;
                 let completed = &timings.timings;
 
-                let mut vec = Vec::with_capacity(completed.len() + 1); // +1 for running task
+                let mut vec = Vec::with_capacity(completed.len() + 1);
                 let (s1, s2) = completed.as_slices();
                 vec.extend_from_slice(s1);
                 vec.extend_from_slice(s2);
@@ -223,14 +221,10 @@ impl ThreadTaskStatistics {
     }
 }
 
-/// Serializable variant of [`core::panic::Location`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerializedLocation {
-    /// Name of the source file
     pub file: SharedString,
-    /// Line in the source file
     pub line: u32,
-    /// Column in the source file
     pub column: u32,
 }
 
@@ -244,23 +238,14 @@ impl From<&core::panic::Location<'static>> for SerializedLocation {
     }
 }
 
-/// Serializable variant of [`TaskTiming`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerializedTaskTiming {
-    /// Location of the timing
     pub location: SerializedLocation,
-    /// Time at which the measurement was reported in nanoseconds
     pub start: u128,
-    /// Duration of the measurement in nanoseconds
     pub duration: u128,
 }
 
 impl SerializedTaskTiming {
-    /// Convert an array of [`TaskTiming`] into their serializable format
-    ///
-    /// # Params
-    ///
-    /// `anchor` - [`Instant`] that should be earlier than all timings to use as base anchor
     pub fn convert(anchor: Instant, timings: &[TaskTiming]) -> Vec<SerializedTaskTiming> {
         let serialized = timings
             .iter()
@@ -278,7 +263,6 @@ impl SerializedTaskTiming {
         serialized
     }
 
-    /// `anchor` - [`Instant`] that should be earlier than all timings to use as base anchor
     pub fn from(anchor: Instant, timing: TaskTiming) -> SerializedTaskTiming {
         let start = timing.start.duration_since(anchor).as_nanos();
         let duration = timing.end.0.duration_since(timing.start).as_nanos();
@@ -290,23 +274,14 @@ impl SerializedTaskTiming {
     }
 }
 
-/// Serializable variant of [`ThreadTaskTimings`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerializedThreadTaskTimings {
-    /// Thread name
     pub thread_name: Option<String>,
-    /// Hash of the thread id
     pub thread_id: u64,
-    /// Timing records for this thread
     pub timings: Vec<SerializedTaskTiming>,
 }
 
 impl SerializedThreadTaskTimings {
-    /// Convert [`ThreadTaskTimings`] into their serializable format
-    ///
-    /// # Params
-    ///
-    /// `anchor` - [`Instant`] that should be earlier than all timings to use as base anchor
     pub fn convert(anchor: Instant, timings: ThreadTaskTimings) -> SerializedThreadTaskTimings {
         let serialized_timings = SerializedTaskTiming::convert(anchor, &timings.timings);
 
@@ -325,16 +300,11 @@ impl SerializedThreadTaskTimings {
 #[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct ThreadTimingsDelta {
-    /// Hashed thread id
     pub thread_id: u64,
-    /// Thread name, if known
     pub thread_name: Option<String>,
-    /// New timings since the last call. If the circular buffer wrapped around
-    /// since the previous poll, some entries may have been lost.
     pub new_timings: Vec<SerializedTaskTiming>,
 }
 
-/// Tracks which timing events have already been seen so that callers can request only unseen events.
 #[doc(hidden)]
 pub struct ProfilingCollector {
     startup_time: Instant,
@@ -369,8 +339,6 @@ impl ProfilingCollector {
             let buffer_start = thread.total_pushed.saturating_sub(buffer_len);
 
             let mut slice = if prev_cursor < buffer_start {
-                // Cursor fell behind the buffer — some entries were evicted.
-                // Return everything still in the buffer.
                 thread.timings.as_slice()
             } else {
                 let skip = (prev_cursor - buffer_start) as usize;
@@ -401,9 +369,6 @@ impl ProfilingCollector {
     }
 }
 
-// Allow 16MiB of task timing entries.
-// VecDeque grows by doubling its capacity when full, so keep this a power of 2 to avoid wasting
-// memory.
 #[cfg(feature = "profiler")]
 const MAX_TASK_TIMINGS: usize = (16 * 1024 * 1024) / core::mem::size_of::<TaskTiming>();
 
@@ -455,8 +420,6 @@ impl std::fmt::Display for TaskStatistics {
 impl Default for TaskStatistics {
     fn default() -> Self {
         Self {
-            // Do not track polls that are not problematic
-            // this keeps more calls on the fast path
             poll_time_to_beat: Duration::from_micros(100),
             runtime_to_beat: Duration::from_micros(100),
             longest_poll_times: [TaskTiming::placeholder(); 5],
@@ -470,7 +433,7 @@ impl TaskStatistics {
     fn add_yield_timing(&mut self, task: TaskTiming) {
         let yielded_after = task.poll_duration();
         if yielded_after >= self.poll_time_to_beat {
-            std::hint::cold_path(); // most tasks are not the worst, optimize for that
+            std::hint::cold_path();
             let to_replace = self
                 .longest_poll_times
                 .iter()
@@ -491,7 +454,7 @@ impl TaskStatistics {
     fn add_runtime(&mut self, task: TaskTiming) {
         let runtime = task.since_spawn();
         if runtime >= self.runtime_to_beat {
-            std::hint::cold_path(); // most tasks are not the worst, optimize for that
+            std::hint::cold_path();
             let to_replace = self
                 .longest_runtimes
                 .iter()
@@ -513,15 +476,6 @@ impl TaskStatistics {
 pub static GLOBAL_THREAD_TIMINGS: spin::Mutex<Vec<GlobalThreadTimings>> =
     spin::Mutex::new(Vec::new());
 
-/// Upgrades all live per-thread timing handles, holding the global registry
-/// lock only for the duration of the upgrades.
-///
-/// The upgraded `Arc`s must never be dropped while `GLOBAL_THREAD_TIMINGS` is
-/// locked: dropping the last strong reference runs [`ThreadTimings::drop`],
-/// which locks `GLOBAL_THREAD_TIMINGS` again and would deadlock the
-/// non-reentrant spinlock. A thread exiting concurrently can hand off its last
-/// reference to us at any time, so callers of this function process (lock,
-/// read, drop) the returned handles only after the global lock is released.
 fn upgraded_thread_timings() -> Vec<(ThreadId, Arc<GuardedTaskTimings>)> {
     let global_thread_timings = GLOBAL_THREAD_TIMINGS.lock();
     global_thread_timings
@@ -611,7 +565,7 @@ impl ThreadTimings {
         self.stats.add_runtime(timing);
 
         if trace_enabled() {
-            std::hint::cold_path(); // optimize for when the profiling is off
+            std::hint::cold_path();
             if self.timings.len() >= MAX_TASK_TIMINGS {
                 self.timings.pop_front();
             }
@@ -623,8 +577,6 @@ impl ThreadTimings {
     #[cfg(not(feature = "profiler"))]
     pub fn save_task_timing(&mut self, _: YieldTime) {}
 
-    // Running tasks are included in the reliability trace, which is written
-    // whenever the foreground executor makes no progress for > n seconds
     pub fn get_thread_task_timings(&self, includes: TasksIncluded) -> ThreadTaskTimings {
         ThreadTaskTimings {
             thread_name: self.thread_name.clone(),
@@ -697,13 +649,6 @@ const TRACE_SETTING_ENABLED: u64 = 1 << 63;
 const TRACE_SCOPE_COUNT_MASK: u64 = TRACE_SETTING_ENABLED - 1;
 static TRACE_STATE: AtomicU64 = AtomicU64::new(0);
 
-/// Enables or disables profiler trace collection at runtime.
-///
-/// When transitioning from enabled to disabled, `add_task_timing` becomes
-/// cheaper since only cheap statistics are gathered. The existing per-thread
-/// task buffers and the frame-event buffer are cleared so stale data isn't
-/// reported after a later re-enable. Active trace scopes keep collection enabled
-/// until the last scope ends. Calls with the current setting are a no-op.
 pub fn set_trace_enabled(enabled: bool) -> bool {
     let mut state = TRACE_STATE.load(Ordering::Acquire);
     loop {
@@ -760,7 +705,6 @@ impl Drop for TraceGuard {
     }
 }
 
-/// Returns whether profiler trace collection is enabled.
 pub fn trace_enabled() -> bool {
     TRACE_STATE.load(Ordering::Relaxed) != 0
 }
@@ -781,96 +725,64 @@ fn clear_trace_buffers() {
     }
 }
 
-/// Timing for a single drawn window frame.
 #[cfg(feature = "profiler")]
 #[derive(Debug, Copy, Clone)]
 pub struct FrameTiming {
-    /// The window that was drawn.
     pub window_id: WindowId,
-    /// When the frame first became dirty (its first invalidation). `None` if
-    /// profiler tracing was not yet enabled when the invalidation occurred.
     pub dirty_at: Option<Instant>,
-    /// Number of invalidations coalesced into this frame.
     pub invalidations: u64,
-    /// When `Window::draw` started.
     pub draw_start: Instant,
-    /// When `Window::draw` finished.
     pub draw_end: Instant,
 }
 
 #[cfg(feature = "profiler")]
 impl FrameTiming {
-    /// Time spent inside `Window::draw`.
     pub fn draw_duration(&self) -> Duration {
         self.draw_end.duration_since(self.draw_start)
     }
 
-    /// Time from the frame's first invalidation to the end of its draw, if the
-    /// first invalidation was observed.
     pub fn dirty_to_draw_duration(&self) -> Option<Duration> {
         self.dirty_at
             .map(|dirty_at| self.draw_end.duration_since(dirty_at))
     }
 }
 
-/// Work spent submitting a window frame to the platform.
 #[cfg(feature = "profiler")]
 #[derive(Debug, Copy, Clone)]
 pub struct PresentTiming {
-    /// The window whose frame was submitted.
     pub window_id: WindowId,
-    /// When the platform submission began.
     pub present_start: Instant,
-    /// When the platform submission completed.
     pub present_end: Instant,
-    /// The interval since the previous newly drawn frame was submitted, when
-    /// both frames belong to an active animation.
     pub animation_interval: Option<Duration>,
 }
 
 #[cfg(feature = "profiler")]
 impl PresentTiming {
-    /// Time spent submitting the frame to the platform.
     pub fn present_duration(&self) -> Duration {
         self.present_end.duration_since(self.present_start)
     }
 }
 
-/// A frame event observed by the profiler.
 #[cfg(feature = "profiler")]
 #[derive(Debug, Copy, Clone)]
 pub enum FrameEvent {
-    /// A window frame was drawn.
     Draw(FrameTiming),
-    /// A newly drawn window frame was presented.
     Present(PresentTiming),
 }
 
-/// A point-in-time snapshot of the frame-duration histograms for a window,
-/// suitable for external formatting.
 #[cfg(feature = "profiler")]
 #[derive(Clone)]
 pub struct FrameDurationSnapshot {
-    /// Histogram of durations from the first invalidation through presentation, in nanoseconds.
     pub dirty_to_present_histogram: Histogram<u64>,
-    /// Histogram of `Window::draw` durations, in nanoseconds.
     pub draw_duration_histogram: Histogram<u64>,
-    /// Histogram of intervals between consecutively presented frames while the
-    /// window was animating, in nanoseconds.
     pub present_interval_histogram: Histogram<u64>,
 }
 
-/// A point-in-time snapshot of the input-latency histograms for a window,
-/// suitable for external formatting.
 #[cfg(feature = "profiler")]
 #[derive(Clone)]
 pub struct InputLatencySnapshot {
-    /// Histogram of input-to-frame latency samples, in nanoseconds.
     pub latency_histogram: Histogram<u64>,
-    /// Histogram of input events coalesced per rendered frame.
     pub events_per_frame_histogram: Histogram<u64>,
-    /// Count of input events that arrived mid-draw and were excluded from
-    /// latency recording.
     pub mid_draw_events_dropped: u64,
 }
 
@@ -885,11 +797,6 @@ enum WindowActivity {
     },
 }
 
-/// Collects profiling information for one window.
-///
-/// Aggregate histograms are always populated when the `profiler` feature is
-/// compiled in. Individual draw and present events are added to the global
-/// profiler buffer only while tracing is enabled.
 #[cfg(feature = "profiler")]
 pub struct WindowProfiler {
     window_id: WindowId,
@@ -910,7 +817,6 @@ pub struct WindowProfiler {
 
 #[cfg(feature = "profiler")]
 impl WindowProfiler {
-    /// Creates a profiler for a window.
     pub fn new(window_id: WindowId) -> anyhow::Result<Self> {
         let profiler = Self {
             window_id,
@@ -942,8 +848,6 @@ impl WindowProfiler {
         Ok(profiler)
     }
 
-    /// Records the beginning of an input dispatch. `kind` names the platform
-    /// input variant being dispatched (see [`crate::PlatformInput::kind_name`]).
     pub fn begin_input(&mut self, kind: &'static str) {
         journal::begin_foreground_turn();
         self.active_activities.push(WindowActivity::Input {
@@ -952,7 +856,6 @@ impl WindowProfiler {
         });
     }
 
-    /// Records the end of an input dispatch.
     pub fn end_input(&mut self, caused_invalidation: bool) {
         let Some(WindowActivity::Input { started_at, kind }) = self.active_activities.pop() else {
             debug_assert!(false, "input activity must be the current window activity");
@@ -993,18 +896,13 @@ impl WindowProfiler {
         }
     }
 
-    /// Records the beginning of an action handler.
     pub fn begin_action_handler(&mut self, action: &(dyn Action + 'static), cx: &mut App) {
         journal::begin_foreground_turn();
         let name = actions::update_running_action(action, cx);
         self.active_actions.push((name, Instant::now()));
     }
 
-    /// Records the end of the current action handler.
     pub fn end_action_handler(&mut self) {
-        // Dual-write to the legacy aggregate store; its single global running
-        // slot misbehaves when tests run actions concurrently, which is why
-        // the journal entry is tracked here on the window instead.
         actions::save_action_timing();
         let Some((name, start)) = self.active_actions.pop() else {
             debug_assert!(false, "action handler must be begun before it ends");
@@ -1021,7 +919,6 @@ impl WindowProfiler {
         journal::end_foreground_turn();
     }
 
-    /// Records the beginning of a window draw.
     pub fn begin_draw(&mut self) {
         journal::begin_foreground_turn();
         let started_at = Instant::now();
@@ -1030,7 +927,6 @@ impl WindowProfiler {
             .push(WindowActivity::Draw { started_at });
     }
 
-    /// Records the end of a window draw and returns the draw duration.
     pub fn end_draw(&mut self, dirty_at: Option<Instant>, invalidations: u64) -> Duration {
         let Some(WindowActivity::Draw {
             started_at: draw_start,
@@ -1057,10 +953,6 @@ impl WindowProfiler {
         draw_duration
     }
 
-    /// Records that a frame was presented.
-    ///
-    /// `next_frame_scheduled` marks the animation state for the interval ending
-    /// at the next newly drawn frame's presentation.
     pub fn record_present(
         &mut self,
         present_start: Instant,
@@ -1076,7 +968,6 @@ impl WindowProfiler {
         );
     }
 
-    /// Returns a snapshot of the current input-latency histograms.
     pub fn input_latency_snapshot(&self) -> InputLatencySnapshot {
         InputLatencySnapshot {
             latency_histogram: self.input_latency_histogram.clone(),
@@ -1085,7 +976,6 @@ impl WindowProfiler {
         }
     }
 
-    /// Returns a snapshot of the current frame-duration histograms.
     pub fn frame_duration_snapshot(&self) -> FrameDurationSnapshot {
         FrameDurationSnapshot {
             dirty_to_present_histogram: self.dirty_to_present_histogram.clone(),
@@ -1184,7 +1074,6 @@ impl Drop for WindowProfiler {
     }
 }
 
-// Allow 16MiB of frame event entries.
 #[cfg(feature = "profiler")]
 const MAX_FRAME_TIMINGS: usize = (16 * 1024 * 1024) / core::mem::size_of::<FrameEvent>();
 
@@ -1200,15 +1089,12 @@ static FRAME_TIMINGS: spin::Mutex<FrameTimings> = spin::Mutex::new(FrameTimings 
     total_pushed: 0,
 });
 
-/// Records a frame event.
-///
-/// No-op unless profiler tracing is enabled via [`set_trace_enabled`].
 #[cfg(feature = "profiler")]
 pub fn record_frame_event(event: FrameEvent) {
     if !trace_enabled() {
         return;
     }
-    std::hint::cold_path(); // optimize for when profiling is off
+    std::hint::cold_path();
 
     let mut frames = FRAME_TIMINGS.lock();
     if frames.timings.len() >= MAX_FRAME_TIMINGS {
@@ -1218,8 +1104,6 @@ pub fn record_frame_event(event: FrameEvent) {
     frames.total_pushed += 1;
 }
 
-/// Drains frame events recorded after this collector was created, tracking a
-/// cursor so each call to [`Self::collect_unseen`] returns only new entries.
 #[cfg(feature = "profiler")]
 pub struct FrameTimingCollector {
     cursor: u64,
@@ -1234,16 +1118,12 @@ impl Default for FrameTimingCollector {
 
 #[cfg(feature = "profiler")]
 impl FrameTimingCollector {
-    /// Creates a collector that only sees frame events recorded from this point on.
     pub fn new() -> Self {
         Self {
             cursor: FRAME_TIMINGS.lock().total_pushed,
         }
     }
 
-    /// Returns frame events recorded since the previous call (or since the
-    /// collector was created). If the ring buffer wrapped around since the
-    /// previous poll, the evicted entries are lost.
     pub fn collect_unseen(&mut self) -> Vec<FrameEvent> {
         let frames = FRAME_TIMINGS.lock();
         let buffer_len = frames.timings.len() as u64;

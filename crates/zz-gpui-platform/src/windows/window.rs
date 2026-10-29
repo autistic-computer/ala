@@ -64,26 +64,15 @@ pub struct WindowsWindowState {
     pub direct_manipulation: DirectManipulationHandler,
 
     pub renderer: RefCell<DirectXRenderer>,
-    /// Set when the next `draw_window` call must be treated as a forced
-    /// render. Used after a GPU device-lost recovery, where the next frame
-    /// must both re-enable drawing (via `mark_drawable`) and bypass the GPUI
-    /// view cache (which would otherwise replay stale atlas tile references
-    /// from the previous frame and panic in `DirectXAtlasTextures::texture`),
-    /// and when a forced render was requested while another draw was in
-    /// progress and had to be deferred.
     pub force_render_pending: Cell<bool>,
 
     pub click_state: ClickState,
     pub current_cursor: Cell<Option<HCURSOR>>,
-    /// Shared with [`WindowsPlatformState::cursor_visible`].
     pub cursor_visible: Arc<AtomicBool>,
     pub nc_button_pressed: Cell<Option<u32>>,
 
     pub display: Cell<WindowsDisplay>,
-    /// Flag to instruct the `VSyncProvider` thread to invalidate the directx devices
-    /// as resizing them has failed, causing us to have lost at least the render target.
     pub invalidate_devices: Arc<AtomicBool>,
-    /// Shared with [`WindowsPlatformState::draw_coordinator`] and every other window.
     pub(crate) draw_coordinator: Rc<DrawCoordinator>,
     fullscreen: Cell<Option<StyleAndBounds>>,
     initial_placement: Cell<Option<WindowOpenStatus>>,
@@ -208,7 +197,6 @@ impl WindowsWindowState {
         }
     }
 
-    // Calculate the bounds used for saving and whether the window is maximized.
     fn calculate_window_bounds(&self) -> (Bounds<Pixels>, bool) {
         let placement = unsafe {
             let mut placement = WINDOWPLACEMENT {
@@ -242,19 +230,12 @@ impl WindowsWindowState {
         }
     }
 
-    /// get the logical size of the app's drawable area.
-    ///
-    /// Currently, GPUI uses the logical size of the app to handle mouse interactions (such as
-    /// whether the mouse collides with other elements of GPUI).
     fn content_size(&self) -> Size<Pixels> {
         self.logical_size.get()
     }
 }
 
 impl WindowsWindowInner {
-    /// Whether the window is being presented: shown and not minimized. Windows
-    /// has no notification for a window fully covered by other windows, so
-    /// that case reports `Visible`.
     pub(crate) fn visibility(&self) -> WindowVisibility {
         let is_visible =
             unsafe { IsWindowVisible(self.hwnd).as_bool() && !IsIconic(self.hwnd).as_bool() };
@@ -437,8 +418,6 @@ impl WindowsWindow {
         params: WindowParams,
         creation_info: WindowCreationInfo,
     ) -> Result<Self> {
-        // Native popups are not implemented on Windows yet. Rejecting lets callers fall back to
-        // zz-gpui's in-window popovers.
         if let WindowKind::AnchoredPopup(_) = params.kind {
             return Err(popup::PopupNotSupportedError.into());
         }
@@ -463,7 +442,6 @@ impl WindowsWindow {
             if parent_window.is_invalid() {
                 None
             } else {
-                // Disable the parent window to make this dialog modal
                 unsafe {
                     EnableWindow(parent_window, false).as_bool();
                 };
@@ -560,8 +538,6 @@ impl WindowsWindow {
             )
         };
 
-        // Failure to create a `WindowsWindowState` can cause window creation to fail,
-        // so check the inner result first.
         let this = context.inner.take().transpose()?;
         let hwnd = creation_result?;
         let this = this.unwrap();
@@ -609,10 +585,7 @@ impl Drop for WindowsWindow {
     fn drop(&mut self) {
         self.0.dialog_owner.close();
         unsafe { ShowWindowAsync(self.0.hwnd, SW_HIDE).ok().log_err() };
-        // `DestroyWindow` below sends `WM_SHOWWINDOW`; without a callback the
-        // resulting visibility report has nothing to notify.
         self.0.state.callbacks.visibility_change.take();
-        // clone this `Rc` to prevent early release of the pointer
         let this = self.0.clone();
         self.0
             .executor
@@ -641,10 +614,6 @@ impl PlatformWindow for WindowsWindow {
         self.state.window_bounds()
     }
 
-    /// get the logical size of the app's drawable area.
-    ///
-    /// Currently, GPUI uses the logical size of the app to handle mouse interactions (such as
-    /// whether the mouse collides with other elements of GPUI).
     fn content_size(&self) -> Size<Pixels> {
         self.state.content_size()
     }
@@ -730,66 +699,62 @@ impl PlatformWindow for WindowsWindow {
         let dialog = crate::windows::dialog::show_dialog(
             Some(self.0.dialog_owner.clone()),
             &self.0.executor,
-            move |handle| {
-                unsafe {
-                    let mut config = TASKDIALOGCONFIG::default();
-                    config.cbSize = std::mem::size_of::<TASKDIALOGCONFIG>() as _;
-                    config.hwndParent = handle;
-                    config.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION;
-                    let title;
-                    let main_icon;
-                    match level {
-                        PromptLevel::Info => {
-                            title = windows::core::w!("Info");
-                            main_icon = TD_INFORMATION_ICON;
-                        }
-                        PromptLevel::Warning => {
-                            title = windows::core::w!("Warning");
-                            main_icon = TD_WARNING_ICON;
-                        }
-                        PromptLevel::Critical => {
-                            title = windows::core::w!("Critical");
-                            main_icon = TD_ERROR_ICON;
-                        }
-                    };
-                    config.pszWindowTitle = title;
-                    config.Anonymous1.pszMainIcon = main_icon;
-                    let instruction = HSTRING::from(msg);
-                    config.pszMainInstruction = PCWSTR::from_raw(instruction.as_ptr());
-                    let hints_encoded;
-                    if let Some(ref hints) = detail_string {
-                        hints_encoded = HSTRING::from(hints);
-                        config.pszContent = PCWSTR::from_raw(hints_encoded.as_ptr());
-                    };
-                    let mut button_id_map = Vec::with_capacity(answers.len());
-                    let mut buttons = Vec::new();
-                    let mut btn_encoded = Vec::new();
-                    for (index, btn) in answers.iter().enumerate() {
-                        let encoded = HSTRING::from(btn.label().as_ref());
-                        let button_id = match btn {
-                            PromptButton::Ok(_) => IDOK.0,
-                            PromptButton::Cancel(_) => IDCANCEL.0,
-                            // the first few low integer values are reserved for known buttons
-                            // so for simplicity we just go backwards from -1
-                            PromptButton::Other(_) => -(index as i32) - 1,
-                        };
-                        button_id_map.push(button_id);
-                        buttons.push(TASKDIALOG_BUTTON {
-                            nButtonID: button_id,
-                            pszButtonText: PCWSTR::from_raw(encoded.as_ptr()),
-                        });
-                        btn_encoded.push(encoded);
+            move |handle| unsafe {
+                let mut config = TASKDIALOGCONFIG::default();
+                config.cbSize = std::mem::size_of::<TASKDIALOGCONFIG>() as _;
+                config.hwndParent = handle;
+                config.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION;
+                let title;
+                let main_icon;
+                match level {
+                    PromptLevel::Info => {
+                        title = windows::core::w!("Info");
+                        main_icon = TD_INFORMATION_ICON;
                     }
-                    config.cButtons = buttons.len() as _;
-                    config.pButtons = buttons.as_ptr();
-
-                    config.pfCallback = Some(crate::windows::dialog::task_dialog_callback);
-                    config.lpCallbackData = button_id_map.contains(&IDCANCEL.0) as isize;
-                    let mut res = std::mem::zeroed();
-                    TaskDialogIndirect(&config, Some(&mut res), None, None)
-                        .context("unable to create task dialog")?;
-                    Ok(button_id_map.iter().position(|&button_id| button_id == res))
+                    PromptLevel::Warning => {
+                        title = windows::core::w!("Warning");
+                        main_icon = TD_WARNING_ICON;
+                    }
+                    PromptLevel::Critical => {
+                        title = windows::core::w!("Critical");
+                        main_icon = TD_ERROR_ICON;
+                    }
+                };
+                config.pszWindowTitle = title;
+                config.Anonymous1.pszMainIcon = main_icon;
+                let instruction = HSTRING::from(msg);
+                config.pszMainInstruction = PCWSTR::from_raw(instruction.as_ptr());
+                let hints_encoded;
+                if let Some(ref hints) = detail_string {
+                    hints_encoded = HSTRING::from(hints);
+                    config.pszContent = PCWSTR::from_raw(hints_encoded.as_ptr());
+                };
+                let mut button_id_map = Vec::with_capacity(answers.len());
+                let mut buttons = Vec::new();
+                let mut btn_encoded = Vec::new();
+                for (index, btn) in answers.iter().enumerate() {
+                    let encoded = HSTRING::from(btn.label().as_ref());
+                    let button_id = match btn {
+                        PromptButton::Ok(_) => IDOK.0,
+                        PromptButton::Cancel(_) => IDCANCEL.0,
+                        PromptButton::Other(_) => -(index as i32) - 1,
+                    };
+                    button_id_map.push(button_id);
+                    buttons.push(TASKDIALOG_BUTTON {
+                        nButtonID: button_id,
+                        pszButtonText: PCWSTR::from_raw(encoded.as_ptr()),
+                    });
+                    btn_encoded.push(encoded);
                 }
+                config.cButtons = buttons.len() as _;
+                config.pButtons = buttons.as_ptr();
+
+                config.pfCallback = Some(crate::windows::dialog::task_dialog_callback);
+                config.lpCallbackData = button_id_map.contains(&IDCANCEL.0) as isize;
+                let mut res = std::mem::zeroed();
+                TaskDialogIndirect(&config, Some(&mut res), None, None)
+                    .context("unable to create task dialog")?;
+                Ok(button_id_map.iter().position(|&button_id| button_id == res))
             },
         );
         self.0
@@ -819,7 +784,6 @@ impl PlatformWindow for WindowsWindow {
                 this.set_window_placement().log_err();
 
                 unsafe {
-                    // If the window is minimized, restore it.
                     if IsIconic(hwnd).as_bool() {
                         ShowWindowAsync(hwnd, SW_RESTORE).ok().log_err();
                     }
@@ -828,11 +792,6 @@ impl PlatformWindow for WindowsWindow {
                     SetFocus(Some(hwnd)).ok();
                 }
 
-                // premium ragebait by windows, this is needed because the window
-                // must have received an input event to be able to set itself to foreground
-                // so let's just simulate user input as that seems to be the most reliable way
-                // some more info: https://gist.github.com/Aetopia/1581b40f00cc0cadc93a0e8ccb65dc8c
-                // bonus: this bug also doesn't manifest if you have vs attached to the process
                 let inputs = [
                     INPUT {
                         r#type: INPUT_KEYBOARD,
@@ -857,8 +816,6 @@ impl PlatformWindow for WindowsWindow {
                 ];
                 unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
 
-                // todo(windows)
-                // crate `windows 0.56` reports true as Err
                 unsafe { SetForegroundWindow(hwnd).as_bool() };
             })
             .detach();
@@ -915,29 +872,17 @@ impl PlatformWindow for WindowsWindow {
         self.state.background_appearance.set(background_appearance);
         let hwnd = self.0.hwnd;
 
-        // using Dwm APIs for Mica, MicaAlt and (where available) Acrylic
-        // backdrops. others follow the set_window_composition_attribute
-        // approach
         match background_appearance {
             WindowBackgroundAppearance::Opaque => {
                 set_window_composition_attribute(hwnd, None, 0);
-                // DWMSBT_NONE, so leaving a backdrop appearance actually
-                // clears it
                 dwm_set_window_composition_attribute(hwnd, 1);
             }
             WindowBackgroundAppearance::Transparent => {
                 set_window_composition_attribute(hwnd, None, 2);
-                // DWMSBT_NONE
                 dwm_set_window_composition_attribute(hwnd, 1);
             }
             WindowBackgroundAppearance::Blurred => {
                 if system_backdrop_supported() {
-                    // The undocumented acrylic accent stopped blurring on the
-                    // builds that ship the documented backdrop API, so prefer
-                    // that: DWMSBT_TRANSIENTWINDOW => Acrylic. The accent is
-                    // reset so the appearance does not depend on the previous
-                    // one; per-pixel alpha comes from the composition
-                    // swapchain, not the accent.
                     set_window_composition_attribute(hwnd, None, 0);
                     dwm_set_window_composition_attribute(hwnd, 3);
                 } else {
@@ -945,11 +890,9 @@ impl PlatformWindow for WindowsWindow {
                 }
             }
             WindowBackgroundAppearance::MicaBackdrop => {
-                // DWMSBT_MAINWINDOW => MicaBase
                 dwm_set_window_composition_attribute(hwnd, 2);
             }
             WindowBackgroundAppearance::MicaAltBackdrop => {
-                // DWMSBT_TABBEDWINDOW => MicaAlt
                 dwm_set_window_composition_attribute(hwnd, 4);
             }
         }
@@ -960,9 +903,6 @@ impl PlatformWindow for WindowsWindow {
     }
 
     fn set_visible(&self, visible: bool) {
-        // SW_SHOWNA rather than SW_SHOW: it keeps the placement the hide left
-        // behind (a maximized window comes back maximized) and takes no focus,
-        // which stays `activate`'s job.
         let command = if visible { SW_SHOWNA } else { SW_HIDE };
         unsafe { ShowWindowAsync(self.0.hwnd, command).ok().log_err() };
     }
@@ -1100,7 +1040,6 @@ impl PlatformWindow for WindowsWindow {
     }
 
     fn play_system_bell(&self) {
-        // MB_OK: The sound specified as the Windows Default Beep sound.
         let _ = unsafe { MessageBeep(MB_OK) };
     }
 
@@ -1130,19 +1069,12 @@ impl PlatformWindow for WindowsWindow {
             a11y.as_mut()
                 .and_then(|a11y| a11y.adapter.update_if_active(|| tree_update))
         };
-        // The borrow must be dropped before raising events, because
-        // `events.raise()` calls `UiaRaiseAutomationPropertyChangedEvent`
-        // which may send a nested `WM_GETOBJECT` back into this window
-        // procedure, re-entering `handle_wm_getobject` which also borrows
-        // `self.state.a11y`.
         if let Some(events) = events {
             events.raise();
         }
     }
 
-    fn a11y_update_window_bounds(&self) {
-        // Windows UIA handles window bounds tracking automatically.
-    }
+    fn a11y_update_window_bounds(&self) {}
 }
 
 pub(crate) struct A11yState {
@@ -1341,7 +1273,6 @@ impl ClickState {
         }
     }
 
-    /// update self and return the needed click count
     pub fn update(&self, button: MouseButton, new_position: Point<DevicePixels>) -> usize {
         if self.button.get() == button && self.is_double_click(new_position) {
             self.current_count.update(|it| it + 1);
@@ -1357,15 +1288,12 @@ impl ClickState {
 
     pub fn system_update(&self, wparam: usize) {
         match wparam {
-            // SPI_SETDOUBLECLKWIDTH
             29 => self
                 .double_click_spatial_tolerance_width
                 .set(unsafe { GetSystemMetrics(SM_CXDOUBLECLK) }),
-            // SPI_SETDOUBLECLKHEIGHT
             30 => self
                 .double_click_spatial_tolerance_height
                 .set(unsafe { GetSystemMetrics(SM_CYDOUBLECLK) }),
-            // SPI_SETDOUBLECLICKTIME
             32 => self
                 .double_click_interval
                 .set(Duration::from_millis(unsafe { GetDoubleClickTime() } as u64)),
@@ -1534,7 +1462,7 @@ fn get_module_handle() -> HMODULE {
             windows::core::w!("ZedModule"),
             &mut h_module,
         )
-        .expect("Unable to get module handle"); // this should never fail
+        .expect("Unable to get module handle");
 
         h_module
     }
@@ -1543,9 +1471,6 @@ fn get_module_handle() -> HMODULE {
 fn register_drag_drop(window: &Rc<WindowsWindowInner>) -> Result<()> {
     let window_handle = window.hwnd;
     let handler = WindowsDragDropHandler(window.clone());
-    // The lifetime of `IDropTarget` is handled by Windows, it won't release until
-    // we call `RevokeDragDrop`.
-    // So, it's safe to drop it here.
     let drag_drop_handler: IDropTarget = handler.into();
     unsafe {
         RegisterDragDrop(window_handle, &drag_drop_handler)
@@ -1555,13 +1480,6 @@ fn register_drag_drop(window: &Rc<WindowsWindowInner>) -> Result<()> {
 }
 
 fn calculate_window_rect(bounds: Bounds<DevicePixels>, border_offset: &WindowBorderOffset) -> RECT {
-    // NOTE:
-    // The reason we're not using `AdjustWindowRectEx()` here is
-    // that the size reported by this function is incorrect.
-    // You can test it, and there are similar discussions online.
-    // See: https://stackoverflow.com/questions/12423584/how-to-set-exact-client-size-for-overlapped-window-winapi
-    //
-    // So we manually calculate these values here.
     let mut rect = RECT {
         left: bounds.left().0,
         top: bounds.top().0,
@@ -1610,26 +1528,16 @@ fn retrieve_window_placement(
         ..Default::default()
     };
     unsafe { GetWindowPlacement(hwnd, &mut placement)? };
-    // the bounds may be not inside the display
     let bounds = if display.check_given_bounds(initial_bounds) {
         initial_bounds
     } else {
         display.default_bounds()
     };
-    // `bounds` is expressed in logical pixels for `display`, so it must be converted
-    // to device pixels using that display's own scale factor. The window's current
-    // scale factor can't be used here: `CreateWindowExW` was called with
-    // `CW_USEDEFAULT`, so at this point the window may still be sitting on whichever
-    // monitor Windows picked by default, which can have a different DPI than `display`
-    // and would otherwise throw off the physical position (e.g. leaving the window
-    // partially off-screen when moved to a monitor with a different scale factor).
     let bounds = bounds.to_device_pixels(display.scale_factor());
     placement.rcNormalPosition = calculate_window_rect(bounds, border_offset);
     Ok(placement)
 }
 
-// DWMWA_SYSTEMBACKDROP_TYPE is available only on version 22621 or later
-// using SetWindowCompositionAttributeType as a fallback
 fn system_backdrop_supported() -> bool {
     let mut version = unsafe { std::mem::zeroed() };
     let status = unsafe { windows::Wdk::System::SystemServices::RtlGetVersion(&mut version) };
@@ -1702,9 +1610,6 @@ fn set_window_composition_attribute(hwnd: HWND, color: Option<Color>, state: u32
     }
 }
 
-// When the platform title bar is hidden, Windows may think that our application is meant to appear 'fullscreen'
-// and will stop the taskbar from appearing on top of our window. Prevent this.
-// https://devblogs.microsoft.com/oldnewthing/20250522-00/?p=111211
 fn set_non_rude_hwnd(hwnd: HWND, non_rude: bool) {
     if non_rude {
         unsafe { SetPropW(hwnd, w!("NonRudeHWND"), Some(HANDLE(1 as _))) }.log_err();

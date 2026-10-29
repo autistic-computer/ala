@@ -524,7 +524,6 @@ fn nanos(duration: Duration) -> u64 {
 
 #[cfg(target_os = "linux")]
 fn thread_id() -> Option<u64> {
-    // SAFETY: gettid has no arguments and does not access caller-owned memory.
     Some(unsafe { libc::gettid() } as u64)
 }
 
@@ -539,7 +538,6 @@ fn thread_cpu_time() -> Option<Duration> {
         tv_sec: 0,
         tv_nsec: 0,
     };
-    // SAFETY: clock_gettime writes to a valid timespec and is checked before reading it.
     let result = unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut time) };
     (result == 0).then(|| Duration::new(time.tv_sec as u64, time.tv_nsec as u32))
 }

@@ -1,54 +1,3 @@
-//! KeyDispatch is where GPUI deals with binding actions to key events.
-//!
-//! The key pieces to making a key binding work are to define an action,
-//! implement a method that takes that action as a type parameter,
-//! and then to register the action during render on a focused node
-//! with a keymap context:
-//!
-//! ```ignore
-//! actions!(editor,[Undo, Redo]);
-//!
-//! impl Editor {
-//!   fn undo(&mut self, _: &Undo, _window: &mut Window, _cx: &mut Context<Self>) { ... }
-//!   fn redo(&mut self, _: &Redo, _window: &mut Window, _cx: &mut Context<Self>) { ... }
-//! }
-//!
-//! impl Render for Editor {
-//!   fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-//!     div()
-//!       .track_focus(&self.focus_handle(cx))
-//!       .key_context("Editor")
-//!       .on_action(cx.listener(Editor::undo))
-//!       .on_action(cx.listener(Editor::redo))
-//!     ...
-//!    }
-//! }
-//!```
-//!
-//! The keybindings themselves are managed independently by calling cx.bind_keys().
-//! (Though mostly when developing Zed itself, you just need to add a new line to
-//!  assets/keymaps/default-{platform}.json).
-//!
-//! ```ignore
-//! cx.bind_keys([
-//!   KeyBinding::new("cmd-z", Editor::undo, Some("Editor")),
-//!   KeyBinding::new("cmd-shift-z", Editor::redo, Some("Editor")),
-//! ])
-//! ```
-//!
-//! With all of this in place, GPUI will ensure that if you have an Editor that contains
-//! the focus, hitting cmd-z will Undo.
-//!
-//! In real apps, it is a little more complicated than this, because typically you have
-//! several nested views that each register keyboard handlers. In this case action matching
-//! bubbles up from the bottom. For example in Zed, the Workspace is the top-level view, which contains Pane's, which contain Editors. If there are conflicting keybindings defined
-//! then the Editor's bindings take precedence over the Pane's bindings, which take precedence over the Workspace.
-//!
-//! In GPUI, keybindings are not limited to just single keystrokes, you can define
-//! sequences by separating the keys with a space:
-//!
-//!  KeyBinding::new("cmd-k left", pane::SplitLeft, Some("Pane"))
-
 use crate::collections::FxHashMap;
 use crate::{
     Action, ActionRegistry, App, DispatchPhase, EntityId, FocusId, KeyBinding, KeyContext, Keymap,
@@ -62,8 +11,6 @@ use std::{
     rc::Rc,
 };
 
-/// ID of a node within `DispatchTree`. Note that these are **not** stable between frames, and so a
-/// `DispatchNodeId` should only be used with the `DispatchTree` that provided it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub(crate) struct DispatchNodeId(usize);
 
@@ -341,8 +288,6 @@ impl DispatchTree {
             for DispatchActionListener { action_type, .. } in &node.action_listeners {
                 if let Err(ix) = actions.binary_search_by_key(action_type, |a| a.as_any().type_id())
                 {
-                    // Intentionally silence these errors without logging.
-                    // If an action cannot be built by default, it's not available.
                     let action = self.action_registry.build_action_type(action_type).ok();
                     if let Some(action) = action {
                         actions.insert(ix, action);
@@ -367,18 +312,11 @@ impl DispatchTree {
         false
     }
 
-    /// Returns key bindings that invoke an action on the currently focused element. Bindings are
-    /// returned in the order they were added. For display, the last binding should take precedence.
-    ///
-    /// Bindings are only included if they are the highest precedence match for their keystrokes, so
-    /// shadowed bindings are not included.
     pub fn bindings_for_action(
         &self,
         action: &dyn Action,
         context_stack: &[KeyContext],
     ) -> Vec<KeyBinding> {
-        // Ideally this would return a `DoubleEndedIterator` to avoid `highest_precedence_*`
-        // methods, but this can't be done very cleanly since keymap must be borrowed.
         let keymap = self.keymap.borrow();
         keymap
             .bindings_for_action(action)
@@ -389,8 +327,6 @@ impl DispatchTree {
             .collect()
     }
 
-    /// Returns the highest precedence binding for the given action and context stack. This is the
-    /// same as the last result of `bindings_for_action`, but more efficient than getting all bindings.
     pub fn highest_precedence_binding_for_action(
         &self,
         action: &dyn Action,
@@ -436,7 +372,6 @@ impl DispatchTree {
         (bindings, partial, context_stack)
     }
 
-    /// Find the bindings that can follow the current input sequence.
     pub fn possible_next_bindings_for_input(
         &self,
         input: &[Keystroke],
@@ -447,13 +382,6 @@ impl DispatchTree {
             .possible_next_bindings_for_input(input, context_stack)
     }
 
-    /// dispatch_key processes the keystroke
-    /// input should be set to the value of `pending` from the previous call to dispatch_key.
-    /// This returns three instructions to the input handler:
-    /// - bindings: any bindings to execute before processing this keystroke
-    /// - pending: the new set of pending keystrokes to store
-    /// - to_replay: any keystroke that had been pushed to pending, but are no-longer matched,
-    ///   these should be replayed first.
     pub fn dispatch_key(
         &mut self,
         mut input: SmallVec<[Keystroke; 1]>,
@@ -492,8 +420,6 @@ impl DispatchTree {
         result
     }
 
-    /// If the user types a matching prefix of a binding and then waits for a timeout
-    /// flush_dispatch() converts any previously pending input to replay events.
     pub fn flush_dispatch(
         &mut self,
         input: SmallVec<[Keystroke; 1]>,
@@ -508,7 +434,6 @@ impl DispatchTree {
         to_replay
     }
 
-    /// Converts the longest prefix of input to a replay event and returns the rest.
     fn replay_prefix(
         &self,
         mut input: SmallVec<[Keystroke; 1]>,
@@ -541,7 +466,7 @@ impl DispatchTree {
             dispatch_path.push(node_id);
             current_node_id = self.nodes.get(node_id.0).and_then(|node| node.parent);
         }
-        dispatch_path.reverse(); // Reverse the path so it goes from the root to the focused node.
+        dispatch_path.reverse();
         dispatch_path
     }
 
@@ -555,7 +480,7 @@ impl DispatchTree {
             }
             current_node_id = node.parent;
         }
-        focus_path.reverse(); // Reverse the path so it goes from the root to the focused node.
+        focus_path.reverse();
         focus_path
     }
 
@@ -980,26 +905,13 @@ mod tests {
         assert!(highest.is_some_and(|binding| binding.action.partial_eq(&TestAction)));
     }
 
-    /// Models the picker preview footer scenario: a picker action is bound in
-    /// `Picker > Editor`, but a base keymap binds the same chord to an editor
-    /// action in `Editor`. `Picker > Editor` and `Editor` resolve at the same
-    /// context depth, so at equal depth precedence is decided purely by load
-    /// order (later wins). Because base keymaps load after the default keymap,
-    /// the picker binding is shadowed unless it is (re)bound by an overlay that
-    /// loads after the base keymap - which is exactly what
-    /// `keymaps/specific-overrides*.json` does.
     #[test]
     fn test_overlay_after_base_restores_shadowed_picker_binding() {
-        // SecondaryTestAction stands in for the editor/base action (e.g.
-        // editor::AddSelectionBelow), TestAction for the picker action.
         let contexts = vec![
             KeyContext::parse("Picker").unwrap(),
             KeyContext::parse("Editor").unwrap(),
         ];
 
-        // Default keymap (picker binding) followed by a base keymap that binds
-        // the same chord to an editor action: the base binding wins and the
-        // picker action is shadowed, so its footer tooltip renders no shortcut.
         let shadowed = test_dispatch_tree(vec![
             KeyBinding::new("ctrl-alt-down", TestAction, Some("Picker > Editor")),
             KeyBinding::new("ctrl-alt-down", SecondaryTestAction, Some("Editor")),
@@ -1010,12 +922,9 @@ mod tests {
             "picker binding should be shadowed by the base editor binding"
         );
 
-        // Re-binding the picker action in an overlay loaded after the base keymap
-        // restores it as the resolved binding.
         let fixed = test_dispatch_tree(vec![
             KeyBinding::new("ctrl-alt-down", TestAction, Some("Picker > Editor")),
             KeyBinding::new("ctrl-alt-down", SecondaryTestAction, Some("Editor")),
-            // overlay loaded last:
             KeyBinding::new("ctrl-alt-down", TestAction, Some("Picker > Editor")),
         ]);
         let highest = fixed.highest_precedence_binding_for_action(&TestAction, &contexts);
@@ -1024,9 +933,6 @@ mod tests {
             "overlay loaded after base should restore the picker binding"
         );
 
-        // Conversely, putting the override in the default keymap (i.e. before the
-        // base keymap) does NOT help: the later base binding still wins at equal
-        // depth. This is why the overlay must be loaded after the base keymap.
         let override_before_base = test_dispatch_tree(vec![
             KeyBinding::new("ctrl-alt-down", TestAction, Some("Picker > Editor")),
             KeyBinding::new("ctrl-alt-down", TestAction, Some("Picker > Editor")),
@@ -1281,8 +1187,6 @@ mod tests {
             assert!(!window.has_pending_keystrokes());
         });
 
-        // Focus-triggered pending-input notifications are deferred to the end of the current
-        // effect cycle, so the observer callback should run after the focus update completes.
         cx.update(|_, _| {
             let count_after_focus_change = *pending_input_changed_count.borrow();
             assert!(count_after_focus_change > *count_after_pending_for_assertion.borrow());
@@ -1340,8 +1244,6 @@ mod tests {
         });
         let shift = Keystroke::parse("shift").expect("valid keystroke");
 
-        // Pressing Shift is not a keystroke. Consuming its recognized release suppresses
-        // the binding.
         cx.simulate_modifiers_change(Modifiers::shift());
         assert!(intercepted_keystrokes.borrow().is_empty());
         cx.simulate_modifiers_change(Modifiers::none());
@@ -1352,7 +1254,6 @@ mod tests {
         assert_eq!(action_count.get(), 0);
         assert!(observed_keystrokes.borrow().is_empty());
 
-        // Without consumption, the same recognized release reaches keymap dispatch.
         should_consume.set(false);
         intercepted_keystrokes.borrow_mut().clear();
         cx.simulate_modifiers_change(Modifiers::shift());
@@ -1532,7 +1433,6 @@ mod tests {
             })
         });
 
-        // Shift-F1 is the only keystroke. Releasing Shift must not emit a second one.
         cx.simulate_modifiers_change(Modifiers::shift());
         assert!(intercepted_keystrokes.borrow().is_empty());
         cx.simulate_keystrokes("shift-f1");
@@ -1569,8 +1469,6 @@ mod tests {
             })
         });
 
-        // Exercise both paths that processing Shift would take: completing `j shift`, and
-        // replaying `j` when `j k` no longer matches.
         for binding in ["j shift", "j k"] {
             cx.update(|_, cx| {
                 cx.clear_key_bindings();
@@ -1589,7 +1487,6 @@ mod tests {
                     .to_vec()
             });
 
-            // Consuming Shift must not complete or replay the pending `j`.
             cx.simulate_modifiers_change(Modifiers::shift());
             cx.simulate_modifiers_change(Modifiers::none());
             cx.update(|window, _| {
@@ -1602,7 +1499,6 @@ mod tests {
                 assert_eq!(test.text.borrow().as_str(), "");
             });
 
-            // The unchanged timeout should replay `j` after its remaining half.
             cx.executor()
                 .advance_clock(crate::PENDING_INPUT_TIMEOUT / 2);
             cx.run_until_parked();
@@ -1669,7 +1565,6 @@ mod tests {
         });
         assert_eq!(action_count.get(), 0);
 
-        // Emulate a countdown indicator re-rendering the window while waiting for the timeout.
         for _ in 0..10 {
             cx.executor()
                 .advance_clock(crate::PENDING_INPUT_TIMEOUT / 10);

@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-
 #![allow(clippy::too_many_arguments)]
 
 use crate::fallback::FontFallbackIter;
@@ -23,23 +21,10 @@ use fontdb::Style;
 use unicode_script::{Script, UnicodeScript};
 use unicode_segmentation::UnicodeSegmentation;
 
-/// The shaping strategy of some text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Shaping {
-    /// Basic shaping with no font fallback.
-    ///
-    /// This shaping strategy is very cheap, but it will not display complex
-    /// scripts properly nor try to find missing glyphs in your system fonts.
-    ///
-    /// You should use this strategy when you have complete control of the text
-    /// and the font you are displaying in your application.
     #[cfg(feature = "swash")]
     Basic,
-    /// Advanced text shaping and font fallback.
-    ///
-    /// You will need to enable this strategy if the text contains a complex
-    /// script, the font used needs it, and/or multiple fonts in your system
-    /// may be needed to display all of the glyphs.
     Advanced,
 }
 
@@ -83,28 +68,21 @@ impl Shaping {
 
 const NUM_SHAPE_PLANS_PER_FONT: usize = 6;
 
-/// A set of buffers containing allocations for shaped text.
 #[derive(Default)]
 pub struct ShapeBuffer {
     shape_plan_cache: crate::HashMap<fontdb::ID, VecDeque<harfrust::ShapePlan>>,
 
-    /// Buffer for holding unicode text.
     harfrust_buffer: Option<harfrust::UnicodeBuffer>,
 
-    /// Temporary buffers for scripts.
     scripts: Vec<Script>,
 
-    /// Buffer for shape spans.
     spans: Vec<ShapeSpan>,
 
-    /// Buffer for shape words.
     words: Vec<ShapeWord>,
 
-    /// Buffers for visual lines.
     visual_lines: Vec<VisualLine>,
     cached_visual_lines: Vec<VisualLine>,
 
-    /// Buffer for sets of layout glyphs.
     glyph_sets: Vec<Vec<LayoutGlyph>>,
 }
 
@@ -143,10 +121,6 @@ fn shape_fallback(
         harfrust::Direction::LeftToRight
     });
     if run.contains('\t') {
-        // Push string to buffer, replacing tabs with spaces
-        //TODO: Find a way to do this with minimal allocating, calling
-        // UnicodeBuffer::push_str multiple times causes issues and
-        // UnicodeBuffer::add resizes the buffer with every character
         buffer.push_str(&run.replace('\t', " "));
     } else {
         buffer.push_str(run);
@@ -159,7 +133,6 @@ fn shape_fallback(
     let attrs = attrs_list.get_span(start_run);
     let mut rb_font_features = Vec::new();
 
-    // Convert attrs::Feature to harfrust::Feature
     for feature in &attrs.font_features.features {
         rb_font_features.push(harfrust::Feature::new(
             harfrust::Tag::new(feature.tag.as_bytes()),
@@ -219,7 +192,7 @@ fn shape_fallback(
 
         glyphs.push(ShapeGlyph {
             start: start_glyph,
-            end: end_run, // Set later
+            end: end_run,
             x_advance,
             y_advance,
             x_offset,
@@ -230,7 +203,6 @@ fn shape_fallback(
             font_id: font.id(),
             font_weight: attrs.weight,
             glyph_id: info.glyph_id.try_into().expect("failed to cast glyph ID"),
-            //TODO: color should not be related to shaping
             color_opt: attrs.color_opt,
             metadata: attrs.metadata,
             cache_key_flags: override_fake_italic(attrs.cache_key_flags, font, &attrs),
@@ -238,7 +210,6 @@ fn shape_fallback(
         });
     }
 
-    // Adjust end of glyphs
     if rtl {
         for i in glyph_start + 1..glyphs.len() {
             let next_start = glyphs[i - 1].start;
@@ -263,7 +234,6 @@ fn shape_fallback(
         }
     }
 
-    // Restore the buffer to save an allocation.
     scratch.harfrust_buffer = Some(glyph_buffer.clear());
 
     missing
@@ -278,7 +248,6 @@ fn shape_run(
     end_run: usize,
     span_rtl: bool,
 ) {
-    // Re-use the previous script buffer if possible.
     let mut scripts = {
         let mut scripts = mem::take(&mut font_system.shape_buffer.scripts);
         scripts.clear();
@@ -321,7 +290,6 @@ fn shape_run(
         )
     };
 
-    //TODO: improve performance!
     while !missing.is_empty() {
         let Some(font) = font_iter.next() else {
             break;
@@ -344,13 +312,11 @@ fn shape_run(
             span_rtl,
         );
 
-        // Insert all matching glyphs
         let mut fb_i = 0;
         while fb_i < fb_glyphs.len() {
             let start = fb_glyphs[fb_i].start;
             let end = fb_glyphs[fb_i].end;
 
-            // Skip clusters that are not missing, or where the fallback font is missing
             if !missing.contains(&start) || fb_missing.contains(&start) {
                 fb_i += 1;
                 continue;
@@ -359,14 +325,12 @@ fn shape_run(
             let mut missing_i = 0;
             while missing_i < missing.len() {
                 if missing[missing_i] >= start && missing[missing_i] < end {
-                    // println!("No longer missing {}", missing[missing_i]);
                     missing.remove(missing_i);
                 } else {
                     missing_i += 1;
                 }
             }
 
-            // Find prior glyphs
             let mut i = glyph_start;
             while i < glyphs.len() {
                 if glyphs[i].start >= start && glyphs[i].end <= end {
@@ -375,11 +339,9 @@ fn shape_run(
                 i += 1;
             }
 
-            // Remove prior glyphs
             while i < glyphs.len() {
                 if glyphs[i].start >= start && glyphs[i].end <= end {
                     let _glyph = glyphs.remove(i);
-                    // log::trace!("Removed {},{} from {}", _glyph.start, _glyph.end, i);
                 } else {
                     break;
                 }
@@ -388,7 +350,6 @@ fn shape_run(
             while fb_i < fb_glyphs.len() {
                 if fb_glyphs[fb_i].start >= start && fb_glyphs[fb_i].end <= end {
                     let fb_glyph = fb_glyphs.remove(fb_i);
-                    // log::trace!("Insert {},{} from font {} at {}", fb_glyph.start, fb_glyph.end, font_i, i);
                     glyphs.insert(i, fb_glyph);
                     i += 1;
                 } else {
@@ -398,16 +359,8 @@ fn shape_run(
         }
     }
 
-    // Debug missing font fallbacks
     font_iter.check_missing(&line[start_run..end_run]);
 
-    /*
-    for glyph in glyphs.iter() {
-        log::trace!("'{}': {}, {}, {}, {}", &line[glyph.start..glyph.end], glyph.x_advance, glyph.y_advance, glyph.x_offset, glyph.y_offset);
-    }
-    */
-
-    // Restore the scripts buffer.
     font_system.shape_buffer.scripts = scripts;
 }
 
@@ -431,7 +384,6 @@ fn shape_run_cached(
     };
     for (attrs_range, attrs) in attrs_list.spans.overlapping(&run_range) {
         if attrs == &key.default_attrs {
-            // Skip if attrs matches default attrs
             continue;
         }
         let start = max(attrs_range.start, start_run).saturating_sub(start_run);
@@ -443,7 +395,6 @@ fn shape_run_cached(
     }
     if let Some(cache_glyphs) = font_system.shape_run_cache.get(&key) {
         for mut glyph in cache_glyphs.iter().cloned() {
-            // Adjust glyph start and end to match run position
             glyph.start += start_run;
             glyph.end += start_run;
             glyphs.push(glyph);
@@ -451,7 +402,6 @@ fn shape_run_cached(
         return;
     }
 
-    // Fill in cache if not already set
     let mut cache_glyphs = Vec::new();
     shape_run(
         &mut cache_glyphs,
@@ -464,7 +414,6 @@ fn shape_run_cached(
     );
     glyphs.extend_from_slice(&cache_glyphs);
     for glyph in cache_glyphs.iter_mut() {
-        // Adjust glyph start and end to remove run position
         glyph.start -= start_run;
         glyph.end -= start_run;
     }
@@ -498,8 +447,6 @@ fn shape_skip(
 
     shape_skip_glyphs(glyphs, &font, line, attrs_list, start_run, end_run);
 
-    // If any glyphs are missing and the user has specified a font,
-    // fall back to a default font (SansSerif or Monospace)
     if matches!(attrs.family, Family::Name(_))
         && glyphs[glyph_start..].iter().any(|g| g.glyph_id == 0)
     {
@@ -623,7 +570,6 @@ fn override_fake_italic(
     }
 }
 
-/// A shaped glyph
 #[derive(Clone, Debug)]
 pub struct ShapeGlyph {
     pub start: usize,
@@ -674,8 +620,6 @@ impl ShapeGlyph {
         }
     }
 
-    /// Get the width of the [`ShapeGlyph`] in pixels, either using the provided font size
-    /// or the [`ShapeGlyph::metrics_opt`] override.
     pub fn width(&self, font_size: f32) -> f32 {
         self.metrics_opt.map_or(font_size, |x| x.font_size) * self.x_advance
     }
@@ -704,7 +648,6 @@ fn decoration_metrics(font: &Font) -> (DecorationMetrics, DecorationMetrics, f32
     )
 }
 
-/// span index used in `VlRange` to indicate this range is the ellipsis.
 const ELLIPSIS_SPAN: usize = usize::MAX;
 
 fn shape_ellipsis(
@@ -721,7 +664,7 @@ fn shape_ellipsis(
     };
     let word = ShapeWord::new(
         font_system,
-        "\u{2026}", // TODO: maybe do CJK ellipsis
+        "\u{2026}",
         &attrs_list,
         0.."\u{2026}".len(),
         level,
@@ -730,7 +673,6 @@ fn shape_ellipsis(
     );
     let mut glyphs = word.glyphs;
 
-    // did we fail to shape it?
     if glyphs.is_empty() || glyphs.iter().all(|g| g.glyph_id == 0) {
         let fallback = ShapeWord::new(
             font_system,
@@ -746,7 +688,6 @@ fn shape_ellipsis(
     glyphs
 }
 
-/// A shaped word (for word wrapping)
 #[derive(Clone, Debug)]
 pub struct ShapeWord {
     pub blank: bool,
@@ -754,9 +695,6 @@ pub struct ShapeWord {
 }
 
 impl ShapeWord {
-    /// Creates an empty word.
-    ///
-    /// The returned word is in an invalid state until [`Self::build_in_buffer`] is called.
     pub(crate) fn empty() -> Self {
         Self {
             blank: true,
@@ -764,7 +702,6 @@ impl ShapeWord {
         }
     }
 
-    /// Shape a word into a set of glyphs.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         font_system: &mut FontSystem,
@@ -788,9 +725,6 @@ impl ShapeWord {
         empty
     }
 
-    /// See [`Self::new`].
-    ///
-    /// Reuses as much of the pre-existing internal allocations as possible.
     #[allow(clippy::too_many_arguments)]
     pub fn build(
         &mut self,
@@ -815,7 +749,6 @@ impl ShapeWord {
 
         let span_rtl = level.is_rtl();
 
-        // Fast path optimization: For simple ASCII words, skip expensive grapheme iteration
         let is_simple_ascii =
             word.is_ascii() && !word.chars().any(|c| c.is_ascii_control() && c != '\t');
 
@@ -837,7 +770,6 @@ impl ShapeWord {
                 span_rtl,
             );
         } else {
-            // Complex text path: Full grapheme iteration and attribute processing
             let mut start_run = word_range.start;
             let mut attrs = attrs_list.defaults();
             for (egc_i, _egc) in word.grapheme_indices(true) {
@@ -875,7 +807,6 @@ impl ShapeWord {
         self.glyphs = glyphs;
     }
 
-    /// Get the width of the [`ShapeWord`] in pixels, using the [`ShapeGlyph::width`] function.
     pub fn width(&self, font_size: f32) -> f32 {
         let mut width = 0.0;
         for glyph in &self.glyphs {
@@ -885,21 +816,14 @@ impl ShapeWord {
     }
 }
 
-/// A shaped span (for bidirectional processing)
 #[derive(Clone, Debug)]
 pub struct ShapeSpan {
     pub level: unicode_bidi::Level,
     pub words: Vec<ShapeWord>,
-    /// Decoration data per user-level attr span within this shape span.
-    /// Each entry maps a byte range to its decoration config and font metrics.
-    /// Empty when no decorations are active.
     pub decoration_spans: Vec<(Range<usize>, GlyphDecorationData)>,
 }
 
 impl ShapeSpan {
-    /// Creates an empty span.
-    ///
-    /// The returned span is in an invalid state until [`Self::build_in_buffer`] is called.
     pub(crate) fn empty() -> Self {
         Self {
             level: unicode_bidi::Level::ltr(),
@@ -908,7 +832,6 @@ impl ShapeSpan {
         }
     }
 
-    /// Shape a span into a set of words.
     pub fn new(
         font_system: &mut FontSystem,
         line: &str,
@@ -931,9 +854,6 @@ impl ShapeSpan {
         empty
     }
 
-    /// See [`Self::new`].
-    ///
-    /// Reuses as much of the pre-existing internal allocations as possible.
     pub fn build(
         &mut self,
         font_system: &mut FontSystem,
@@ -954,11 +874,9 @@ impl ShapeSpan {
 
         let mut words = mem::take(&mut self.words);
 
-        // Cache the shape words in reverse order so they can be popped for reuse in the same order.
         let mut cached_words = mem::take(&mut font_system.shape_buffer.words);
         cached_words.clear();
         if line_rtl != level.is_rtl() {
-            // Un-reverse previous words so the internal glyph counts match accurately when rewriting memory.
             cached_words.append(&mut words);
         } else {
             cached_words.extend(words.drain(..).rev());
@@ -966,14 +884,12 @@ impl ShapeSpan {
 
         let mut start_word = 0;
         for (end_lb, _) in unicode_linebreak::linebreaks(span) {
-            // Check if this break opportunity splits a likely ligature (e.g. "|>" or "!=")
             if end_lb > 0 && end_lb < span.len() {
                 let start_idx = span_range.start;
                 let pre_char = span[..end_lb].chars().last();
                 let post_char = span[end_lb..].chars().next();
 
                 if let (Some(c1), Some(c2)) = (pre_char, post_char) {
-                    // Only probe if both are punctuation (optimization for coding ligatures)
                     if c1.is_ascii_punctuation() && c2.is_ascii_punctuation() {
                         let probe_text = format!("{}{}", c1, c2);
                         let attrs = attrs_list.get_span(start_idx + end_lb);
@@ -1003,14 +919,10 @@ impl ShapeSpan {
                                 false,
                             );
 
-                            // 1. If we have fewer glyphs than chars, it's definitely a ligature (e.g. -> becoming 1 arrow).
                             if glyphs.len() < probe_text.chars().count() {
                                 continue;
                             }
 
-                            // 2. If we have the same number of glyphs, they might be contextual alternates (e.g. |> becoming 2 special glyphs).
-                            // Check if the glyphs match the standard "cmap" (character to glyph) mapping.
-                            // If they differ, the shaper substituted them, so we should keep them together.
                             #[cfg(feature = "swash")]
                             if glyphs.len() == probe_text.chars().count() {
                                 let charmap = font.as_swash().charmap();
@@ -1024,7 +936,6 @@ impl ShapeSpan {
                                 }
 
                                 if is_modified {
-                                    // Ligature/Contextual Alternate detected!
                                     continue;
                                 }
                             }
@@ -1035,10 +946,6 @@ impl ShapeSpan {
 
             let mut start_lb = end_lb;
             for (i, c) in span[start_word..end_lb].char_indices().rev() {
-                // TODO: Not all whitespace characters are linebreakable, e.g. 00A0 (No-break
-                // space)
-                // https://www.unicode.org/reports/tr14/#GL
-                // https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt
                 if c.is_whitespace() {
                     start_lb = start_word + i;
                 } else {
@@ -1060,7 +967,6 @@ impl ShapeSpan {
             }
             if start_lb < end_lb {
                 for (i, c) in span[start_lb..end_lb].char_indices() {
-                    // assert!(c.is_whitespace());
                     let mut word = cached_words.pop().unwrap_or_else(ShapeWord::empty);
                     word.build(
                         font_system,
@@ -1078,14 +984,12 @@ impl ShapeSpan {
             start_word = end_lb;
         }
 
-        // Reverse glyphs in RTL lines
         if line_rtl {
             for word in &mut words {
                 word.glyphs.reverse();
             }
         }
 
-        // Reverse words in spans that do not match line direction
         if line_rtl != level.is_rtl() {
             words.reverse();
         }
@@ -1093,13 +997,8 @@ impl ShapeSpan {
         self.level = level;
         self.words = words;
 
-        // Build decoration spans: one entry per user-level attr span that has
-        // decorations within this shape span's byte range.  Font metrics come from
-        // the primary font (first shaped glyph), following Pango convention.
         self.decoration_spans.clear();
 
-        // Early-out: skip font lookup and span iteration when no decorations exist.
-        // For plain text (the common case) this is a single bool check.
         let any_decoration = attrs_list.defaults().text_decoration.has_decoration()
             || attrs_list.spans_iter().any(|(range, attr_owned)| {
                 let start = range.start.max(span_range.start);
@@ -1108,7 +1007,6 @@ impl ShapeSpan {
             });
 
         if any_decoration {
-            // Get font metrics once from the primary glyph of this shape span
             let primary_metrics = self
                 .words
                 .iter()
@@ -1121,18 +1019,15 @@ impl ShapeSpan {
                 });
 
             if let Some((ul_metrics, st_metrics, ascent)) = primary_metrics {
-                // Track which sub-ranges of span_range are covered by explicit spans
                 let mut covered_end = span_range.start;
 
                 for (range, attr_owned) in attrs_list.spans_iter() {
-                    // Compute intersection with our shape span's byte range
                     let start = range.start.max(span_range.start);
                     let end = range.end.min(span_range.end);
                     if start >= end {
                         continue;
                     }
 
-                    // Check the gap before this span (covered by defaults)
                     if covered_end < start {
                         let default_attrs = attrs_list.defaults();
                         if default_attrs.text_decoration.has_decoration() {
@@ -1163,7 +1058,6 @@ impl ShapeSpan {
                     }
                 }
 
-                // Check trailing gap (covered by defaults)
                 if covered_end < span_range.end {
                     let default_attrs = attrs_list.defaults();
                     if default_attrs.text_decoration.has_decoration() {
@@ -1181,12 +1075,10 @@ impl ShapeSpan {
             }
         }
 
-        // Cache buffer for future reuse.
         font_system.shape_buffer.words = cached_words;
     }
 }
 
-/// A shaped line (or paragraph)
 #[derive(Clone, Debug)]
 pub struct ShapeLine {
     pub rtl: bool,
@@ -1236,15 +1128,12 @@ impl SpanWordGlyphPos {
     }
 }
 
-/// Controls whether we layout spans forward or backward.
-/// Backward layout is used to improve efficiency
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum LayoutDirection {
     Forward,
     Backward,
 }
 
-// Visual Line Ranges
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 struct VlRange {
     span: usize,
@@ -1270,8 +1159,6 @@ struct VisualLine {
     spaces: u32,
     w: f32,
     ellipsized: bool,
-    /// Byte range (start, end) of the original line text that was replaced by the ellipsis.
-    /// Only set when `ellipsized` is true.
     elided_byte_range: Option<(usize, usize)>,
 }
 
@@ -1286,9 +1173,6 @@ impl VisualLine {
 }
 
 impl ShapeLine {
-    /// Creates an empty line.
-    ///
-    /// The returned line is in an invalid state until [`Self::build_in_buffer`] is called.
     pub(crate) fn empty() -> Self {
         Self {
             rtl: false,
@@ -1298,12 +1182,6 @@ impl ShapeLine {
         }
     }
 
-    /// Shape a line into a set of spans, using a scratch buffer. If [`unicode_bidi::BidiInfo`]
-    /// detects multiple paragraphs, they will be joined.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if `line` contains multiple paragraphs that do not have matching direction
     pub fn new(
         font_system: &mut FontSystem,
         line: &str,
@@ -1316,13 +1194,6 @@ impl ShapeLine {
         empty
     }
 
-    /// See [`Self::new`].
-    ///
-    /// Reuses as much of the pre-existing internal allocations as possible.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if `line` contains multiple paragraphs that do not have matching direction
     pub fn build(
         &mut self,
         font_system: &mut FontSystem,
@@ -1331,14 +1202,10 @@ impl ShapeLine {
         shaping: Shaping,
         tab_width: u16,
     ) {
-        // Clear stale ellipsis span so it gets recomputed with the current attrs.
-        // Without this, reusing a ShapeLine from a previous text (via Cached::Unused)
-        // would keep an ellipsis shaped with the old attrs.
         self.ellipsis_span = None;
 
         let mut spans = mem::take(&mut self.spans);
 
-        // Cache the shape spans in reverse order so they can be popped for reuse in the same order.
         let mut cached_spans = mem::take(&mut font_system.shape_buffer.spans);
         cached_spans.clear();
         cached_spans.extend(spans.drain(..).rev());
@@ -1359,8 +1226,6 @@ impl ShapeLine {
             let line_range = para_info.range.clone();
             let levels = Self::adjust_levels(&unicode_bidi::Paragraph::new(&bidi, para_info));
 
-            // Find consecutive level runs. We use this to create Spans.
-            // Each span is a set of characters with equal levels.
             let mut start = line_range.start;
             let mut run_level = levels[start];
             spans.reserve(line_range.end - start + 1);
@@ -1372,7 +1237,6 @@ impl ShapeLine {
                 .skip(start + 1)
             {
                 if new_level != run_level {
-                    // End of the previous run, start of a new one.
                     let mut span = cached_spans.pop().unwrap_or_else(ShapeSpan::empty);
                     span.build(
                         font_system,
@@ -1401,13 +1265,11 @@ impl ShapeLine {
             spans.push(span);
         }
 
-        // Adjust for tabs
         let mut x = 0.0;
         for span in &mut spans {
             for word in &mut span.words {
                 for glyph in &mut word.glyphs {
                     if line.get(glyph.start..glyph.end) == Some("\t") {
-                        // Tabs are shaped as spaces, so they will always have the x_advance of a space.
                         let tab_x_advance = f32::from(tab_width) * glyph.x_advance;
                         let tab_stop = (math::floorf(x / tab_x_advance) + 1.0) * tab_x_advance;
                         glyph.x_advance = tab_stop - x;
@@ -1425,9 +1287,7 @@ impl ShapeLine {
             let attrs = if attrs_list.spans.is_empty() {
                 attrs_list.defaults()
             } else {
-                attrs_list.get_span(0) // TODO: using the attrs from the first span for
-                                       // ellipsis even if it's at the end. Which for rich text may look weird if the first
-                                       // span has a different color or size than where ellipsizing is happening
+                attrs_list.get_span(0)
             };
             let mut glyphs = shape_ellipsis(font_system, &attrs, shaping, rtl);
             if rtl {
@@ -1437,8 +1297,6 @@ impl ShapeLine {
                 blank: false,
                 glyphs,
             };
-            // The level here is a placeholder; the actual level used for BiDi reordering
-            // is set on the VlRange when the ellipsis is inserted during layout.
             let level = if rtl {
                 unicode_bidi::Level::rtl()
             } else {
@@ -1451,11 +1309,9 @@ impl ShapeLine {
             }
         });
 
-        // Return the buffer for later reuse.
         font_system.shape_buffer.spans = cached_spans;
     }
 
-    // A modified version of first part of unicode_bidi::bidi_info::visual_run
     fn adjust_levels(para: &unicode_bidi::Paragraph) -> Vec<unicode_bidi::Level> {
         use unicode_bidi::BidiClass::{B, BN, FSI, LRE, LRI, LRO, PDF, PDI, RLE, RLI, RLO, S, WS};
         let text = para.info.text;
@@ -1466,15 +1322,11 @@ impl ShapeLine {
         let line_classes = &original_classes[..];
         let line_levels = &mut levels[..];
 
-        // Reset some whitespace chars to paragraph level.
-        // <http://www.unicode.org/reports/tr9/#L1>
         let mut reset_from: Option<usize> = Some(0);
         let mut reset_to: Option<usize> = None;
         for (i, c) in text.char_indices() {
             match line_classes[i] {
-                // Ignored by X9
                 RLE | LRE | RLO | LRO | PDF | BN => {}
-                // Segment separator, Paragraph separator
                 B | S => {
                     assert_eq!(reset_to, None);
                     reset_to = Some(i + c.len_utf8());
@@ -1482,7 +1334,6 @@ impl ShapeLine {
                         reset_from = Some(i);
                     }
                 }
-                // Whitespace, isolate formatting
                 WS | FSI | LRI | RLI | PDI => {
                     if reset_from.is_none() {
                         reset_from = Some(i);
@@ -1508,7 +1359,6 @@ impl ShapeLine {
         levels
     }
 
-    // A modified version of second part of unicode_bidi::bidi_info::visual run
     fn reorder(&self, line_range: &[VlRange]) -> Vec<Range<usize>> {
         let line: Vec<unicode_bidi::Level> = line_range.iter().map(|range| range.level).collect();
         let count = line.len();
@@ -1516,9 +1366,6 @@ impl ShapeLine {
             return Vec::new();
         }
 
-        // Each VlRange is its own element for L2 reordering.
-        // Using individual elements (not grouped runs) ensures that reversal
-        // correctly reorders elements even when consecutive ranges share a level.
         let mut elements: Vec<Range<usize>> = (0..count).map(|i| i..i + 1).collect();
 
         let mut min_level = line[0];
@@ -1528,14 +1375,9 @@ impl ShapeLine {
             max_level = max(max_level, level);
         }
 
-        // Re-order the odd runs.
-        // <http://www.unicode.org/reports/tr9/#L2>
-
-        // Stop at the lowest *odd* level.
         min_level = min_level.new_lowest_ge_rtl().expect("Level error");
 
         while max_level >= min_level {
-            // Look for the start of a sequence of consecutive elements at max_level or higher.
             let mut seq_start = 0;
             while seq_start < count {
                 if line[elements[seq_start].start] < max_level {
@@ -1543,7 +1385,6 @@ impl ShapeLine {
                     continue;
                 }
 
-                // Found the start of a sequence. Now find the end.
                 let mut seq_end = seq_start + 1;
                 while seq_end < count {
                     if line[elements[seq_end].start] < max_level {
@@ -1552,7 +1393,6 @@ impl ShapeLine {
                     seq_end += 1;
                 }
 
-                // Reverse the individual elements within this sequence.
                 elements[seq_start..seq_end].reverse();
 
                 seq_start = seq_end;
@@ -1689,7 +1529,6 @@ impl ShapeLine {
     ) -> bool {
         let mut acc: f32 = 0.0;
 
-        // Remaining words in the current span
         let word_range: Range<usize> = match (direction, congruent) {
             (LayoutDirection::Forward, true) => word_idx + 1..word_count,
             (LayoutDirection::Forward, false) => 0..word_idx,
@@ -1703,7 +1542,6 @@ impl ShapeLine {
             }
         }
 
-        // Remaining spans
         let span_range: Range<usize> = match direction {
             LayoutDirection::Forward => span_index + 1..span_count,
             LayoutDirection::Backward => start_span..span_index,
@@ -1720,10 +1558,6 @@ impl ShapeLine {
         false
     }
 
-    /// This will fit as much as possible in one line
-    /// If forward is false, it will fit as much as possible from the end of the spans
-    /// it will stop when it gets to "start".
-    /// If forward is true, it will start from start and keep going to the end of the spans
     #[inline]
     fn layout_spans(
         &self,
@@ -1815,30 +1649,25 @@ impl ShapeLine {
                 };
 
                 let overflowing = {
-                    // only check this if we're ellipsizing
                     check_ellipsizing
-                        && (
-                            // if this  word doesn't fit, then we have an overflow
-                            (total_w + word_range_width + word_width > max_width)
-                                || (Self::remaining_content_exceeds(
-                                    spans,
-                                    font_size,
-                                    span_index,
-                                    word_idx,
-                                    word_count,
-                                    starting_word_index,
-                                    direction,
-                                    congruent,
-                                    start.span,
-                                    span_count,
-                                    ellipsis_w,
-                                ) && total_w + word_range_width + word_width + ellipsis_w
-                                    > max_width)
-                        )
+                        && ((total_w + word_range_width + word_width > max_width)
+                            || (Self::remaining_content_exceeds(
+                                spans,
+                                font_size,
+                                span_index,
+                                word_idx,
+                                word_count,
+                                starting_word_index,
+                                direction,
+                                congruent,
+                                start.span,
+                                span_count,
+                                ellipsis_w,
+                            ) && total_w + word_range_width + word_width + ellipsis_w
+                                > max_width))
                 };
 
                 if overflowing {
-                    // overflow detected
                     let available = (max_width - ellipsis_w).max(0.0);
 
                     let (glyph_end, glyphs_w) = Self::fit_glyphs(
@@ -1868,13 +1697,6 @@ impl ShapeLine {
                             (WordGlyphPos::ZERO, WordGlyphPos::new(word_idx, glyph_end))
                         }
                     } else {
-                        // For an incongruent span in the forward direction, the
-                        // word indices are (0..start.word).rev(). Cap the VlRange
-                        // end at start.word_glyph_pos() so it doesn't include
-                        // words beyond start.word that belong to a previous line.
-                        // For the backward direction (congruent span), the word
-                        // indices are (start.word..word_count).rev() and
-                        // span.words.len() is the correct end.
                         let range_end = if span_index == start.span && !congruent {
                             start.word_glyph_pos()
                         } else {
@@ -1891,7 +1713,6 @@ impl ShapeLine {
                         number_of_blanks,
                     );
 
-                    // don't iterate anymore since we overflowed
                     current_visual_line.ellipsized = true;
                     break 'outer;
                 }
@@ -1901,7 +1722,6 @@ impl ShapeLine {
                     number_of_blanks += 1;
                 }
 
-                // Backward-only: if we've reached the starting point, commit and stop.
                 if matches!(direction, LayoutDirection::Backward)
                     && word_idx == start.word
                     && span_index == start.span
@@ -1928,8 +1748,6 @@ impl ShapeLine {
                 }
             }
 
-            // if we get to here that means we didn't ellipsize, so either the whole span fits,
-            // or we don't really care
             total_w += word_range_width;
             let (start_pos, end_pos) = if congruent {
                 if span_index == start.span {
@@ -1974,7 +1792,6 @@ impl ShapeLine {
     ) {
         assert!(matches!(ellipsize, Ellipsize::Middle(_)));
 
-        // First check if all content fits without any ellipsis.
         {
             let mut test_line = VisualLine::default();
             self.layout_spans(
@@ -2003,7 +1820,7 @@ impl ShapeLine {
             rtl,
             Some(width / 2.0),
             Ellipsize::End(EllipsizeHeightLimit::Lines(1)),
-            0., //pass 0 for ellipsis_w
+            0.,
             LayoutDirection::Forward,
         );
         let forward_pass_overflowed = starting_line.ellipsized;
@@ -2011,7 +1828,6 @@ impl ShapeLine {
         match end_range_opt {
             Some(range) if forward_pass_overflowed => {
                 let congruent = rtl == self.spans[range.span].level.is_rtl();
-                // create a new range and do the other half
                 let mut ending_line = VisualLine::default();
                 let start = if congruent {
                     SpanWordGlyphPos {
@@ -2034,11 +1850,9 @@ impl ShapeLine {
                     rtl,
                     Some((width - starting_line.w - ellipsis_w).max(0.0)),
                     Ellipsize::Start(EllipsizeHeightLimit::Lines(1)),
-                    0., //pass 0 for ellipsis_w
+                    0.,
                     LayoutDirection::Backward,
                 );
-                // Insert the ellipsis VlRange between the two halves.
-                // Its BiDi level is determined by the adjacent ranges.
                 let ellipsis_level = self.ellipsis_level_between(
                     starting_line.ranges.last(),
                     ending_line.ranges.first(),
@@ -2053,8 +1867,6 @@ impl ShapeLine {
                 current_visual_line.spaces = starting_line.spaces + ending_line.spaces;
             }
             None if forward_pass_overflowed && width > ellipsis_w => {
-                // buffer is small enough that the forward pass didn't fit
-                // only show the ellipsis
                 current_visual_line
                     .ranges
                     .push(self.ellipsis_vlrange(if self.rtl {
@@ -2067,7 +1879,6 @@ impl ShapeLine {
                 current_visual_line.spaces = 0;
             }
             _ => {
-                // everything fit in the forward pass
                 current_visual_line.ranges = starting_line.ranges;
                 current_visual_line.w = starting_line.w;
                 current_visual_line.spaces = starting_line.spaces;
@@ -2076,7 +1887,6 @@ impl ShapeLine {
         }
     }
 
-    /// Returns the words for a given span index, handling the ellipsis sentinel.
     fn get_span_words(&self, span_index: usize) -> &[ShapeWord] {
         if span_index == ELLIPSIS_SPAN {
             &self
@@ -2122,20 +1932,17 @@ impl ShapeLine {
         if !visual_line.ellipsized {
             return None;
         }
-        // Find the position of the ellipsis VlRange
         let ellipsis_idx = visual_line
             .ranges
             .iter()
             .position(|r| r.span == ELLIPSIS_SPAN)?;
 
-        // Find the byte range of the visible content before the ellipsis
         let before_end = (0..ellipsis_idx)
             .rev()
             .find_map(|i| self.byte_range_of_vlrange(&visual_line.ranges[i]))
             .map(|(_, end)| end)
             .unwrap_or(0);
 
-        // Find the byte range of the visible content after the ellipsis
         let after_start = (ellipsis_idx + 1..visual_line.ranges.len())
             .find_map(|i| self.byte_range_of_vlrange(&visual_line.ranges[i]))
             .map(|(start, _)| start)
@@ -2144,8 +1951,6 @@ impl ShapeLine {
         Some((before_end, after_start))
     }
 
-    /// Returns the maximum byte offset across all glyphs in all non-ellipsis spans.
-    /// This effectively gives the byte length of the original shaped text.
     fn max_byte_offset(&self) -> usize {
         self.spans
             .iter()
@@ -2156,14 +1961,12 @@ impl ShapeLine {
             .unwrap_or(0)
     }
 
-    /// Returns the width of the ellipsis in the given font size.
     fn ellipsis_w(&self, font_size: f32) -> f32 {
         self.ellipsis_span
             .as_ref()
             .map_or(0.0, |s| s.words.iter().map(|w| w.width(font_size)).sum())
     }
 
-    /// Creates a `VlRange` for the ellipsis with the give`BiDi`Di level.
     fn ellipsis_vlrange(&self, level: unicode_bidi::Level) -> VlRange {
         VlRange {
             span: ELLIPSIS_SPAN,
@@ -2173,8 +1976,6 @@ impl ShapeLine {
         }
     }
 
-    /// Determines the appropriate `BiDi` level for the ellipsis based on the
-    /// adjacent ranges, following UAX#9 N1/N2 rules for neutral characters.
     fn ellipsis_level_between(
         &self,
         before: Option<&VlRange>,
@@ -2219,7 +2020,6 @@ impl ShapeLine {
                     ellipsis_w,
                     LayoutDirection::Backward,
                 );
-                // Insert ellipsis at the visual start (index 0, after backward reversal)
                 if current_visual_line.ellipsized {
                     let level =
                         self.ellipsis_level_between(None, current_visual_line.ranges.first());
@@ -2253,7 +2053,6 @@ impl ShapeLine {
                     ellipsis_w,
                     LayoutDirection::Forward,
                 );
-                // Insert ellipsis at the visual end
                 if current_visual_line.ellipsized {
                     let level =
                         self.ellipsis_level_between(current_visual_line.ranges.last(), None);
@@ -2265,8 +2064,6 @@ impl ShapeLine {
             }
         }
 
-        // Compute the byte range of ellipsized text so the ellipsis LayoutGlyph
-        // can have valid start/end indices into the original line text.
         if current_visual_line.ellipsized {
             let line_len = self.max_byte_offset();
             current_visual_line.elided_byte_range =
@@ -2286,9 +2083,6 @@ impl ShapeLine {
         match_mono_width: Option<f32>,
         hinting: Hinting,
     ) {
-        // For each visual line a list of  (span index,  and range of words in that span)
-        // Note that a BiDi visual line could have multiple spans or parts of them
-        // let mut vl_range_of_spans = Vec::with_capacity(1);
         let mut visual_lines = mem::take(&mut scratch.visual_lines);
         let mut cached_visual_lines = mem::take(&mut scratch.cached_visual_lines);
         cached_visual_lines.clear();
@@ -2297,7 +2091,6 @@ impl ShapeLine {
             l
         }));
 
-        // Cache glyph sets in reverse order so they will ideally be reused in exactly the same lines.
         let mut cached_glyph_sets = mem::take(&mut scratch.glyph_sets);
         cached_glyph_sets.clear();
         cached_glyph_sets.extend(layout_lines.drain(..).rev().map(|mut v| {
@@ -2305,10 +2098,6 @@ impl ShapeLine {
             v.glyphs
         }));
 
-        // This would keep the maximum number of spans that would fit on a visual line
-        // If one span is too large, this variable will hold the range of words inside that span
-        // that fits on a line.
-        // let mut current_visual_line: Vec<VlRange> = Vec::with_capacity(1);
         let mut current_visual_line = cached_visual_lines.pop().unwrap_or_default();
 
         if wrap == Wrap::None {
@@ -2348,7 +2137,6 @@ impl ShapeLine {
                                            width_opt: Option<f32>,
                                            ellipsize: Ellipsize|
              -> bool {
-                // If Ellipsize::End, then how many lines can we fit or how much is the available height
                 if max_line_count_opt == Some(total_line_count + 1)
                     || max_height_opt.is_some_and(|max_height| {
                         total_line_height + line_height * 2.0 > max_height
@@ -2382,33 +2170,25 @@ impl ShapeLine {
                     let mut width_before_last_blank = 0.;
                     let mut number_of_blanks: u32 = 0;
 
-                    // Create the word ranges that fits in a visual line
                     if self.rtl != span.level.is_rtl() {
-                        // incongruent directions
                         let mut fitting_start = WordGlyphPos::new(span.words.len(), 0);
                         for (i, word) in span.words.iter().enumerate().rev() {
                             let word_width = word.width(font_size);
-                            // Addition in the same order used to compute the final width, so that
-                            // relayouts with that width as the `line_width` will produce the same
-                            // wrapping results.
                             if current_visual_line.w + (word_range_width + word_width)
-                            <= width_opt.unwrap_or(f32::INFINITY)
-                            // Include one blank word over the width limit since it won't be
-                            // counted in the final width
-                            || (word.blank
-                                && (current_visual_line.w + word_range_width) <= width_opt.unwrap_or(f32::INFINITY))
+                                <= width_opt.unwrap_or(f32::INFINITY)
+                                || (word.blank
+                                    && (current_visual_line.w + word_range_width)
+                                        <= width_opt.unwrap_or(f32::INFINITY))
                             {
-                                // fits
                                 if word.blank {
                                     number_of_blanks += 1;
                                     width_before_last_blank = word_range_width;
                                 }
                                 word_range_width += word_width;
                             } else if wrap == Wrap::Glyph
-                            // Make sure that the word is able to fit on it's own line, if not, fall back to Glyph wrapping.
-                            || (wrap == Wrap::WordOrGlyph && word_width > width_opt.unwrap_or(f32::INFINITY))
+                                || (wrap == Wrap::WordOrGlyph
+                                    && word_width > width_opt.unwrap_or(f32::INFINITY))
                             {
-                                // Commit the current line so that the word starts on the next line.
                                 if word_range_width > 0.
                                     && wrap == Wrap::WordOrGlyph
                                     && word_width > width_opt.unwrap_or(f32::INFINITY)
@@ -2489,12 +2269,7 @@ impl ShapeLine {
                                     }
                                 }
                             } else {
-                                // Wrap::Word, Wrap::WordOrGlyph
-
-                                // If we had a previous range, commit that line before the next word.
                                 if word_range_width > 0. {
-                                    // Current word causing a wrap is not whitespace, so we ignore the
-                                    // previous word if it's a whitespace
                                     let trailing_blank = span
                                         .words
                                         .get(i + 1)
@@ -2522,8 +2297,6 @@ impl ShapeLine {
                                     }
                                 }
 
-                                // This fixes a bug that a long first word at the boundary of
-                                // was overflowing
                                 if !current_visual_line.ranges.is_empty() {
                                     visual_lines.push(current_visual_line);
                                     current_visual_line =
@@ -2570,28 +2343,24 @@ impl ShapeLine {
                             number_of_blanks,
                         );
                     } else {
-                        // congruent direction
                         let mut fitting_start = WordGlyphPos::ZERO;
                         for (i, word) in span.words.iter().enumerate() {
                             let word_width = word.width(font_size);
                             if current_visual_line.w + (word_range_width + word_width)
-                            <= width_opt.unwrap_or(f32::INFINITY)
-                            // Include one blank word over the width limit since it won't be
-                            // counted in the final width.
-                            || (word.blank
-                                && (current_visual_line.w + word_range_width) <= width_opt.unwrap_or(f32::INFINITY))
+                                <= width_opt.unwrap_or(f32::INFINITY)
+                                || (word.blank
+                                    && (current_visual_line.w + word_range_width)
+                                        <= width_opt.unwrap_or(f32::INFINITY))
                             {
-                                // fits
                                 if word.blank {
                                     number_of_blanks += 1;
                                     width_before_last_blank = word_range_width;
                                 }
                                 word_range_width += word_width;
                             } else if wrap == Wrap::Glyph
-                            // Make sure that the word is able to fit on it's own line, if not, fall back to Glyph wrapping.
-                            || (wrap == Wrap::WordOrGlyph && word_width > width_opt.unwrap_or(f32::INFINITY))
+                                || (wrap == Wrap::WordOrGlyph
+                                    && word_width > width_opt.unwrap_or(f32::INFINITY))
                             {
-                                // Commit the current line so that the word starts on the next line.
                                 if word_range_width > 0.
                                     && wrap == Wrap::WordOrGlyph
                                     && word_width > width_opt.unwrap_or(f32::INFINITY)
@@ -2672,12 +2441,7 @@ impl ShapeLine {
                                     }
                                 }
                             } else {
-                                // Wrap::Word, Wrap::WordOrGlyph
-
-                                // If we had a previous range, commit that line before the next word.
                                 if word_range_width > 0. {
-                                    // Current word causing a wrap is not whitespace, so we ignore the
-                                    // previous word if it's a whitespace.
                                     let trailing_blank = i > 0 && span.words[i - 1].blank;
 
                                     if trailing_blank {
@@ -2758,7 +2522,6 @@ impl ShapeLine {
             visual_lines.push(current_visual_line);
         }
 
-        // Create the LayoutLines using the ranges inside visual lines
         let align = align.unwrap_or(if self.rtl { Align::Right } else { Align::Left });
 
         let line_width = width_opt.unwrap_or_else(|| {
@@ -2806,24 +2569,8 @@ impl ShapeLine {
                 x = x.round();
             }
 
-            // TODO: Only certain `is_whitespace` chars are typically expanded but this is what is
-            // currently used to compute `visual_line.spaces`.
-            //
-            // https://www.unicode.org/reports/tr14/#Introduction
-            // > When expanding or compressing interword space according to common
-            // > typographical practice, only the spaces marked by U+0020 SPACE and U+00A0
-            // > NO-BREAK SPACE are subject to compression, and only spaces marked by U+0020
-            // > SPACE, U+00A0 NO-BREAK SPACE, and occasionally spaces marked by U+2009 THIN
-            // > SPACE are subject to expansion. All other space characters normally have
-            // > fixed width.
-            //
-            // (also some spaces aren't followed by potential linebreaks but they could
-            //  still be expanded)
-
-            // Amount of extra width added to each blank space within a line.
             let justification_expansion = if matches!(align, Align::Justified)
                 && visual_line.spaces > 0
-                // Don't justify the last line in a paragraph.
                 && index != number_of_visual_lines - 1
             {
                 (line_width - visual_line.w) / visual_line.spaces as f32
@@ -2854,10 +2601,7 @@ impl ShapeLine {
                     } else {
                         &self.spans[r.span].decoration_spans
                     };
-                    // Cursor into deco_spans — advances forward as glyphs are
-                    // emitted in byte order, giving amortized O(1) lookup.
                     let mut deco_cursor: usize = 0;
-                    // If ending_glyph is not 0 we need to include glyphs from the ending_word
                     for i in r.start.word..r.end.word + usize::from(r.end.glyph != 0) {
                         let word = &span_words[i];
                         let included_glyphs = match (i == r.start.word, i == r.end.word) {
@@ -2868,7 +2612,6 @@ impl ShapeLine {
                         };
 
                         for glyph in included_glyphs {
-                            // Use overridden font size
                             let font_size = glyph.metrics_opt.map_or(font_size, |x| x.font_size);
 
                             let match_mono_em_width = match_mono_width.map(|w| w / font_size);
@@ -2902,7 +2645,6 @@ impl ShapeLine {
                                 },
                             );
                             if let Some(match_em_width) = match_mono_em_width {
-                                // Round to nearest monospace width
                                 x_advance = ((x_advance / match_em_width).round()) * match_em_width;
                             }
                             if hinting == Hinting::Enabled {
@@ -2920,17 +2662,8 @@ impl ShapeLine {
                                 x_advance,
                                 r.level,
                             );
-                            // Fix ellipsis glyph indices: point both start and
-                            // end to the elision boundary so that hit-detection
-                            // places the cursor at the seam between visible and
-                            // elided text instead of selecting invisible content.
                             if is_ellipsis {
                                 if let Some((elided_start, elided_end)) = elided_byte_range {
-                                    // Use the boundary closest to the visible
-                                    // content that is adjacent to this ellipsis:
-                                    //   Start:  …|visible  → boundary = elided_end
-                                    //   End:    visible|…  → boundary = elided_start
-                                    //   Middle: vis|…|vis  → boundary = elided_start
                                     let boundary = if elided_start == 0 {
                                         elided_end
                                     } else {
@@ -2996,7 +2729,6 @@ impl ShapeLine {
                     );
                 }
             } else {
-                /* LTR */
                 for range in new_order {
                     process_range(
                         range,
@@ -3036,7 +2768,6 @@ impl ShapeLine {
             });
         }
 
-        // This is used to create a visual line for empty lines (e.g. lines with only a <CR>)
         if layout_lines.is_empty() {
             layout_lines.push(LayoutLine {
                 w: 0.0,
@@ -3048,7 +2779,6 @@ impl ShapeLine {
             });
         }
 
-        // Restore the buffer to the scratch set to prevent reallocations.
         scratch.visual_lines = visual_lines;
         scratch.visual_lines.append(&mut cached_visual_lines);
         scratch.cached_visual_lines = cached_visual_lines;

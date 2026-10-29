@@ -31,7 +31,6 @@ struct NodeContext {
 pub struct TaffyLayoutEngine {
     taffy: TaffyTree<NodeContext>,
     absolute_layout_bounds: FxHashMap<LayoutId, Bounds<Pixels>>,
-    /// Unrounded absolute border-box top-left per-node coordinate in device pixels.
     absolute_outer_origins: FxHashMap<LayoutId, Point<f32>>,
     computed_layouts: FxHashSet<LayoutId>,
     layout_bounds_scratch_space: Vec<LayoutId>,
@@ -75,7 +74,6 @@ impl TaffyLayoutEngine {
                 .into()
         } else {
             self.taffy
-                // This is safe because LayoutId is repr(transparent) to taffy::tree::NodeId.
                 .new_with_children(taffy_style, LayoutId::to_taffy_slice(children))
                 .expect(EXPECT_MESSAGE)
                 .into()
@@ -106,12 +104,6 @@ impl TaffyLayoutEngine {
             .into()
     }
 
-    /// Treats any `auto` dimension of the given node's style as filling `size`.
-    ///
-    /// This is applied to window roots before layout so they behave like the
-    /// root element on the web, which stretches to fill the initial containing
-    /// block (the viewport) unless given an explicit size. Explicitly styled
-    /// dimensions are preserved.
     pub fn stretch_auto_size_to_fill(
         &mut self,
         id: LayoutId,
@@ -136,23 +128,19 @@ impl TaffyLayoutEngine {
         self.taffy.set_style(id.0, style).expect(EXPECT_MESSAGE);
     }
 
-    // Used to understand performance
     #[allow(dead_code)]
     fn count_all_children(&self, parent: LayoutId) -> anyhow::Result<u32> {
         let mut count = 0;
 
         for child in self.taffy.children(parent.0)? {
-            // Count this child.
             count += 1;
 
-            // Count all of this child's children.
             count += self.count_all_children(LayoutId(child))?
         }
 
         Ok(count)
     }
 
-    // Used to understand performance
     #[allow(dead_code)]
     fn max_depth(&self, depth: u32, parent: LayoutId) -> anyhow::Result<u32> {
         println!(
@@ -169,7 +157,6 @@ impl TaffyLayoutEngine {
         Ok(depth + 1 + max_child_depth)
     }
 
-    // Used to understand performance
     #[allow(dead_code)]
     fn get_edges(&self, parent: LayoutId) -> anyhow::Result<Vec<(LayoutId, LayoutId)>> {
         let mut edges = Vec::new();
@@ -191,17 +178,6 @@ impl TaffyLayoutEngine {
         window: &mut Window,
         cx: &mut App,
     ) {
-        // Leaving this here until we have a better instrumentation approach.
-        // println!("Laying out {} children", self.count_all_children(id)?);
-        // println!("Max layout depth: {}", self.max_depth(0, id)?);
-
-        // Output the edges (branches) of the tree in Mermaid format for visualization.
-        // println!("Edges:");
-        // for (a, b) in self.get_edges(id)? {
-        //     println!("N{} --> N{}", u64::from(a), u64::from(b));
-        // }
-        //
-
         if !self.computed_layouts.insert(id) {
             let stack = &mut self.layout_bounds_scratch_space;
             stack.push(id);
@@ -278,81 +254,6 @@ impl TaffyLayoutEngine {
             .expect(EXPECT_MESSAGE);
     }
 
-    // Pixel snapping
-    //
-    // Painting primitives at non-integer pixel coordinates produces blurry
-    // output. Pixel snapping converts layout coordinates into integer
-    // device-pixel coordinates so painted edges land exactly on physical
-    // pixel boundaries.
-    //
-    // Non-integer coordinates can arise for several reasons, including:
-    //   - flex distribution, percentages, centering, and text measurement
-    //     can produce fractional element sizes and positions;
-    //   - at fractional scale factors (for example 125% or 150%), integer
-    //     logical-pixel values can map to non-integer device-pixel values.
-    //
-    // We pixel-snap by rounding in device-pixel space, after multiplying
-    // by `scale_factor`, so that snapping targets physical pixels. Bounds
-    // are divided by `scale_factor` before being returned to GPUI.
-    //
-    // Midpoints are rounded toward zero. This is a stylistic choice: a
-    // 1-logical-pixel line at 150% scale should render as 1 dp rather than
-    // 2 dp.
-    //
-    // Pixel snapping is done in two phases:
-    //
-    //  1. Pre-layout metric snapping. Before Taffy computes layout, all
-    //     authored absolute lengths are rounded in `to_taffy`. This
-    //     includes borders, padding, gaps, and explicit sizes.
-    //     Custom-measured leaf nodes have their measured sizes rounded up
-    //     to integer device-pixel lengths.
-    //
-    //  2. Post-layout edge snapping. After Taffy resolves the tree, layout
-    //     relationships such as flex shares, grid tracks, percentages, and
-    //     centering can produce new fractional edge positions. Boxes now
-    //     have edges in absolute coordinates, and snapping must decide
-    //     where those edges land on the device-pixel grid.
-    //
-    // Ideally, post-layout snapping would satisfy:
-    //
-    //  - Edge closure. Two raw layout edges at the same absolute position
-    //    should snap to the same pixel column.
-    //  - Translation stability. A component's internal geometry should not
-    //    change when it moves to a new absolute position.
-    //
-    // These goals are in tension because rounding is not associative.
-    // The simple local schemes make different tradeoffs:
-    //
-    //  - Absolute edge rounding gives each window coordinate one answer,
-    //    so coincident edges always close globally. But a span's snapped
-    //    length is `round(far) - round(near)`, which may change by 1 dp
-    //    as its absolute origin moves.
-    //
-    //  - Parent-relative edge rounding rounds each child inside its
-    //    parent's coordinate space. This guarantees translation stability,
-    //    but a shared edge reached through different parents can
-    //    accumulate different rounding, causing non-closure between
-    //    cousins.
-    //
-    //  - Length rounding rounds each width, height, and thickness
-    //    independently and then places boxes from those rounded lengths.
-    //    Sizes stay stable under translation, but neighboring boxes derive
-    //    their shared boundary from different sources, so closure is not
-    //    guaranteed.
-    //
-    // We apply absolute edge rounding for each element's outer box in
-    // post-layout rounding to preserve closure. Border and padding widths
-    // are not touched by post-layout rounding; they keep their pre-layout
-    // rounded value so that they remain stable under translation.
-    //
-    // This gives both closure and translation stability in the case that
-    // all local metrics are integer device-pixel lengths. Pre-layout
-    // rounding covers that in most cases. The exception is metrics
-    // resolved by layout relationships, such as percentages. Outer box
-    // edges will still close globally, and painted border widths are still
-    // snapped independently, but the raw content-box origin can carry a
-    // 1dp residual into descendants.
-
     pub fn layout_bounds(&mut self, id: LayoutId, scale_factor: f32) -> Bounds<Pixels> {
         if let Some(layout) = self.absolute_layout_bounds.get(&id).cloned() {
             return layout;
@@ -390,14 +291,12 @@ impl TaffyLayoutEngine {
     }
 }
 
-/// A unique identifier for a layout node, generated when requesting a layout from Taffy
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(transparent)]
 pub struct LayoutId(NodeId);
 
 impl LayoutId {
     fn to_taffy_slice(node_ids: &[Self]) -> &[taffy::NodeId] {
-        // SAFETY: LayoutId is repr(transparent) to taffy::tree::NodeId.
         unsafe { std::mem::transmute::<&[LayoutId], &[taffy::NodeId]>(node_ids) }
     }
 }
@@ -463,29 +362,24 @@ impl ToTaffy<taffy::style::Style> for Style {
         fn to_grid_repeat<T: taffy::style::CheapCloneStr>(
             unit: &Option<GridTemplate>,
         ) -> Vec<taffy::GridTemplateComponent<T>> {
-            unit.map(|template| {
-                match template.min_size {
-                    // grid-template-*: repeat(<number>, minmax(0, 1fr));
-                    crate::GridTemplateMinSize::Zero => {
-                        vec![repeat(
-                            template.repeat,
-                            vec![minmax(length(0.0_f32), fr(1.0_f32))],
-                        )]
-                    }
-                    // grid-template-*: repeat(<number>, minmax(min-content, 1fr));
-                    crate::GridTemplateMinSize::MinContent => {
-                        vec![repeat(
-                            template.repeat,
-                            vec![minmax(min_content(), fr(1.0_f32))],
-                        )]
-                    }
-                    // grid-template-*: repeat(<number>, minmax(0, max-content))
-                    crate::GridTemplateMinSize::MaxContent => {
-                        vec![repeat(
-                            template.repeat,
-                            vec![minmax(length(0.0_f32), max_content())],
-                        )]
-                    }
+            unit.map(|template| match template.min_size {
+                crate::GridTemplateMinSize::Zero => {
+                    vec![repeat(
+                        template.repeat,
+                        vec![minmax(length(0.0_f32), fr(1.0_f32))],
+                    )]
+                }
+                crate::GridTemplateMinSize::MinContent => {
+                    vec![repeat(
+                        template.repeat,
+                        vec![minmax(min_content(), fr(1.0_f32))],
+                    )]
+                }
+                crate::GridTemplateMinSize::MaxContent => {
+                    vec![repeat(
+                        template.repeat,
+                        vec![minmax(length(0.0_f32), max_content())],
+                    )]
                 }
             })
             .unwrap_or_default()
@@ -684,32 +578,15 @@ where
     }
 }
 
-/// The space available for an element to be laid out in
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
 pub enum AvailableSpace {
-    /// The amount of space available is the specified number of pixels
     Definite(Pixels),
-    /// The amount of space available is indefinite and the node should be laid out under a min-content constraint
     #[default]
     MinContent,
-    /// The amount of space available is indefinite and the node should be laid out under a max-content constraint
     MaxContent,
 }
 
 impl AvailableSpace {
-    /// Returns a `Size` with both width and height set to `AvailableSpace::MinContent`.
-    ///
-    /// This function is useful when you want to create a `Size` with the minimum content constraints
-    /// for both dimensions.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use zz_gpui::AvailableSpace;
-    /// let min_content_size = AvailableSpace::min_size();
-    /// assert_eq!(min_content_size.width, AvailableSpace::MinContent);
-    /// assert_eq!(min_content_size.height, AvailableSpace::MinContent);
-    /// ```
     pub const fn min_size() -> Size<Self> {
         Size {
             width: Self::MinContent,

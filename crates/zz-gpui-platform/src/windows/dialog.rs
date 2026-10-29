@@ -49,8 +49,6 @@ impl DialogOwner {
     }
 
     pub(crate) async fn when_idle(&self) {
-        // After close(), queued requests cannot start a native dialog. Only the
-        // active dialog can still use the HWND, and it holds this lock until exit.
         let _guard = self.serialization.lock().await;
     }
 }
@@ -78,10 +76,6 @@ impl Cancellation {
     }
 }
 
-/// Native modal loops may synchronously message their owner, so the foreground
-/// thread must keep pumping messages rather than waiting for the dialog thread.
-/// Holding the owner's lock through native completion also allows window
-/// destruction to wait for the dialog without blocking the foreground thread.
 pub(crate) fn show_dialog<T: Send + 'static>(
     owner: Option<Rc<DialogOwner>>,
     executor: &ForegroundExecutor,
@@ -96,8 +90,6 @@ pub(crate) fn show_dialog<T: Send + 'static>(
     let hwnd = owner.as_ref().map(|owner| SafeHwnd::from(owner.hwnd));
     executor
         .spawn(async move {
-            // Let Windows manage enabling and activating the owner. Overlapping
-            // modal loops could otherwise re-enable it while another dialog is open.
             let serialization = if let Some(owner) = owner.as_ref() {
                 match select(owner.serialization.lock(), sender.cancellation()).await {
                     Either::Left((guard, _)) => Some(guard),
@@ -142,8 +134,6 @@ pub(crate) fn show_dialog<T: Send + 'static>(
                     result_receiver.await
                 }
             };
-            // Neither launch another dialog nor destroy the owner until the
-            // native loop exits, even if the caller no longer wants its result.
             drop(serialization);
             sender
                 .send(result.unwrap_or_else(|error| Err(error.into())))
@@ -218,8 +208,6 @@ pub(crate) unsafe extern "system" fn task_dialog_callback(
     _: LPARAM,
     has_cancel_button: isize,
 ) -> HRESULT {
-    // WM_CLOSE requires TDF_ALLOW_DIALOG_CANCELLATION, which also enables Esc/X.
-    // Only allow those user gestures when the prompt offered a Cancel button.
     if notification == TDN_BUTTON_CLICKED
         && button.0 == IDCANCEL.0 as usize
         && has_cancel_button == 0
@@ -232,8 +220,6 @@ pub(crate) unsafe extern "system" fn task_dialog_callback(
 }
 
 unsafe extern "system" fn close_dialog(hwnd: HWND, _: LPARAM) -> BOOL {
-    // Shell dialogs can open further modal dialogs. Close only dialog windows
-    // on this dedicated thread, not hidden COM infrastructure windows.
     let mut class_name = [0u16; 32];
     let length = unsafe { GetClassNameW(hwnd, &mut class_name) } as usize;
     let dialog_class = w!("#32770");

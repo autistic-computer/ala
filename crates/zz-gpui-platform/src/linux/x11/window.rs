@@ -235,9 +235,6 @@ struct RawWindow {
     visual_id: u32,
 }
 
-// Safety: The raw pointers in RawWindow point to X11 connection
-// which is valid for the window's lifetime. These are used only for
-// passing to wgpu which needs Send+Sync for surface creation.
 unsafe impl Send for RawWindow {}
 unsafe impl Sync for RawWindow {}
 
@@ -278,13 +275,8 @@ pub struct X11WindowState {
     maximized_vertical: bool,
     maximized_horizontal: bool,
     hidden: bool,
-    /// Whether the client wants the window mapped. `hidden` above is the WM's
-    /// minimized state; this is ours, and a withdrawn window carries no
-    /// `_NET_WM_STATE` to read it back from.
     mapped: bool,
     active: bool,
-    /// Owned by the client's `WindowRef`, which combines the mapped state with
-    /// `VisibilityNotify`; this is the last value it reported.
     visibility: WindowVisibility,
     hovered: bool,
     pub(crate) force_render_after_recovery: bool,
@@ -398,11 +390,6 @@ where
         .with_context(failure_context)
 }
 
-/// Sets or clears the ICCCM WM_HINTS urgency flag, preserving the other hints.
-///
-/// Clearing when the flag isn't set is skipped: writing it back would create a
-/// WM_HINTS property on windows that never requested attention, and would add an
-/// X round trip to every window state change.
 fn set_wm_hints_urgency(xcb: &XCBConnection, x_window: xproto::Window, urgent: bool) {
     let mut hints = WmHints::new();
     match WmHints::get(xcb, x_window) {
@@ -431,7 +418,6 @@ fn set_wm_hints_urgency(xcb: &XCBConnection, x_window: xproto::Window, urgent: b
     xcb_flush(xcb);
 }
 
-/// Convert X11 connection errors to `anyhow::Error` and panic for unrecoverable errors.
 pub(crate) fn handle_connection_error(err: ConnectionError) -> anyhow::Error {
     match err {
         ConnectionError::UnknownError => anyhow!("X11 connection: Unknown error"),
@@ -470,8 +456,6 @@ impl X11WindowState {
         supports_xinput_gestures: bool,
         is_bgr: bool,
     ) -> anyhow::Result<Self> {
-        // Native popups are not implemented on X11 yet. Rejecting lets callers fall back to
-        // zz-gpui's in-window popovers.
         if let WindowKind::AnchoredPopup(_) = params.kind {
             return Err(PopupNotSupportedError.into());
         }
@@ -504,7 +488,6 @@ impl X11WindowState {
         };
 
         let win_aux = xproto::CreateWindowAux::new()
-            // https://stackoverflow.com/questions/43218127/x11-xlib-xcb-creating-a-window-requires-border-pixel-if-specifying-colormap-wh
             .border_pixel(visual_set.black_pixel)
             .colormap(colormap)
             .override_redirect((params.kind == WindowKind::PopUp) as u32)
@@ -557,7 +540,6 @@ impl X11WindowState {
             ),
         )?;
 
-        // Collect errors during setup, so that window can be destroyed on failure.
         let setup_result = maybe!({
             let pid = std::process::id();
             check_reply(
@@ -574,9 +556,6 @@ impl X11WindowState {
             let reply = get_reply(|| "X11 GetGeometry failed.", xcb.get_geometry(x_window))?;
             if reply.x == 0 && reply.y == 0 {
                 bounds.origin.x.0 += 2;
-                // Work around a bug where our rendered content appears
-                // outside the window bounds when opened at the default position
-                // (14px, 49px on X + Gnome + Ubuntu 22).
                 let x = bounds.origin.x.0;
                 let y = bounds.origin.y.0;
                 check_reply(
@@ -624,10 +603,6 @@ impl X11WindowState {
 
             if params.kind == WindowKind::Floating || params.kind == WindowKind::Dialog {
                 if let Some(parent_window) = parent_window.as_ref().map(|w| w.x_window) {
-                    // WM_TRANSIENT_FOR hint indicating the main application window. For floating windows, we set
-                    // a parent window (WM_TRANSIENT_FOR) such that the window manager knows where to
-                    // place the floating window in relation to the main window.
-                    // https://specifications.freedesktop.org/wm-spec/1.4/ar01s05.html
                     check_reply(
                         || "X11 ChangeProperty32 setting WM_TRANSIENT_FOR for floating window failed.",
                         xcb.change_property32(
@@ -652,8 +627,6 @@ impl X11WindowState {
             };
 
             if params.kind == WindowKind::Dialog {
-                // _NET_WM_WINDOW_TYPE_DIALOG indicates that this is a dialog (floating) window
-                // https://specifications.freedesktop.org/wm-spec/1.4/ar01s05.html
                 check_reply(
                     || "X11 ChangeProperty32 setting window type for dialog window failed.",
                     xcb.change_property32(
@@ -665,9 +638,6 @@ impl X11WindowState {
                     ),
                 )?;
 
-                // We set the modal state for dialog windows, so that the window manager
-                // can handle it appropriately (e.g., prevent interaction with the parent window
-                // while the dialog is open).
                 check_reply(
                     || "X11 ChangeProperty32 setting modal state for dialog window failed.",
                     xcb.change_property32(
@@ -718,9 +688,6 @@ impl X11WindowState {
                 | xinput::XIEventMask::ENTER
                 | xinput::XIEventMask::LEAVE;
             if supports_xinput_gestures {
-                // x11rb 0.13 doesn't define XIEventMask constants for gesture
-                // events, so we construct them from the event opcodes (each
-                // XInput event type N maps to mask bit N).
                 xi_event_mask |=
                     xinput::XIEventMask::from(1u32 << xinput::GESTURE_PINCH_BEGIN_EVENT)
                         | xinput::XIEventMask::from(1u32 << xinput::GESTURE_PINCH_UPDATE_EVENT)
@@ -762,13 +729,7 @@ impl X11WindowState {
                     visual_id: visual.id,
                 };
                 let config = WgpuSurfaceConfig {
-                    // Note: this has to be done after the GPU init, or otherwise
-                    // the sizes are immediately invalidated.
                     size: query_render_extent(xcb, x_window)?,
-                    // We set it to transparent by default, even if we have client-side
-                    // decorations, since those seem to work on X11 even without `true` here.
-                    // If the window appearance changes, then the renderer will get updated
-                    // too
                     transparent: false,
                     preferred_present_mode: None,
                 };
@@ -777,8 +738,6 @@ impl X11WindowState {
 
             renderer.set_subpixel_layout(is_bgr);
 
-            // Set max window size hints based on the GPU's maximum texture dimension.
-            // This prevents the window from being resized larger than what the GPU can render.
             let max_texture_size = renderer.max_texture_size();
             let mut size_hints = WmSizeHints::new();
             if let Some(size) = params.window_min_size {
@@ -797,7 +756,6 @@ impl X11WindowState {
             )?;
 
             if let Some(image) = params.icon {
-                // https://specifications.freedesktop.org/wm-spec/1.4/ar01s05.html#id-1.6.13
                 let property_size = 2 + (image.width() * image.height()) as usize;
                 let mut property_data: Vec<u32> = Vec::with_capacity(property_size);
                 property_data.push(image.width());
@@ -836,7 +794,6 @@ impl X11WindowState {
                 atoms: *atoms,
                 input_handler: None,
                 active: false,
-                // The window is not mapped until the client sees `MapNotify`.
                 visibility: WindowVisibility::Hidden,
                 hovered: false,
                 force_render_after_recovery: false,
@@ -917,8 +874,6 @@ impl Drop for X11Window {
 }
 
 enum WmHintPropertyState {
-    // Remove = 0,
-    // Add = 1,
     Toggle = 2,
 }
 
@@ -1030,13 +985,7 @@ impl X11Window {
             32,
             self.0.x_window,
             state.atoms._NET_WM_MOVERESIZE,
-            [
-                pointer.root_x as u32,
-                pointer.root_y as u32,
-                flag,
-                0, // Left mouse button
-                0,
-            ],
+            [pointer.root_x as u32, pointer.root_y as u32, flag, 0, 0],
         );
         check_reply(
             || "X11 SendEvent to move/resize window failed.",
@@ -1146,8 +1095,6 @@ impl X11WindowStatePtr {
             }
         }
 
-        // The urgency hint has no withdrawal signal of its own; ICCCM leaves that to
-        // the client, and focus is the conventional means for the user to zero it.
         if state.active && !was_active {
             set_wm_hints_urgency(&self.xcb, self.x_window, false);
         }
@@ -1189,8 +1136,6 @@ impl X11WindowStatePtr {
     pub fn refresh(&self, mut request_frame_options: RequestFrameOptions) {
         let callback = self.callbacks.borrow_mut().request_frame.take();
         if let Some(mut fun) = callback {
-            // Expose events can present a frame before the refresh timer runs,
-            // so every frame request must rebuild stale atlas references after recovery.
             request_frame_options.force_render |=
                 std::mem::take(&mut self.state.borrow_mut().force_render_after_recovery);
             fun(request_frame_options);
@@ -1211,7 +1156,6 @@ impl X11WindowStatePtr {
             }
         }
         if let PlatformInput::KeyDown(event) = input {
-            // only allow shift modifier when inserting text
             if event.keystroke.modifiers.is_subset_of(&Modifiers::shift()) {
                 let mut state = self.state.borrow_mut();
                 if let Some(mut input_handler) = state.input_handler.take() {
@@ -1303,8 +1247,6 @@ impl X11WindowStatePtr {
             let is_resize = bounds.size.width != state.bounds.size.width
                 || bounds.size.height != state.bounds.size.height;
 
-            // If it's a resize event (only width/height changed), we ignore `bounds.origin`
-            // because it contains wrong values.
             if is_resize {
                 state.bounds.size = bounds.size;
             } else {
@@ -1396,7 +1338,6 @@ impl PlatformWindow for X11Window {
     fn is_maximized(&self) -> bool {
         let state = self.0.state.borrow();
 
-        // A maximized window that gets minimized will still retain its maximized state.
         !state.hidden && state.maximized_vertical && state.maximized_horizontal
     }
 
@@ -1434,9 +1375,6 @@ impl PlatformWindow for X11Window {
     }
 
     fn content_size(&self) -> Size<Pixels> {
-        // After the wgpu migration, X11WindowState::content_size() returns logical pixels
-        // (bounds.size is already divided by scale_factor in set_bounds), so no further
-        // division is needed here. This matches the Wayland implementation.
         self.0.state.borrow().content_size()
     }
 
@@ -1600,9 +1538,9 @@ impl PlatformWindow for X11Window {
 
     fn set_app_id(&mut self, app_id: &str) {
         let mut data = Vec::with_capacity(app_id.len() * 2 + 2);
-        data.extend(app_id.bytes()); // instance https://unix.stackexchange.com/a/494170
+        data.extend(app_id.bytes());
         data.push(b'\0');
-        data.extend(app_id.bytes()); // class
+        data.extend(app_id.bytes());
         data.push(b'\0');
 
         check_reply(
@@ -1688,9 +1626,6 @@ impl PlatformWindow for X11Window {
             }
             state.mapped = visible;
         }
-        // Unmapping withdraws the window; the WM re-runs its normal map flow
-        // on the way back, which is exactly the ICCCM way to hide without
-        // closing. The client pauses the refresh loop on UnmapNotify.
         if visible {
             check_reply(
                 || "X11 MapWindow failed.",
@@ -1871,7 +1806,6 @@ impl PlatformWindow for X11Window {
     fn window_decorations(&self) -> zz_gpui::Decorations {
         let state = self.0.state.borrow();
 
-        // Client window decorations require compositor support
         if !state.client_side_decorations_supported {
             return Decorations::Server;
         }
@@ -1884,7 +1818,6 @@ impl PlatformWindow for X11Window {
                 } else if let Some(edge_constraints) = &state.edge_constraints {
                     edge_constraints.to_tiling()
                 } else {
-                    // https://source.chromium.org/chromium/chromium/src/+/main:ui/ozone/platform/x11/x11_window.cc;l=2519;drc=1f14cc876cc5bf899d13284a12c451498219bb2d
                     Tiling {
                         top: state.maximized_vertical,
                         bottom: state.maximized_vertical,
@@ -1956,7 +1889,6 @@ impl PlatformWindow for X11Window {
             decorations = zz_gpui::WindowDecorations::Server;
         }
 
-        // https://github.com/rust-windowing/winit/blob/master/src/platform_impl/linux/x11/util/hint.rs#L53-L87
         let hints_data: [u32; 5] = match decorations {
             WindowDecorations::Server => [1 << 1, 0, 1, 0, 0],
             WindowDecorations::Client => [1 << 1, 0, 0, 0, 0],
@@ -2016,7 +1948,6 @@ impl PlatformWindow for X11Window {
     }
 
     fn play_system_bell(&self) {
-        // Volume 0% means don't increase or decrease from system volume
         let _ = self.0.xcb.bell(0);
     }
 

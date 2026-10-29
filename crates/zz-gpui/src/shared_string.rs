@@ -8,9 +8,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
-/// A shared string is an immutable string that can be cheaply cloned in GPUI
-/// tasks. Essentially an abstraction over an `Arc<str>` and `&'static str`,
-/// currently backed by a [`SmolStr`].
 #[derive(Eq, PartialEq, PartialOrd, Ord, Hash, Clone)]
 pub struct SharedString(SmolStr);
 
@@ -23,17 +20,14 @@ impl std::ops::Deref for SharedString {
 }
 
 impl SharedString {
-    /// Creates a static [`SharedString`] from a `&'static str`.
     pub const fn new_static(str: &'static str) -> Self {
         Self(SmolStr::new_static(str))
     }
 
-    /// Creates a [`SharedString`].
     pub fn new(str: impl AsRef<str>) -> Self {
         SharedString(SmolStr::new(str))
     }
 
-    /// Get a &str from the underlying string.
     pub fn as_str(&self) -> &str {
         &self.0
     }

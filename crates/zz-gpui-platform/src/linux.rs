@@ -26,7 +26,6 @@ pub(crate) use x11::*;
 
 use std::rc::Rc;
 
-/// Returns the default platform implementation for the current OS.
 pub fn current_platform(headless: bool) -> Rc<dyn zz_gpui::Platform> {
     #[cfg(feature = "x11")]
     use anyhow::Context as _;

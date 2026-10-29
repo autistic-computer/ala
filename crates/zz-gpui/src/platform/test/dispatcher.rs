@@ -9,10 +9,6 @@ use std::{
     time::Duration,
 };
 
-/// TestDispatcher provides deterministic async execution for tests.
-///
-/// This implementation delegates task scheduling to the scheduler crate's `TestScheduler`.
-/// Access the scheduler directly via `scheduler()` for clock, rng, and parking control.
 #[doc(hidden)]
 pub struct TestDispatcher {
     session_id: SessionId,
@@ -85,13 +81,10 @@ impl TestDispatcher {
         self.scheduler.forbid_parking();
     }
 
-    /// Override the value returned by `BackgroundExecutor::num_cpus()` in tests.
-    /// A value of 0 means no override (the default of 4 is used).
     pub fn set_num_cpus(&self, count: usize) {
         self.num_cpus_override.store(count, Ordering::SeqCst);
     }
 
-    /// Returns the overridden CPU count, or `None` if no override is set.
     pub fn num_cpus_override(&self) -> Option<usize> {
         match self.num_cpus_override.load(Ordering::SeqCst) {
             0 => None,

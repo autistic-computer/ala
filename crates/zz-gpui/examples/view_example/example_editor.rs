@@ -1,12 +1,3 @@
-//! `Editor` — the workhorse entity. It owns the cursor, blink, focus, keyboard
-//! handling, and the specialized text-shaping renderer. The *text itself* lives
-//! in a shared `Entity<String>` it's handed at construction, so the value is
-//! readable/writable from outside while the editing machinery stays in here.
-//!
-//! This is the piece that proves the point: a text input is genuinely
-//! complicated, and `View` lets all of that complexity live in one entity that
-//! anything can embed.
-
 use std::ops::Range;
 use std::time::Duration;
 
@@ -29,14 +20,11 @@ pub struct Editor {
 }
 
 impl Editor {
-    /// An editor that owns its own string internally, seeded with `text`.
-    /// Nothing to allocate or wire up at the call site.
     pub fn new(text: impl Into<String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let value = cx.new(|_| text.into());
         Self::over(value, window, cx)
     }
 
-    /// An editor over a string *you* own, so the value is shared in and out.
     pub fn over(value: Entity<String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let focus_handle = cx.focus_handle();
 
@@ -47,11 +35,6 @@ impl Editor {
             this.stop_blink(cx);
         });
 
-        // The value is shared: anything can write it while we hold a cursor into
-        // it. Observe it so external writes (a) clamp the cursor back onto a char
-        // boundary before the next IME round-trip can slice out of bounds, and
-        // (b) notify us, so an `editor.cached(..)` subtree re-renders — the cache
-        // is keyed on *our* notify, not the value's.
         let value_sub = cx.observe(&value, |this, value, cx| {
             let content = value.read(cx);
             let mut cursor = this.cursor.min(content.len());
@@ -72,7 +55,6 @@ impl Editor {
         }
     }
 
-    /// The current text. Read this from anywhere to get the value out.
     pub fn text(&self, cx: &App) -> String {
         self.value.read(cx).clone()
     }
@@ -335,10 +317,6 @@ impl zz_gpui::Render for Editor {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// EditorText — the specialized renderer: shapes the text and paints the cursor.
-// ---------------------------------------------------------------------------
 
 struct EditorText {
     editor: Entity<Editor>,

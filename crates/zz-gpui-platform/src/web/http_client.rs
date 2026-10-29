@@ -26,15 +26,11 @@ pub struct FetchHttpClient {
     credentials: FetchCredentials,
 }
 
-/// Controls whether browser Fetch requests include credentials.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum FetchCredentials {
-    /// Never send credentials in the request or include credentials in the response.
     Omit,
-    /// Only send and include credentials for same-origin requests. This is the default.
     #[default]
     SameOrigin,
-    /// Always include credentials, even for cross-origin requests.
     Include,
 }
 
@@ -160,8 +156,6 @@ async fn fetch(
     let status = web_response.status();
     let mut builder = zz_gpui::http_client::http::Response::builder().status(status);
 
-    // `Headers` is a JS iterable yielding `[name, value]` pairs.
-    // `js_sys::Array::from` calls `Array.from()` which accepts any iterable.
     let header_pairs = js_sys::Array::from(&web_response.headers());
     for index in 0..header_pairs.length() {
         match header_pairs.get(index).dyn_into::<js_sys::Array>() {
@@ -198,8 +192,6 @@ async fn fetch(
     builder.body(body).map_err(|error| anyhow!(error))
 }
 
-// Request bodies are buffered into memory because streaming uploads require
-// half-duplex Fetch support that browsers largely don't ship yet.
 async fn read_body_to_bytes(mut body: AsyncBody) -> anyhow::Result<Option<Vec<u8>>> {
     let mut buffer = Vec::new();
     body.read_to_end(&mut buffer).await?;
@@ -214,8 +206,6 @@ const RESPONSE_BODY_CHANNEL_CAPACITY: usize = 8;
 
 struct ReadableStreamBody {
     chunks: futures::stream::IntoAsyncRead<mpsc::Receiver<io::Result<Vec<u8>>>>,
-    // Dropping this sender resolves the pump's cancellation future, which
-    // cancels the browser-side `ReadableStream`.
     _cancellation: oneshot::Sender<()>,
 }
 
@@ -286,8 +276,6 @@ async fn pump_response_body(
 }
 
 fn response_chunk(result: JsValue) -> io::Result<Option<Vec<u8>>> {
-    // `ReadableStreamReadResult` is a dictionary type, so there is no runtime
-    // class to check against; `unchecked_into` is the only available cast.
     let result: web_sys::ReadableStreamReadResult = result.unchecked_into();
     if result.get_done().unwrap_or(false) {
         return Ok(None);

@@ -1,29 +1,23 @@
-//! This code was generated using Zed Agent with Claude Opus 4.
-
-// gate on rust-analyzer so rust-analyzer never needs to expand this macro, it takes up to 10 seconds to expand due to inefficiencies in rust-analyzers proc-macro srv
 #[cfg_attr(not(rust_analyzer), zz_gpui_macros::derive_inspector_reflection)]
 trait Transform: Clone {
-    /// Doubles the value
+    #[doc = " Doubles the value"]
     fn double(self) -> Self;
 
-    /// Triples the value
+    #[doc = " Triples the value"]
     fn triple(self) -> Self;
 
-    /// Increments the value by one
-    ///
-    /// This method has a default implementation
+    #[doc = " Increments the value by one"]
+    #[doc = ""]
+    #[doc = " This method has a default implementation"]
     fn increment(self) -> Self {
-        // Default implementation
         self.add_one()
     }
 
-    /// Quadruples the value by doubling twice
+    #[doc = " Quadruples the value by doubling twice"]
     fn quadruple(self) -> Self {
-        // Default implementation with mut self
         self.double().double()
     }
 
-    // These methods will be filtered out:
     #[allow(dead_code)]
     fn add(&self, other: &Self) -> Self;
     #[allow(dead_code)]
@@ -31,7 +25,7 @@ trait Transform: Clone {
     #[allow(dead_code)]
     fn get_value(&self) -> i32;
 
-    /// Adds one to the value
+    #[doc = " Adds one to the value"]
     fn add_one(self) -> Self;
 }
 
@@ -68,7 +62,6 @@ impl Transform for Number {
 fn test_derive_inspector_reflection() {
     use transform_reflection::*;
 
-    // Get all methods that match the pattern fn(self) -> Self or fn(mut self) -> Self
     let methods = methods::<Number>();
 
     assert_eq!(methods.len(), 5);
@@ -79,7 +72,6 @@ fn test_derive_inspector_reflection() {
     assert!(method_names.contains(&"quadruple"));
     assert!(method_names.contains(&"add_one"));
 
-    // Invoke methods by name
     let num = Number(5);
 
     let doubled = find_method::<Number>("double").unwrap().invoke(num.clone());
@@ -96,20 +88,17 @@ fn test_derive_inspector_reflection() {
     let quadrupled = find_method::<Number>("quadruple").unwrap().invoke(num);
     assert_eq!(quadrupled, Number(20));
 
-    // Try to invoke a non-existent method
     let result = find_method::<Number>("nonexistent");
     assert!(result.is_none());
 
-    // Chain operations
     let num = Number(10);
     let result = find_method::<Number>("double")
         .map(|m| m.invoke(num))
         .and_then(|n| find_method::<Number>("increment").map(|m| m.invoke(n)))
         .and_then(|n| find_method::<Number>("triple").map(|m| m.invoke(n)));
 
-    assert_eq!(result, Some(Number(63))); // (10 * 2 + 1) * 3 = 63
+    assert_eq!(result, Some(Number(63)));
 
-    // Test documentationumentation capture
     let double_method = find_method::<Number>("double").unwrap();
     assert_eq!(double_method.documentation, Some("Doubles the value"));
 

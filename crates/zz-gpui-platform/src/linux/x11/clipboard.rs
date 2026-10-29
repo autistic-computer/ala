@@ -1,23 +1,3 @@
-/*
- * Copyright 2022 - 2025 Zed Industries, Inc.
- * License: Apache-2.0
- * See LICENSE-APACHE for complete license terms
- *
- * Adapted from the x11 submodule of the arboard project https://github.com/1Password/arboard
- *
- * SPDX-License-Identifier: Apache-2.0 OR MIT
- *
- * Copyright 2022 The Arboard contributors
- *
- * The project to which this file belongs is licensed under either of
- * the Apache 2.0 or the MIT license at the licensee's choice. The terms
- * and conditions of the chosen license apply to this file.
-*/
-
-// More info about using the clipboard on X11:
-// https://tronche.com/gui/x/icccm/sec-2.html#s-2.6
-// https://freedesktop.org/wiki/ClipboardManager/
-
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -69,16 +49,10 @@ x11rb::atom_manager! {
         UTF8_STRING,
         UTF8_MIME_0: b"text/plain;charset=utf-8",
         UTF8_MIME_1: b"text/plain;charset=UTF-8",
-        // Text in ISO Latin-1 encoding
-        // See: https://tronche.com/gui/x/icccm/sec-2.html#s-2.6.2
         STRING,
-        // Text in unknown encoding
-        // See: https://tronche.com/gui/x/icccm/sec-2.html#s-2.6.2
         TEXT,
         TEXT_MIME_UNKNOWN: b"text/plain",
 
-        // HTML: b"text/html",
-        // URI_LIST: b"text/uri-list",
 
         PNG__MIME: ImageFormat::mime_type(ImageFormat::Png ).as_bytes(),
         JPEG_MIME: ImageFormat::mime_type(ImageFormat::Jpeg).as_bytes(),
@@ -89,8 +63,6 @@ x11rb::atom_manager! {
         TIFF_MIME: ImageFormat::mime_type(ImageFormat::Tiff).as_bytes(),
         ICO__MIME: ImageFormat::mime_type(ImageFormat::Ico ).as_bytes(),
         PNM__MIME: ImageFormat::mime_type(ImageFormat::Pnm ).as_bytes(),
-        // This is just some random name for the property on our window, into which
-        // the clipboard owner writes the data we requested.
         ARBOARD_CLIPBOARD,
     }
 }
@@ -99,8 +71,6 @@ thread_local! {
     static ATOM_NAME_CACHE: RefCell<HashMap<Atom, &'static str>> = Default::default();
 }
 
-// Some clipboard items, like images, may take a very long time to produce a
-// `SelectionNotify`. Multiple seconds long.
 const LONG_TIMEOUT_DUR: Duration = Duration::from_millis(4000);
 const SHORT_TIMEOUT_DUR: Duration = Duration::from_millis(10);
 
@@ -114,7 +84,6 @@ enum ManagerHandoverState {
 struct GlobalClipboard {
     inner: Arc<Inner>,
 
-    /// Join handle to the thread which serves selection requests.
     server_handle: JoinHandle<()>,
 }
 
@@ -124,8 +93,6 @@ struct XContext {
 }
 
 struct Inner {
-    /// The context for the thread which serves clipboard read
-    /// requests coming to us.
     server: XContext,
     atoms: Atoms,
 
@@ -141,7 +108,6 @@ struct Inner {
 
 impl XContext {
     fn new() -> Result<Self> {
-        // create a new connection to an X11 server
         let (conn, screen_num): (RustConnection, _) =
             RustConnection::connect(None).map_err(|_| {
                 Error::unknown("X11 server connection timed out because it was unreachable")
@@ -153,15 +119,8 @@ impl XContext {
             .ok_or(Error::unknown("no screen found"))?;
         let win_id = conn.generate_id().map_err(into_unknown)?;
 
-        let event_mask =
-            // Just in case that some program reports SelectionNotify events
-            // with XCB_EVENT_MASK_PROPERTY_CHANGE mask.
-            EventMask::PROPERTY_CHANGE |
-            // To receive DestroyNotify event and stop the message loop.
-            EventMask::STRUCTURE_NOTIFY;
-        // create the window
+        let event_mask = EventMask::PROPERTY_CHANGE | EventMask::STRUCTURE_NOTIFY;
         conn.create_window(
-            // copy as much as possible from the parent, because no other specific input is needed
             COPY_DEPTH_FROM_PARENT,
             win_id,
             screen.root,
@@ -172,7 +131,6 @@ impl XContext {
             0,
             WindowClass::COPY_FROM_PARENT,
             COPY_FROM_PARENT,
-            // don't subscribe to any special events because we are requesting everything we need ourselves
             &CreateWindowAux::new().event_mask(event_mask),
         )
         .map_err(into_unknown)?;
@@ -185,11 +143,7 @@ impl XContext {
 #[derive(Default)]
 struct Selection {
     data: RwLock<Option<Vec<ClipboardData>>>,
-    /// Mutex around nothing to use with the below condvar.
     mutex: Mutex<()>,
-    /// A condvar that is notified when the contents of this clipboard are changed.
-    ///
-    /// This is associated with `Self::mutex`.
     data_changed: Condvar,
 }
 
@@ -197,7 +151,6 @@ struct Selection {
 struct ClipboardData {
     bytes: Vec<u8>,
 
-    /// The atom representing the format in which the data is encoded.
     format: Atom,
 }
 
@@ -241,8 +194,6 @@ impl Inner {
 
         let server_win = self.server.win_id;
 
-        // ICCCM version 2, section 2.6.1.3 states that we should re-assert ownership whenever data
-        // changes.
         self.server
             .conn
             .set_selection_owner(server_win, self.atom_of(selection), Time::CURRENT_TIME)
@@ -250,18 +201,12 @@ impl Inner {
 
         self.server.conn.flush().map_err(into_unknown)?;
 
-        // Just setting the data, and the `serve_requests` will take care of the rest.
         let selection = self.selection_of(selection);
         let mut data_guard = selection.data.write();
         *data_guard = Some(data);
 
-        // Lock the mutex to both ensure that no wakers of `data_changed` can wake us between
-        // dropping the `data_guard` and calling `wait[_for]` and that we don't we wake other
-        // threads in that position.
         let mut guard = selection.mutex.lock();
 
-        // Notify any existing waiting threads that we have changed the data in the selection.
-        // It is important that the mutex is locked to prevent this notification getting lost.
         selection.data_changed.notify_all();
 
         match wait {
@@ -279,11 +224,7 @@ impl Inner {
         Ok(())
     }
 
-    /// `formats` must be a slice of atoms, where each atom represents a target format.
-    /// The first format from `formats`, which the clipboard owner supports will be the
-    /// format of the return value.
     fn read(&self, formats: &[Atom], selection: ClipboardKind) -> Result<ClipboardData> {
-        // if we are the current owner, we can get the current clipboard ourselves
         if self.is_owner(selection)? {
             let data = self.selection_of(selection).data.read();
             if let Some(data_list) = &*data {
@@ -324,7 +265,6 @@ impl Inner {
         if let Some(&format) = highest_precedence_format {
             let data = self.read_single(&reader, selection, format)?;
             if !formats.contains(&data.format) {
-                // This shouldn't happen since the format is from the TARGETS list.
                 log::trace!(
                     "Conversion to {} responded with {} which is not supported",
                     self.atom_name(format),
@@ -376,14 +316,11 @@ impl Inner {
         selection: ClipboardKind,
         target_format: Atom,
     ) -> Result<ClipboardData> {
-        // Delete the property so that we can detect (using property notify)
-        // when the selection owner receives our request.
         reader
             .conn
             .delete_property(reader.win_id, self.atoms.ARBOARD_CLIPBOARD)
             .map_err(into_unknown)?;
 
-        // request to convert the clipboard selection to our data type(s)
         reader
             .conn
             .convert_selection(
@@ -413,7 +350,6 @@ impl Inner {
                 }
             };
             match event {
-                // The first response after requesting a selection.
                 Event::SelectionNotify(event) => {
                     log::trace!("Read SelectionNotify");
                     let result = self.handle_read_selection_notify(
@@ -426,17 +362,11 @@ impl Inner {
                     match result {
                         ReadSelNotifyResult::GotData(data) => return Ok(data),
                         ReadSelNotifyResult::IncrStarted => {
-                            // This means we received an indication that an the
-                            // data is going to be sent INCRementally. Let's
-                            // reset our timeout.
                             timeout_end += SHORT_TIMEOUT_DUR;
                         }
                         ReadSelNotifyResult::EventNotRecognized => (),
                     }
                 }
-                // If the previous SelectionNotify event specified that the data
-                // will be sent in INCR segments, each segment is transferred in
-                // a PropertyNotify event.
                 Event::PropertyNotify(event) => {
                     let result = self.handle_read_property_notify(
                         reader,
@@ -539,11 +469,6 @@ impl Inner {
         incr_data: &mut Vec<u8>,
         event: SelectionNotifyEvent,
     ) -> Result<ReadSelNotifyResult> {
-        // The property being set to NONE means that the `convert_selection`
-        // failed.
-
-        // According to: https://tronche.com/gui/x/icccm/sec-2.html#s-2.4
-        // the target must be set to the same as what we requested.
         if event.property == NONE || event.target != target_format {
             return Err(Error::ContentNotAvailable);
         }
@@ -557,13 +482,7 @@ impl Inner {
             log::warn!("Received a SelectionNotify while already expecting INCR segments.");
             return Ok(ReadSelNotifyResult::EventNotRecognized);
         }
-        // Accept any property type. The property type will typically match the format type except
-        // when it is `TARGETS` in which case it is `ATOM`. `ANY` is provided to handle the case
-        // where the clipboard is not convertible to the requested format. In this case
-        // `reply.type_` will have format information, but `bytes` will only be non-empty if `ANY`
-        // is provided.
         let property_type = AtomEnum::ANY;
-        // request the selection
         let mut reply = reader
             .conn
             .get_property(
@@ -578,12 +497,7 @@ impl Inner {
             .reply()
             .map_err(into_unknown)?;
 
-        // we found something
         if reply.type_ == self.atoms.INCR {
-            // Note that we call the get_property again because we are
-            // indicating that we are ready to receive the data by deleting the
-            // property, however deleting only works if the type matches the
-            // property type. But the type didn't match in the previous call.
             reply = reader
                 .conn
                 .get_property(
@@ -615,7 +529,6 @@ impl Inner {
         }
     }
 
-    /// Returns Ok(true) when the incr_data is ready
     fn handle_read_property_notify(
         &self,
         reader: &XContext,
@@ -629,8 +542,6 @@ impl Inner {
             return Ok(false);
         }
         if !using_incr {
-            // This must mean the selection owner received our request, and is
-            // now preparing the data
             return Ok(false);
         }
         let reply = reader
@@ -651,17 +562,13 @@ impl Inner {
             .reply()
             .map_err(into_unknown)?;
 
-        // log::trace!("Received segment. value_len {}", reply.value_len,);
         if reply.value_len == 0 {
-            // This indicates that all the data has been sent.
             return Ok(true);
         }
         incr_data.extend(reply.value);
 
-        // Let's reset our timeout, since we received a valid chunk.
         *timeout_end = Instant::now() + SHORT_TIMEOUT_DUR;
 
-        // Not yet complete
         Ok(false)
     }
 
@@ -677,7 +584,6 @@ impl Inner {
         };
 
         let success;
-        // we are asked for a list of supported conversion targets
         if event.target == self.atoms.TARGETS {
             log::trace!(
                 "Handling TARGETS, dst property is {}",
@@ -691,8 +597,6 @@ impl Inner {
                 for data in data_list {
                     targets.push(data.format);
                     if data.format == self.atoms.UTF8_STRING {
-                        // When we are storing a UTF8 string,
-                        // add all equivalent formats to the supported targets
                         targets.push(self.atoms.UTF8_MIME_0);
                         targets.push(self.atoms.UTF8_MIME_1);
                     }
@@ -704,7 +608,6 @@ impl Inner {
                     PropMode::REPLACE,
                     event.requestor,
                     event.property,
-                    // TODO: change to `AtomEnum::ATOM`
                     self.atoms.ATOM,
                     &targets,
                 )
@@ -733,19 +636,14 @@ impl Inner {
                     None => false,
                 };
             } else {
-                // This must mean that we lost ownership of the data
-                // since the other side requested the selection.
-                // Let's respond with the property set to none.
                 success = false;
             }
         }
-        // on failure we notify the requester of it
         let property = if success {
             event.property
         } else {
             AtomEnum::NONE.into()
         };
-        // tell the requestor that we finished sending data
         self.server
             .conn
             .send_event(
@@ -769,13 +667,11 @@ impl Inner {
 
     fn ask_clipboard_manager_to_request_our_data(&self) -> Result<()> {
         if self.server.win_id == 0 {
-            // This shouldn't really ever happen but let's just check.
             log::error!("The server's window id was 0. This is unexpected");
             return Ok(());
         }
 
         if !self.is_owner(ClipboardKind::Clipboard)? {
-            // We are not owning the clipboard, nothing to do.
             return Ok(());
         }
         if self
@@ -784,13 +680,9 @@ impl Inner {
             .read()
             .is_none()
         {
-            // If we don't have any data, there's nothing to do.
             return Ok(());
         }
 
-        // It's important that we lock the state before sending the request
-        // because we don't want the request server thread to lock the state
-        // after the request but before we can lock it here.
         let mut handover_state = self.handover_state.lock();
 
         log::trace!("Sending the data to the clipboard manager");
@@ -809,8 +701,6 @@ impl Inner {
         *handover_state = ManagerHandoverState::InProgress;
         let max_handover_duration = Duration::from_millis(100);
 
-        // Note that we are using a parking_lot condvar here, which doesn't wake up
-        // spuriously
         let result = self
             .handover_cv
             .wait_for(&mut handover_state, max_handover_duration);
@@ -836,7 +726,6 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
         log::trace!("Finishing clipboard manager handover.");
         *handover_state = ManagerHandoverState::Finished;
 
-        // Not sure if unlocking the mutex is necessary here but better safe than sorry.
         drop(handover_state);
 
         clip.handover_cv.notify_all();
@@ -854,14 +743,10 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
     loop {
         match context.server.conn.wait_for_event().map_err(into_unknown)? {
             Event::DestroyNotify(_) => {
-                // This window is being destroyed.
                 log::trace!("Clipboard server window is being destroyed x_x");
                 return Ok(());
             }
             Event::SelectionClear(event) => {
-                // TODO: check if this works
-                // Someone else has new content in the clipboard, so it is
-                // notifying us that we should delete our data now.
                 log::trace!("Somebody else owns the clipboard now");
 
                 if let Some(selection) = context.kind_of(event.selection) {
@@ -869,11 +754,6 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
                     let mut data_guard = selection.data.write();
                     *data_guard = None;
 
-                    // It is important that this mutex is locked at the time of calling
-                    // `notify_all` to prevent notifications getting lost in case the sleeping
-                    // thread has unlocked its `data_guard` and is just about to sleep.
-                    // It is also important that the RwLock is kept write-locked for the same
-                    // reason.
                     let _guard = selection.mutex.lock();
                     selection.data_changed.notify_all();
                 }
@@ -884,21 +764,15 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
                     context.atom_name(event.selection),
                     context.atom_name(event.target),
                 );
-                // Someone is requesting the clipboard content from us.
                 context
                     .handle_selection_request(event)
                     .map_err(into_unknown)?;
 
-                // if we are in the progress of saving to the clipboard manager
-                // make sure we save that we have finished writing
                 let handover_state = context.handover_state.lock();
                 if *handover_state == ManagerHandoverState::InProgress {
-                    // Only set written, when the actual contents were written,
-                    // not just a response to what TARGETS we have.
                     if event.target != context.atoms.TARGETS {
                         log::trace!("The contents were written to the clipboard manager.");
                         written = true;
-                        // if we have written and notified, make sure to notify that we are done
                         if notified {
                             handover_finished(&context, handover_state);
                         }
@@ -906,10 +780,6 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
                 }
             }
             Event::SelectionNotify(event) => {
-                // We've requested the clipboard content and this is the answer.
-                // Considering that this thread is not responsible for reading
-                // clipboard contents, this must come from the clipboard manager
-                // signaling that the data was handed over successfully.
                 if event.selection != context.atoms.CLIPBOARD_MANAGER {
                     log::error!(
                         "Received a `SelectionNotify` from a selection other than the CLIPBOARD_MANAGER. This is unexpected in this thread."
@@ -918,29 +788,17 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
                 }
                 let handover_state = context.handover_state.lock();
                 if *handover_state == ManagerHandoverState::InProgress {
-                    // Note that some clipboard managers send a selection notify
-                    // before even sending a request for the actual contents.
-                    // (That's why we use the "notified" & "written" flags)
                     log::trace!(
                         "The clipboard manager indicated that it's done requesting the contents from us."
                     );
                     notified = true;
 
-                    // One would think that we could also finish if the property
-                    // here is set 0, because that indicates failure. However
-                    // this is not the case; for example on KDE plasma 5.18, we
-                    // immediately get a SelectionNotify with property set to 0,
-                    // but following that, we also get a valid SelectionRequest
-                    // from the clipboard manager.
                     if written {
                         handover_finished(&context, handover_state);
                     }
                 }
             }
-            _event => {
-                // May be useful for debugging but nothing else really.
-                //log::trace!("Received unwanted event: {:?}", event);
-            }
+            _event => {}
         }
     }
 }
@@ -957,7 +815,6 @@ impl Clipboard {
                 inner: Arc::clone(&global_cb.inner),
             });
         }
-        // At this point we know that the clipboard does not exist.
         let ctx = Arc::new(Inner::new()?);
         let join_handle = std::thread::Builder::new()
             .name("Clipboard".to_owned())
@@ -1033,8 +890,6 @@ impl Clipboard {
             self.inner.atoms.TEXT_MIME_UNKNOWN,
         ];
 
-        // image formats first, as they are more specific, and read will return the first
-        // format that the contents can be converted to
         let mut format_atoms = Vec::with_capacity(image_entries.len() + text_format_atoms.len());
         format_atoms.extend(image_entries.iter().map(|(atom, _)| *atom));
         format_atoms.extend_from_slice(text_format_atoms);
@@ -1059,8 +914,6 @@ impl Clipboard {
         }
 
         let text = if result.format == self.inner.atoms.STRING {
-            // ISO Latin-1
-            // See: https://stackoverflow.com/questions/28169745/what-are-the-options-to-convert-iso-8859-1-latin-1-to-a-string-utf-8
             result.bytes.into_iter().map(|c| c as char).collect()
         } else {
             String::from_utf8(result.bytes).map_err(|_| Error::ConversionFailure)?
@@ -1075,18 +928,10 @@ impl Clipboard {
 
 impl Drop for Clipboard {
     fn drop(&mut self) {
-        // There are always at least 3 owners:
-        // the global, the server thread, and one `Clipboard::inner`
         const MIN_OWNERS: usize = 3;
 
-        // We start with locking the global guard to prevent race
-        // conditions below.
         let mut global_cb = CLIPBOARD.lock();
         if Arc::strong_count(&self.inner) == MIN_OWNERS {
-            // If the are the only owners of the clipboard are ourselves and
-            // the global object, then we should destroy the global object,
-            // and send the data to the clipboard manager
-
             if let Err(e) = self.inner.ask_clipboard_manager_to_request_our_data() {
                 log::error!(
                     "Could not hand the clipboard data over to the clipboard manager: {}",
@@ -1110,7 +955,6 @@ impl Drop for Clipboard {
             if let Some(global_cb) = global_cb
                 && let Err(e) = global_cb.server_handle.join()
             {
-                // Let's try extracting the error message
                 let message;
                 if let Some(msg) = e.downcast_ref::<&'static str>() {
                     message = Some((*msg).to_string());
@@ -1138,38 +982,23 @@ fn into_unknown<E: std::fmt::Display>(error: E) -> Error {
     }
 }
 
-/// Clipboard selection
-///
-/// Linux has a concept of clipboard "selections" which tend to be used in different contexts. This
-/// enum provides a way to get/set to a specific clipboard
-///
-/// See <https://specifications.freedesktop.org/clipboards-spec/clipboards-0.1.txt> for a better
-/// description of the different clipboards.
 #[derive(Copy, Clone, Debug)]
 pub enum ClipboardKind {
-    /// Typically used selection for explicit cut/copy/paste actions (ie. windows/macos like
-    /// clipboard behavior)
     Clipboard,
 
-    /// Typically used for mouse selections and/or currently selected text. Accessible via middle
-    /// mouse click.
     Primary,
 
-    /// The secondary clipboard is rarely used but theoretically available on X11.
     Secondary,
 }
 
-/// Configuration on how long to wait for a new X11 copy event is emitted.
 #[derive(Default)]
 pub(crate) enum WaitConfig {
-    /// Waits until the given [`Instant`] has reached.
     #[allow(
         unused,
         reason = "Right now we don't wait for clipboard contents to sync on app close, but we may in the future"
     )]
     Until(Instant),
 
-    /// Waits forever until a new event is reached.
     #[allow(unused)]
     #[allow(
         unused,
@@ -1177,37 +1006,18 @@ pub(crate) enum WaitConfig {
     )]
     Forever,
 
-    /// It shouldn't wait.
     #[default]
     None,
 }
 
 #[non_exhaustive]
 pub enum Error {
-    /// The clipboard contents were not available in the requested format.
-    /// This could either be due to the clipboard being empty or the clipboard contents having
-    /// an incompatible format to the requested one (eg when calling `get_image` on text)
     ContentNotAvailable,
 
-    /// The native clipboard is not accessible due to being held by an other party.
-    ///
-    /// This "other party" could be a different process or it could be within
-    /// the same program. So for example you may get this error when trying
-    /// to interact with the clipboard from multiple threads at once.
-    ///
-    /// Note that it's OK to have multiple `Clipboard` instances. The underlying
-    /// implementation will make sure that the native clipboard is only
-    /// opened for transferring data and then closed as soon as possible.
     ClipboardOccupied,
 
-    /// The image or the text that was about the be transferred to/from the clipboard could not be
-    /// converted to the appropriate format.
     ConversionFailure,
 
-    /// Any error that doesn't fit the other error types.
-    ///
-    /// The `description` field is only meant to help the developer and should not be relied on as a
-    /// means to identify an error case during runtime.
     Unknown { description: String },
 }
 
