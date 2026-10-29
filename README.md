@@ -1,36 +1,29 @@
 # gpui
 
-The GPU UI framework from [Zed](https://github.com/zed-industries/zed), as maintained for
-[zz](https://github.com/demfabris/zz). It started as a patch branch on a Zed fork and drifted far
-enough that rebasing stopped paying off, so it now lives here as its own repository.
+Our fork of [GPUI](https://gpui.rs), the GPU UI framework from [Zed](https://github.com/zed-industries/zed), split out of Zed with the utility crates it needs folded in.
 
-It holds only the 22 crates zz builds against, plus the two font families `gpui` and `gpui_wgpu`
-embed at build time. Crate names are unchanged, so `use gpui::...` keeps working.
+| Crate | What it is |
+|---|---|
+| `zz-gpui` | The framework: elements, layout, windows, text, the scene. Zed's `collections`, `sum_tree`, `scheduler`, `util`, `http_client` and `refineable` live in it as modules. |
+| `zz-gpui-macros` | Proc macros, including the `Refineable` derive. |
+| `zz-gpui-platform` | The backends, each compiled only for its own target: `macos` (Metal, in `apple`), `linux` (Wayland, X11), `windows`, `web`, `ios` (UIKit), and the `wgpu` renderer that Linux, web and iOS share. |
 
-## History
+`third_party/cosmic-text` is a patched cosmic-text used by the wgpu text system. See its `UPSTREAM.md`.
 
-- The first commit is upstream `zed-industries/zed` at `933d8d9381`, limited to these crates.
-- The next 89 commits are the zz patch set, replayed from `demfabris/zed` branch `zz-patches`
-  (tip `5a00ac89a4`). Every crate tree here matches that tip.
-- After that, this repository is the source of truth. Upstream fixes come in by hand.
-
-## Using it
+## Use it
 
 ```toml
 [dependencies]
-gpui = { git = "https://github.com/demfabris/gpui", rev = "<sha>" }
-gpui_platform = { git = "https://github.com/demfabris/gpui", rev = "<sha>" }
+zz-gpui = { git = "https://github.com/autistic-computer/gpui", branch = "main" }
+zz-gpui-platform = { git = "https://github.com/autistic-computer/gpui", branch = "main", features = ["font-kit", "wayland", "x11"] }
 ```
 
-## Pulling a fix from upstream
+Needs Rust 1.99. Try `cargo run -p zz-gpui --example hello_world`, and read `crates/zz-gpui/README.md` for the framework itself.
 
-```bash
-git -C ~/src/zed format-patch -1 <sha> --stdout -- crates/gpui crates/gpui_wgpu | git am -3
-```
+## Where changes come from
 
-Limit the pathspec to the crates the fix touches. Paths match upstream, so patches apply as-is.
+[zz](https://github.com/demfabris/zz) carries this repo as a git subtree in `libs/gpui`, edits it in place and sends its commits here with `git subtree push`. Commits made here directly go back into zz with `git subtree pull`. Both work, so open PRs against whichever repo you're in.
 
 ## License
 
-Apache-2.0, same as upstream. See `LICENSE-APACHE`. The bundled fonts keep their own licenses
-under `assets/fonts`.
+Apache-2.0, like upstream gpui. See `LICENSE-APACHE`.
