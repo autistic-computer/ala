@@ -1,3 +1,4 @@
+pub mod android;
 #[cfg(target_os = "macos")]
 pub mod apple;
 pub mod ios;
@@ -11,13 +12,28 @@ pub mod web;
     target_os = "linux",
     target_os = "freebsd",
     target_family = "wasm",
-    target_os = "ios"
+    target_os = "ios",
+    target_os = "android"
 ))]
 pub mod wgpu;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
 pub use ala::Platform;
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+pub mod mobile {
+    #[cfg(target_os = "android")]
+    pub use crate::android::{
+        Accessibility, accessibility, display_corner_radius, phone, request_paste,
+        set_compact_keyboard, set_status_bar_on_dark, show_edit_menu,
+    };
+    #[cfg(target_os = "ios")]
+    pub use crate::ios::{
+        Accessibility, accessibility, display_corner_radius, phone, request_paste,
+        set_compact_keyboard, set_status_bar_on_dark, show_edit_menu,
+    };
+}
 
 use std::rc::Rc;
 
@@ -94,6 +110,12 @@ pub fn current_platform(headless: bool) -> Rc<dyn Platform> {
     {
         let _ = headless;
         Rc::new(crate::ios::IosPlatform::new())
+    }
+
+    #[cfg(target_os = "android")]
+    {
+        let _ = headless;
+        Rc::new(crate::android::AndroidPlatform::new())
     }
 }
 

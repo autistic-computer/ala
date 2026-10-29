@@ -2597,6 +2597,24 @@ impl Window {
         self.platform_window.hide_soft_keyboard();
     }
 
+    pub fn on_system_back(
+        &self,
+        cx: &App,
+        mut callback: impl FnMut(&mut Window, &mut App) + 'static,
+    ) {
+        let handle = self.handle;
+        let mut cx = cx.to_async();
+        self.platform_window.set_back_handler(Box::new(move || {
+            handle
+                .update(&mut cx, |_, window, cx| callback(window, cx))
+                .log_err();
+        }));
+    }
+
+    pub fn set_system_back_enabled(&self, enabled: bool) {
+        self.platform_window.set_back_enabled(enabled);
+    }
+
     pub fn is_window_active(&self) -> bool {
         self.active.get()
     }

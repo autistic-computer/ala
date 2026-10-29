@@ -1022,7 +1022,7 @@ fn clip_font_runs(font_runs: &[FontRun], range: Range<usize>) -> SmallVec<[FontR
     clipped
 }
 
-#[cfg(feature = "font-kit")]
+#[cfg(all(feature = "font-kit", any(target_os = "linux", target_os = "freebsd")))]
 fn find_best_match(
     font: &Font,
     candidates: &[FontId],
@@ -1048,7 +1048,7 @@ fn find_best_match(
     Ok(ix)
 }
 
-#[cfg(not(feature = "font-kit"))]
+#[cfg(not(all(feature = "font-kit", any(target_os = "linux", target_os = "freebsd"))))]
 fn find_best_match(
     font: &Font,
     candidates: &[FontId],
@@ -1212,7 +1212,7 @@ fn cosmic_font_features(features: &FontFeatures) -> Result<CosmicFontFeatures> {
     Ok(result)
 }
 
-#[cfg(feature = "font-kit")]
+#[cfg(all(feature = "font-kit", any(target_os = "linux", target_os = "freebsd")))]
 fn font_into_properties(font: &ala::Font) -> font_kit::properties::Properties {
     font_kit::properties::Properties {
         style: match font.style {
@@ -1225,7 +1225,7 @@ fn font_into_properties(font: &ala::Font) -> font_kit::properties::Properties {
     }
 }
 
-#[cfg(feature = "font-kit")]
+#[cfg(all(feature = "font-kit", any(target_os = "linux", target_os = "freebsd")))]
 fn face_info_into_properties(
     face_info: &cosmic_text::fontdb::FaceInfo,
 ) -> font_kit::properties::Properties {
