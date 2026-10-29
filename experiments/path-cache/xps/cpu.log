@@ -1,0 +1,7 @@
+Verifying this experiment...
+paths/curves: baseline=4.3952ms (p95 4.9575, 1.00x), cached=0.3064ms (p95 0.4607, 14.34x)
+paths/dashed: baseline=2.7809ms (p95 3.0431, 1.00x), cached=0.2834ms (p95 0.3161, 9.81x)
+paths/triangle: baseline=0.0862ms (p95 0.0938, 1.00x), cached=0.0872ms (p95 0.1000, 0.99x)
+paths/changing: baseline=4.4602ms (p95 4.8686, 1.00x), cached=4.9538ms (p95 5.3293, 0.90x)
+paths/cold: baseline=4.4892ms (p95 5.0047, 1.00x), cached=5.1390ms (p95 5.7704, 0.87x)
+Saved 60 runs to experiments/path-cache/xps/xps-path-cache.json

@@ -1,0 +1,15 @@
+Verifying this experiment...
+{
+  "case": "verification",
+  "exact_mesh_comparisons": 1536,
+  "cache_hits": 768,
+  "retained_payload_bytes": 5239092,
+  "pixel_checks_available": true,
+  "equal_pixels": 5760000,
+  "distinct_scenes": 3,
+  "wall_seconds": 1.4313632490011514,
+  "command": [
+    "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+    "--verify"
+  ]
+}

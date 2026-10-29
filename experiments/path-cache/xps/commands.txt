@@ -1,0 +1,15 @@
+Source: 5e0a214dbb12cda890f62be68d4e3a852547acc2
+Worktree: /home/demfabris/dev/ala-worktrees/path-cache
+Build environment: CARGO_TARGET_DIR=/home/demfabris/dev/ala-native-target CARGO_BUILD_JOBS=4
+
+python3 experiments/path-cache/run.py --build --verify-only --output experiments/path-cache/xps/verify-xps.json
+cargo test --release --locked -p ala --no-default-features --lib path_builder::cache::tests
+python3 experiments/path-cache/run.py --binary /home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9 --cpu 2 --repetitions 5 --samples 120 --output experiments/path-cache/xps/xps-path-cache.json
+python3 experiments/path-cache/xps/measure-memory.py /home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9
+
+Every build, test and benchmark process completed before the next started.
+The memory script records each exact child command, binary hash, hit/miss and payload assertions.
+The standard runner records source/compiler/binary hashes and all child commands.
+Machine snapshot commands and results are in machine.json.
+Raw cache-tests.log is preserved locally; its unchanged gzip copy is published.
+git diff --check
