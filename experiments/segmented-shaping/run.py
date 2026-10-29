@@ -95,7 +95,9 @@ def main():
     metadata["relevant_environment"] = env
     def run(flags):
         started = time.monotonic()
-        result = subprocess.run([str(binary), *flags], text=True, capture_output=True, check=True)
+        result = subprocess.run([str(binary), *flags], text=True, capture_output=True)
+        if result.returncode:
+            raise RuntimeError(f"{binary.name} exited {result.returncode}:\n{result.stderr}\n{result.stdout}")
         value = json.loads(result.stdout)
         value["wall_seconds"] = time.monotonic() - started
         value["command"] = [str(binary), *flags]

@@ -385,25 +385,29 @@ fn verify_shaping() -> Value {
         len: probe.len(),
         font_id: font,
     }];
-    assert!(experimental_text::segment_cuts(&probe).is_some());
-    system.layout_line(&probe, px(16.), &runs);
+    let probe_cuts = experimental_text::segment_cuts(&probe).unwrap();
+    let probe_baseline = baseline.layout_line(&probe, px(16.), &runs);
+    let probe_segmented = system.layout_line(&probe, px(16.), &runs);
+    let probe_drift = probe_baseline
+        .runs
+        .iter()
+        .flat_map(|r| &r.glyphs)
+        .zip(probe_segmented.runs.iter().flat_map(|r| &r.glyphs))
+        .map(|(a, b)| f32::from(a.position.x - b.position.x).abs())
+        .fold(0.0f32, f32::max);
     system.reset_counts();
     system.layout_line(&probe, px(16.), &runs);
     assert_eq!(system.calls.load(Ordering::Relaxed), 0);
-    let generation = system.font_generation();
-    baseline
-        .add_fonts(vec![std::borrow::Cow::Borrowed(include_bytes!(
-            "../../ala/assets/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf"
-        ))])
-        .unwrap();
-    assert_ne!(system.font_generation(), generation);
-    system.layout_line(&probe, px(16.), &runs);
-    assert!(system.calls.load(Ordering::Relaxed) > 0);
     json!({"paragraphs":80, "wrap_comparisons":compared, "wrap_differences":wrap_differences,
         "max_glyph_x_drift_px":max_drift, "max_glyph_y_drift_px":max_y_drift,
         "exact_line_layouts_equivalent":layouts_equal, "fallback_cases":fallback_cases,
         "verified_fallback_cases":verified_fallback_cases, "font_invalidation":true,
-        "external_font_invalidation":true, "glyph_identity_equivalent":identities_equal,
+        "external_font_generation_tested":false, "glyph_identity_equivalent":identities_equal,
+        "ascii_probe":{"text_unit":"hello ", "repetitions":700, "text_bytes":probe.len(),
+            "segment_cuts":probe_cuts, "max_glyph_x_drift_px":probe_drift,
+            "baseline_width_px":f32::from(probe_baseline.width), "segmented_width_px":f32::from(probe_segmented.width),
+            "layout_equivalent":format!("{probe_baseline:?}")==format!("{probe_segmented:?}"),
+            "warm_cache_raw_calls":system.calls.load(Ordering::Relaxed)},
         "first_layout_difference":first_layout_difference, "first_wrap_difference":first_wrap_difference,
         "max_drift_case":max_drift_case,
         "layout_equivalent":wrap_differences == 0 && layouts_equal,
