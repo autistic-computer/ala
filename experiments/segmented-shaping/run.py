@@ -147,6 +147,7 @@ def main():
                 output["runs"].append(result)
         for mode in modes:
             result = run([*flags, "--mode", mode, "--samples", str(args.samples), "--count-allocations"])
+            assert result["retained_glyphs"] <= 262144, result
             result.update(name=name, allocation_only=True)
             allocations[mode].append(statistics.median(s["allocated_bytes"] for s in result["samples"]))
             output["runs"].append(result)

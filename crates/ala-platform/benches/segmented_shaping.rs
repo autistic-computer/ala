@@ -395,6 +395,7 @@ fn verify_shaping() -> Value {
         .zip(probe_segmented.runs.iter().flat_map(|r| &r.glyphs))
         .map(|(a, b)| f32::from(a.position.x - b.position.x).abs())
         .fold(0.0f32, f32::max);
+    let probe_layouts_equal = format!("{probe_baseline:?}") == format!("{probe_segmented:?}");
     system.reset_counts();
     system.layout_line(&probe, px(16.), &runs);
     assert_eq!(system.calls.load(Ordering::Relaxed), 0);
@@ -406,11 +407,11 @@ fn verify_shaping() -> Value {
         "ascii_probe":{"text_unit":"hello ", "repetitions":700, "text_bytes":probe.len(),
             "segment_cuts":probe_cuts, "max_glyph_x_drift_px":probe_drift,
             "baseline_width_px":f32::from(probe_baseline.width), "segmented_width_px":f32::from(probe_segmented.width),
-            "layout_equivalent":format!("{probe_baseline:?}")==format!("{probe_segmented:?}"),
+            "layout_equivalent":probe_layouts_equal,
             "warm_cache_raw_calls":system.calls.load(Ordering::Relaxed)},
         "first_layout_difference":first_layout_difference, "first_wrap_difference":first_wrap_difference,
         "max_drift_case":max_drift_case,
-        "layout_equivalent":wrap_differences == 0 && layouts_equal,
+        "layout_equivalent":wrap_differences == 0 && layouts_equal && probe_layouts_equal,
         "pixel_equivalence":"not established for segmented text"})
 }
 
