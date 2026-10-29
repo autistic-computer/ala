@@ -1,18 +1,21 @@
-```
----
-NAME: GPUI
-DESCRIPTION: GPU-ACCELERATED UI FRAMEWORK FOR RUST
-AUTHOR: AUTISTIC.COMPUTER
-LICENSE: APACHE-2.0
-VERSION: 0.1.0
----
+<p align="center">
+<samp>
+       //      {{{{     &gt;&gt;        <br>
+      //     {{           &gt;&gt;      <br>
+     //    {{{              &gt;&gt;    <br>
+    //       {{           &gt;&gt;      <br>
+   //          {{{{     &gt;&gt;        <br>
+                                  <br>
+---                               <br>
+name: gpui                        <br>
+description: ui framework         <br>
+author: autistic.computer         <br>
+license: apache-2.0               <br>
+version: 0.1.0                    <br>
+---                               
+</samp>
+</p>
 
-        //      {{{{     >>
-       //     {{           >>
-      //    {{{              >>
-     //       {{           >>
-    //          {{{{     >>
-
-```
-
-[AUTISTIC-COMPUTER](https://github.com/autistic-computer)
+<p align="center">
+<a href="https://autistic.computer"><kbd> /{&gt; autistic.computer </kbd></a>
+</p>
