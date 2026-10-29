@@ -1,0 +1,20 @@
+Source: ccd4ea0bc09eaa13f3b4b24fe7969f9bd716cf6f
+Worktree: /home/demfabris/dev/ala-worktrees/retained-layout
+Build environment: CARGO_TARGET_DIR=/home/demfabris/dev/ala-native-target CARGO_BUILD_JOBS=4
+
+python3 experiments/retained-layout/run.py --build --verify-only --output experiments/retained-layout/xps/verify-xps.json
+python3 experiments/retained-layout/run.py --binary /home/demfabris/dev/ala-native-target/release/deps/retained_layout-74a6da6bc1299138 --cpu 2 --repetitions 5 --samples 120 --output experiments/retained-layout/xps/xps-retained-layout.json
+
+Final-state control check (full per-node verifier is separate):
+python3 - <<'PY'
+import json
+x = json.load(open('experiments/retained-layout/xps/xps-retained-layout.json'))
+for dirty in (0, 1, 64, 3840):
+    rows = [r for r in x['runs'] if r['dirty_leaves'] == dirty]
+    assert {r['mode'] for r in rows} == {'rebuild', 'retained', 'write-all'}
+    assert len({r['geometry_checksum'] for r in rows}) == 1
+PY
+
+Machine audit commands and results are in machine.json.
+No concurrent builds or other benchmark workloads ran.
+git diff --check

@@ -41,3 +41,5 @@ The correctness gate compares 499,328 exact node rectangles over 128 frames. Com
 ## Cloud evidence
 
 `cloud.json` contains raw process/sample results; `cloud.summary.json` contains the summary and verification. These are Linux VM measurements against the in-process baseline from commit `b9b22210d37bd7157161a238f602136a65095723`, not physical GPU benchmarks. See the PR for measured results and validation status.
+
+[XPS/Linux native results](xps/README.md) validate the kernel and all dirty/rewrite-all controls on an i7-1065G7. They establish no ALA application frame-time improvement; Apple and Windows/MSVC native validation remain outstanding.
