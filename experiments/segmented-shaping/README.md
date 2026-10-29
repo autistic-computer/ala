@@ -4,7 +4,7 @@
 
 Linux verification finds 5 differing wrap results in 400 comparisons and up to 0.318359375 px glyph-position drift. Glyph identities match in this corpus, but that is insufficient for layout equivalence. `--verify-only` reports `layout_equivalent: false`; successful process completion means the experiment completed, not that segmentation is safe to ship. CoreText and DirectWrite may expose additional differences.
 
-The cache is bounded by 262,144 glyphs, compares full keys after hashing and clears on font generation changes. Mixed script, RTL, tabs, bidi controls and newlines fall back to full-line shaping. This is not a complete typography conformance corpus.
+The cache is bounded by 262,144 glyphs, compares full keys after hashing and clears on font generation changes. Detected RTL ranges, tabs, bidi controls, newlines and other controls fall back to full-line shaping. The filter does not reject every mixed-script input. This is not a complete typography conformance corpus.
 
 ## Machines and prerequisites
 
@@ -38,7 +38,7 @@ py -3 experiments/segmented-shaping/run.py --build --repetitions 5 --samples 120
 
 The runner builds the selected benchmark, records source/compiler/binary hashes and native backend, runs correctness checks, alternates baseline/candidate order, and saves raw samples plus a readable `.summary.json`. Allocation requests are counted in separate processes with instrumentation disabled for timing passes; they do not measure retained memory or RSS. Save both result files and the machine details with your report.
 
-Inspect `verification.text` before considering speedups. Repeat the correctness corpus on all three native text systems. Add real application fonts, ligatures, combining marks, emoji, selection/caret positions, mixed fonts, edits around segment boundaries and adversarial wrap widths before designing a production cache. Cold paragraphs and unchanged text are negative controls; include their regressions in any report. A production proposal must eliminate differences or define and accept a new layout contract first.
+Inspect `verification.text` before considering speedups. The runner also saves `correctness_blocked` and prints a warning before diagnostic timings when exact layout differs. Successful execution still means the experiment completed. The verifier records the first unequal glyph/line, segment-cut widths, wrap boundaries and maximum-drift location, and asserts exact fallback results and direct/shared-backend font invalidation. Repeat the correctness corpus on all three native text systems. Add real application fonts, ligatures, combining marks, emoji, selection/caret positions, mixed fonts, edits around segment boundaries and adversarial wrap widths before designing a production cache. Cold paragraphs and unchanged text are negative controls; include their regressions in any report. A production proposal must eliminate differences or define and accept a new layout contract first.
 
 ## Cloud evidence
 

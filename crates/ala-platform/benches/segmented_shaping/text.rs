@@ -236,6 +236,10 @@ impl PlatformTextSystem for ExperimentalTextSystem {
     }
 }
 
+pub fn segment_cuts(text: &str) -> Option<Vec<usize>> {
+    segments::cut_points(text)
+}
+
 pub fn paragraph(bytes: usize, seed: usize) -> String {
     const WORDS: &[&str] = &[
         "the",

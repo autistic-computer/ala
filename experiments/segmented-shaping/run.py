@@ -104,7 +104,10 @@ def main():
         return value
     print("Verifying this experiment...", flush=True)
     verification = run(["--verify"])
-    output = {"metadata": metadata, "verification": verification, "runs": [], "summary": []}
+    blocked = not verification["text"]["layout_equivalent"]
+    output = {"metadata": metadata, "verification": verification, "correctness_blocked": blocked, "runs": [], "summary": []}
+    if blocked:
+        print("CORRECTNESS BLOCKED: native line layouts differ; timing results are diagnostic only.", flush=True)
     if args.verify_only:
         args.output.parent.mkdir(parents=True,exist_ok=True)
         args.output.write_text(json.dumps(output,indent=2)+"\n")
@@ -131,6 +134,7 @@ def main():
             order = modes if repetition % 2 == 0 else tuple(reversed(modes))
             for mode in order:
                 result = run([*flags, "--mode", mode, "--samples", str(args.samples)])
+                assert result["retained_glyphs"] <= 262144, result
                 if result["case"] == "animation":
                     expected = 0 if mode == "replay" else args.samples
                     assert result["pane_renders"] == expected, result

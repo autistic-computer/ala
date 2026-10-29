@@ -218,6 +218,10 @@ fn verify_shaping() -> Value {
     let mut wrap_differences = 0;
     let mut compared = 0;
     let mut fallback_cases = 0;
+    let mut verified_fallback_cases = 0;
+    let mut first_layout_difference = None;
+    let mut first_wrap_difference = None;
+    let mut max_drift_case = None;
     for seed in 0..80 {
         let mut text = paragraph(2000 + seed * 37, seed + 1);
         if seed % 8 == 0 {
@@ -235,7 +239,13 @@ fn verify_shaping() -> Value {
         }];
         let a = baseline.layout_line(&text, px(16.), &runs);
         let b = system.layout_line(&text, px(16.), &runs);
-        layouts_equal &= format!("{a:?}") == format!("{b:?}");
+        let exact_layout = format!("{a:?}") == format!("{b:?}");
+        layouts_equal &= exact_layout;
+        if seed % 8 == 0 {
+            assert!(experimental_text::segment_cuts(&text).is_none());
+            assert!(exact_layout, "fallback layout differs for seed {seed}");
+            verified_fallback_cases += 1;
+        }
         assert_eq!(a.len, b.len);
         let a_glyphs: Vec<_> = a
             .runs
@@ -248,10 +258,59 @@ fn verify_shaping() -> Value {
             .flat_map(|r| r.glyphs.iter().map(move |g| (r.font_id, g)))
             .collect();
         identities_equal &= a_glyphs.len() == b_glyphs.len();
-        for ((af, a), (bf, b)) in a_glyphs.iter().zip(&b_glyphs) {
+        let mut first_position_difference = None;
+        for (ordinal, ((af, a), (bf, b))) in a_glyphs.iter().zip(&b_glyphs).enumerate() {
             identities_equal &= (af, a.id, a.index, a.is_emoji) == (bf, b.id, b.index, b.is_emoji);
-            max_drift = max_drift.max(f32::from(a.position.x - b.position.x).abs());
+            let drift = f32::from(a.position.x - b.position.x).abs();
+            if drift > max_drift {
+                max_drift = drift;
+                max_drift_case = Some(json!({"seed":seed, "generator_seed":seed+1,
+                    "text_bytes":text.len(), "glyph_ordinal":ordinal, "byte_index":a.index,
+                    "baseline_x_px":f32::from(a.position.x), "segmented_x_px":f32::from(b.position.x)}));
+            }
+            if a.position != b.position && first_position_difference.is_none() {
+                first_position_difference = Some(json!({"glyph_ordinal":ordinal,
+                    "baseline_byte_index":a.index, "segmented_byte_index":b.index,
+                    "baseline_font_id":format!("{af:?}"), "segmented_font_id":format!("{bf:?}"),
+                    "baseline_glyph_id":format!("{:?}",a.id), "segmented_glyph_id":format!("{:?}",b.id),
+                    "baseline_x_px":f32::from(a.position.x), "segmented_x_px":f32::from(b.position.x),
+                    "baseline_x_bits":f32::from(a.position.x).to_bits(), "segmented_x_bits":f32::from(b.position.x).to_bits(),
+                    "baseline_y_px":f32::from(a.position.y), "segmented_y_px":f32::from(b.position.y)}));
+            }
             max_y_drift = max_y_drift.max(f32::from(a.position.y - b.position.y).abs());
+        }
+        if !exact_layout && first_layout_difference.is_none() {
+            let mut cut_diagnostics = Vec::new();
+            let mut start = 0;
+            let mut summed_width = px(0.);
+            for cut in experimental_text::segment_cuts(&text).unwrap_or_default() {
+                let part = baseline.layout_line(
+                    &text[start..cut],
+                    px(16.),
+                    &[FontRun {
+                        len: cut - start,
+                        font_id: font,
+                    }],
+                );
+                let prefix = baseline.layout_line(
+                    &text[..cut],
+                    px(16.),
+                    &[FontRun {
+                        len: cut,
+                        font_id: font,
+                    }],
+                );
+                summed_width += part.width;
+                cut_diagnostics.push(json!({"cut_byte":cut,
+                    "native_prefix_width_px":f32::from(prefix.width), "summed_segment_width_px":f32::from(summed_width),
+                    "baseline_next_glyph_x_px":a_glyphs.iter().find(|(_,g)|g.index>=cut).map(|(_,g)|f32::from(g.position.x)),
+                    "segmented_next_glyph_x_px":b_glyphs.iter().find(|(_,g)|g.index>=cut).map(|(_,g)|f32::from(g.position.x))}));
+                start = cut;
+            }
+            first_layout_difference = Some(json!({"seed":seed, "generator_seed":seed+1,
+                "text":text, "text_bytes":text.len(), "font":"IBM Plex Sans", "font_size_px":16,
+                "baseline_width_px":f32::from(a.width), "segmented_width_px":f32::from(b.width),
+                "first_position_difference":first_position_difference, "segment_cuts":cut_diagnostics}));
         }
         for width in [200., 300., 500., 700., 1000.] {
             let text_runs = [TextRun {
@@ -283,8 +342,32 @@ fn verify_shaping() -> Value {
                     })
                     .collect::<Vec<_>>()
             };
-            if indices(&a_window) != indices(&b_window) {
+            let a_indices = indices(&a_window);
+            let b_indices = indices(&b_window);
+            if a_indices != b_indices {
                 wrap_differences += 1;
+                if first_wrap_difference.is_none() {
+                    let line = (0..a_indices.len().max(b_indices.len()))
+                        .find(|&i| a_indices.get(i) != b_indices.get(i))
+                        .unwrap();
+                    let a_breaks = a_indices.get(line).map(Vec::as_slice).unwrap_or_default();
+                    let b_breaks = b_indices.get(line).map(Vec::as_slice).unwrap_or_default();
+                    let ordinal = (0..a_breaks.len().max(b_breaks.len()))
+                        .find(|&i| a_breaks.get(i) != b_breaks.get(i))
+                        .unwrap();
+                    let a_index = a_breaks.get(ordinal).copied();
+                    let b_index = b_breaks.get(ordinal).copied();
+                    first_wrap_difference = Some(
+                        json!({"seed":seed, "generator_seed":seed+1, "text":text,
+                        "text_bytes":text.len(), "font":"IBM Plex Sans", "font_size_px":16, "wrap_width_px":width,
+                        "line_ordinal":line, "boundary_ordinal":ordinal,
+                        "baseline_byte_index":a_index, "segmented_byte_index":b_index,
+                        "baseline_boundary_x_px":a_index.and_then(|i|a_glyphs.iter().find(|(_,g)|g.index==i).map(|(_,g)|f32::from(g.position.x))),
+                        "segmented_boundary_x_px":b_index.and_then(|i|b_glyphs.iter().find(|(_,g)|g.index==i).map(|(_,g)|f32::from(g.position.x))),
+                        "baseline_wrap_byte_indices":a_indices, "segmented_wrap_byte_indices":b_indices,
+                        "segment_cuts":experimental_text::segment_cuts(&text)}),
+                    );
+                }
             }
             compared += 1;
         }
@@ -297,10 +380,32 @@ fn verify_shaping() -> Value {
         ))])
         .unwrap();
     assert_eq!(system.retained_glyphs(), 0);
+    let probe = "hello ".repeat(700);
+    let runs = [FontRun {
+        len: probe.len(),
+        font_id: font,
+    }];
+    assert!(experimental_text::segment_cuts(&probe).is_some());
+    system.layout_line(&probe, px(16.), &runs);
+    system.reset_counts();
+    system.layout_line(&probe, px(16.), &runs);
+    assert_eq!(system.calls.load(Ordering::Relaxed), 0);
+    let generation = system.font_generation();
+    baseline
+        .add_fonts(vec![std::borrow::Cow::Borrowed(include_bytes!(
+            "../../ala/assets/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf"
+        ))])
+        .unwrap();
+    assert_ne!(system.font_generation(), generation);
+    system.layout_line(&probe, px(16.), &runs);
+    assert!(system.calls.load(Ordering::Relaxed) > 0);
     json!({"paragraphs":80, "wrap_comparisons":compared, "wrap_differences":wrap_differences,
         "max_glyph_x_drift_px":max_drift, "max_glyph_y_drift_px":max_y_drift,
         "exact_line_layouts_equivalent":layouts_equal, "fallback_cases":fallback_cases,
-        "font_invalidation":true, "glyph_identity_equivalent":identities_equal,
+        "verified_fallback_cases":verified_fallback_cases, "font_invalidation":true,
+        "external_font_invalidation":true, "glyph_identity_equivalent":identities_equal,
+        "first_layout_difference":first_layout_difference, "first_wrap_difference":first_wrap_difference,
+        "max_drift_case":max_drift_case,
         "layout_equivalent":wrap_differences == 0 && layouts_equal,
         "pixel_equivalence":"not established for segmented text"})
 }

@@ -3,12 +3,10 @@
 // Apache-2.0; retains the GPUI and Mesa Hills Research attribution.
 //! Shaping a long line in segments.
 //!
-//! Shaping a long plain paragraph as one line costs time in proportion to its length, every time
-//! its text changes. A paragraph that grows by a word, as a streamed reply does, would shape all of
-//! its text again for each word. When the platform shapes each word on its own, a line cut after a
-//! space can be shaped in pieces, and the layout of the pieces put side by side is the layout of
-//! the line. Each piece is cached by its text, its font size and its font runs, so a change shapes
-//! the pieces it touches and takes the others from the cache.
+//! This prototype caches pieces cut after spaces, keyed by text, size and font runs.
+//! Native verification finds that joining their widths and glyph positions changes
+//! floating-point accumulation and can change wrapping. Glyph identities alone do
+//! not establish layout equivalence.
 //!
 //! Where to cut depends on the text around the cut alone, so that a change moves the cuts near it
 //! and leaves the others where they were.
@@ -38,10 +36,8 @@ const CUT_BITS: u32 = 5;
 /// text and bidirectional controls, which reorder across words, and tabs and other control
 /// characters, whose width depends on where in the line they fall.
 ///
-/// A cut falls after a space, before a character that starts a word and that a line may break
-/// before. Cutting there changes nothing in the text system's choice of fonts for the characters
-/// on either side, since a space is in the primary font. The text system shapes the word before
-/// the space and the word after it on their own either way.
+/// Cuts fall after spaces at accepted word starts. The filter does not prove
+/// font-selection or shaping independence for every accepted script or backend.
 pub(super) fn cut_points(text: &str) -> Option<Vec<usize>> {
     if text.len() < MIN_LINE_LEN {
         return None;
@@ -101,9 +97,8 @@ fn hash_character(hash: u32, character: char) -> u32 {
     (hash ^ character as u32).wrapping_mul(0x0100_0193)
 }
 
-/// Whether a line may break before `character` after a space, and the character doesn't join the
-/// space in shaping. These are the letters and digits of scripts shaped one character to a glyph,
-/// and the punctuation that opens a word.
+/// Accepted word starts for this experimental cut heuristic. Their inclusion
+/// does not establish an exact native shaping contract across the cut.
 fn starts_word(character: char) -> bool {
     match character {
         'a'..='z' | 'A'..='Z' | '0'..='9' => true,
