@@ -22,6 +22,39 @@ pub type PathVertex_ScaledPixels = PathVertex<ScaledPixels>;
 
 pub type DrawOrder = u32;
 
+#[cfg(feature = "perf-experiments")]
+impl Scene {
+    pub(crate) fn push_experimental_opacity(&mut self, opacity: f32) {
+        let opacity = self.experimental_opacity.last().copied().unwrap_or(1.0) * opacity;
+        self.experimental_opacity.push(opacity);
+    }
+
+    pub(crate) fn pop_experimental_opacity(&mut self) {
+        self.experimental_opacity
+            .pop()
+            .expect("balanced opacity scopes");
+    }
+}
+
+#[cfg(feature = "perf-experiments")]
+fn apply_experimental_opacity(primitive: &mut Primitive, opacity: f32) {
+    match primitive {
+        Primitive::Shadow(value) => value.color = value.color.opacity(opacity),
+        Primitive::Quad(value) => {
+            value.background = value.background.opacity(opacity);
+            value.border_color = value.border_color.opacity(opacity);
+        }
+        Primitive::Path(value) => value.color = value.color.opacity(opacity),
+        Primitive::Underline(value) => value.color = value.color.opacity(opacity),
+        Primitive::MonochromeSprite(value) => value.color = value.color.opacity(opacity),
+        Primitive::SubpixelSprite(value) => value.color = value.color.opacity(opacity),
+        Primitive::PolychromeSprite(value) => value.opacity *= opacity,
+        Primitive::Surface(_) | Primitive::ShaderLayer(_) | Primitive::Glass(_) => {
+            panic!("this experimental opacity prototype does not support surfaces or effect layers")
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct PaddedBool32(u32);
@@ -41,6 +74,8 @@ pub struct WindowCornerMask {
 
 #[derive(Default)]
 pub struct Scene {
+    #[cfg(feature = "perf-experiments")]
+    experimental_opacity: Vec<f32>,
     pub(crate) paint_operations: Vec<PaintOperation>,
     primitive_bounds: BoundsTree<ScaledPixels>,
     layer_stack: Vec<DrawOrder>,
@@ -214,6 +249,8 @@ struct OpenShaderLayer {
 
 impl Scene {
     pub fn clear(&mut self) {
+        #[cfg(feature = "perf-experiments")]
+        self.experimental_opacity.clear();
         self.paint_operations.clear();
         self.primitive_bounds.clear();
         self.layer_stack.clear();
@@ -316,6 +353,19 @@ impl Scene {
 
     pub fn insert_primitive(&mut self, primitive: impl Into<Primitive>) {
         let mut primitive = primitive.into();
+        #[cfg(feature = "perf-experiments")]
+        if let Some(opacity) = self.experimental_opacity.last().copied() {
+            let mut placed = primitive.clone();
+            if let Some(transform) = self.transforms.last() {
+                transform.apply(&mut placed);
+            }
+            apply_experimental_opacity(&mut placed, opacity);
+            if self.target().place_primitive(&mut placed) {
+                self.paint_operations
+                    .push(PaintOperation::Primitive(primitive));
+            }
+            return;
+        }
         let Some(transform) = self.transforms.last().copied() else {
             if self.target().place_primitive(&mut primitive) {
                 self.paint_operations
