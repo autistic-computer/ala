@@ -36,7 +36,7 @@ py -3 experiments/retained-layout/run.py --build --repetitions 5 --samples 120 -
 
 The runner builds the selected benchmark, records source/compiler/binary hashes and native backend, runs correctness checks, alternates baseline/candidate order, and saves raw samples plus a readable `.summary.json`. Allocation requests are counted in separate processes with instrumentation disabled for timing passes; they do not measure retained memory or RSS. Save both result files and the machine details with your report.
 
-The correctness gate compares 499,328 exact node rectangles over 128 frames. Compare unchanged, one dirty leaf, 60 dirty leaves and all-dirty cases. The all-dirty and rewrite-all modes are negative controls. No graphics driver or native renderer is exercised by this experiment, so a GPU profile of it has no meaning. Native-machine runs check whether the CPU result survives different CPUs and operating systems.
+The correctness gate compares 499,328 exact node rectangles over 128 frames. Compare unchanged, one dirty leaf, 64 dirty leaves and all-dirty cases. The all-dirty and rewrite-all modes are negative controls. No graphics driver or native renderer is exercised by this experiment, so a GPU profile of it has no meaning. Native-machine runs check whether the CPU result survives different CPUs and operating systems.
 
 ## Cloud evidence
 
