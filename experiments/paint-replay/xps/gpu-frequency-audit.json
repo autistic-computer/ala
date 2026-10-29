@@ -1,0 +1,19 @@
+{
+  "/sys/class/drm/card1/gt_RPn_freq_mhz": "300",
+  "/sys/class/drm/card1/gt_RP1_freq_mhz": "400",
+  "/sys/class/drm/card1/gt_max_freq_mhz": "1100",
+  "/sys/class/drm/card1/gt_act_freq_mhz": "100",
+  "/sys/class/drm/card1/gt_min_freq_mhz": "300",
+  "/sys/class/drm/card1/gt_cur_freq_mhz": "517",
+  "/sys/class/drm/card1/gt_RP0_freq_mhz": "1100",
+  "/sys/class/drm/card1/gt_boost_freq_mhz": "1100",
+  "/sys/class/drm/card1/gt/gt0/throttle_reason_pl1": "0",
+  "/sys/class/drm/card1/gt/gt0/throttle_reason_prochot": "0",
+  "/sys/class/drm/card1/gt/gt0/throttle_reason_vr_thermalert": "0",
+  "/sys/class/drm/card1/gt/gt0/throttle_reason_status": "0",
+  "/sys/class/drm/card1/gt/gt0/throttle_reason_pl4": "0",
+  "/sys/class/drm/card1/gt/gt0/throttle_reason_pl2": "0",
+  "/sys/class/drm/card1/gt/gt0/throttle_reason_thermal": "0",
+  "/sys/class/drm/card1/gt/gt0/throttle_reason_ratl": "0",
+  "/sys/class/drm/card1/gt/gt0/throttle_reason_vr_tdc": "0"
+}

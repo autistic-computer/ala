@@ -1,0 +1,1086 @@
+[
+  {
+    "file": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/01-baseline-gpu.json.gz",
+    "input_sha256": "40a26d49271845896fa133f2fe83dc462e18d635befa43ec1ccbed6be0c450ad",
+    "exclude_startup_seconds": 1.0,
+    "total_complete_frames": 3591,
+    "unparsed_tail_characters": 143,
+    "steady_frames": 3531,
+    "event_counts": {
+      "intel_begin_frame": 3531,
+      "intel_begin_cmd_buffer": 24717,
+      "intel_end_cmd_buffer": 24717,
+      "intel_begin_blorp": 14124,
+      "intel_end_blorp": 14124,
+      "intel_begin_render_pass": 3531,
+      "intel_begin_draw": 180081,
+      "intel_end_draw": 180081,
+      "intel_end_render_pass": 3531,
+      "intel_end_frame": 3531
+    },
+    "event_counts_per_frame": {
+      "intel_begin_frame": 1.0,
+      "intel_begin_cmd_buffer": 7.0,
+      "intel_end_cmd_buffer": 7.0,
+      "intel_begin_blorp": 4.0,
+      "intel_end_blorp": 4.0,
+      "intel_begin_render_pass": 1.0,
+      "intel_begin_draw": 51.0,
+      "intel_end_draw": 51.0,
+      "intel_end_render_pass": 1.0,
+      "intel_end_frame": 1.0
+    },
+    "batches_per_frame_histogram": {
+      "9": 3531
+    },
+    "draws_per_frame_histogram": {
+      "51": 3531
+    },
+    "draw_vertex_count_per_frame_histogram": {
+      "4028": 3531
+    },
+    "normalized_signature_sha256_counts": {
+      "6556c36f6c753b60c7ea2aa502c046ebd17e0d80ed12bf8a130628632d0a449f": 3531
+    },
+    "normalization": "Keep batch index, event name, all params except command_buffer_handle and frame; omit timestamps and durations.",
+    "selected_event_parameters": {
+      "intel_end_draw": [
+        {
+          "params": {
+            "count": "8",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 7062,
+          "count_per_frame": 2.0
+        },
+        {
+          "params": {
+            "count": "128",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 3531,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "100",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 3531,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "52",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 3531,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "12",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 81213,
+          "count_per_frame": 23.0
+        },
+        {
+          "params": {
+            "count": "148",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 35310,
+          "count_per_frame": 10.0
+        },
+        {
+          "params": {
+            "count": "152",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 45903,
+          "count_per_frame": 13.0
+        }
+      ],
+      "intel_end_blorp": [
+        {
+          "params": {
+            "dst_fmt": "R32G32B32A32_UINT",
+            "height": "1",
+            "op": "COPY",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_UINT",
+            "width": "7441"
+          },
+          "total_count": 3531,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_AMBIGUATE",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3531,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_COLOR_CLEAR",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3531,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_PARTIAL_RESOLVE",
+            "predicated": "2",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3531,
+          "count_per_frame": 1.0
+        }
+      ],
+      "intel_end_render_pass": [
+        {
+          "params": {
+            "att_count": "1",
+            "height": "750",
+            "msaa": "1",
+            "width": "1000"
+          },
+          "total_count": 3531,
+          "count_per_frame": 1.0
+        }
+      ]
+    },
+    "interval_durations": {
+      "batch_0_duration": {
+        "median_ms": 0.0,
+        "p95_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0
+      },
+      "batch_1_duration": {
+        "median_ms": 0.016094,
+        "p95_ms": 0.048125,
+        "min_ms": 0.012031,
+        "max_ms": 0.076771
+      },
+      "cmd_buffer": {
+        "median_ms": 0.023646,
+        "p95_ms": 2.629062,
+        "min_ms": 0.006042,
+        "max_ms": 4.07776
+      },
+      "batch_2_duration": {
+        "median_ms": 0.086145,
+        "p95_ms": 0.236094,
+        "min_ms": 0.06474,
+        "max_ms": 0.293854
+      },
+      "blorp": {
+        "median_ms": 0.007187,
+        "p95_ms": 0.082552,
+        "min_ms": 0.00375,
+        "max_ms": 0.230729
+      },
+      "batch_3_duration": {
+        "median_ms": 0.027292,
+        "p95_ms": 0.053438,
+        "min_ms": 0.015677,
+        "max_ms": 0.134739
+      },
+      "batch_4_duration": {
+        "median_ms": 0.010781,
+        "p95_ms": 0.021354,
+        "min_ms": 0.006042,
+        "max_ms": 0.061667
+      },
+      "batch_5_duration": {
+        "median_ms": 2.57823,
+        "p95_ms": 3.311146,
+        "min_ms": 1.697917,
+        "max_ms": 4.07776
+      },
+      "draw": {
+        "median_ms": 0.095052,
+        "p95_ms": 1.931042,
+        "min_ms": 0.051146,
+        "max_ms": 3.161875
+      },
+      "render_pass": {
+        "median_ms": 2.569531,
+        "p95_ms": 3.297708,
+        "min_ms": 1.692344,
+        "max_ms": 4.065729
+      },
+      "batch_6_duration": {
+        "median_ms": 0.023646,
+        "p95_ms": 0.039948,
+        "min_ms": 0.014584,
+        "max_ms": 0.071667
+      },
+      "batch_7_duration": {
+        "median_ms": 0.010052,
+        "p95_ms": 0.013021,
+        "min_ms": 0.006302,
+        "max_ms": 0.044583
+      },
+      "batch_8_duration": {
+        "median_ms": 0.0,
+        "p95_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0
+      }
+    },
+    "render_pass_six_time_chunk_medians_ms": [
+      2.584948,
+      2.579739,
+      2.5578385,
+      2.566823,
+      2.5589065,
+      2.56875
+    ],
+    "timing_caution": "Intervals may overlap. Summing draw/BLORP/render-pass intervals double-counts GPU pipeline work."
+  },
+  {
+    "file": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/02-replay-gpu.json.gz",
+    "input_sha256": "e39f01ebebc2b1872a47b67d6f2b4c4b1755357a860c65f41ad213c08c72483d",
+    "exclude_startup_seconds": 1.0,
+    "total_complete_frames": 3590,
+    "unparsed_tail_characters": 143,
+    "steady_frames": 3530,
+    "event_counts": {
+      "intel_begin_frame": 3530,
+      "intel_begin_cmd_buffer": 24710,
+      "intel_end_cmd_buffer": 24710,
+      "intel_begin_blorp": 14120,
+      "intel_end_blorp": 14120,
+      "intel_begin_render_pass": 3530,
+      "intel_begin_draw": 180030,
+      "intel_end_draw": 180030,
+      "intel_end_render_pass": 3530,
+      "intel_end_frame": 3530
+    },
+    "event_counts_per_frame": {
+      "intel_begin_frame": 1.0,
+      "intel_begin_cmd_buffer": 7.0,
+      "intel_end_cmd_buffer": 7.0,
+      "intel_begin_blorp": 4.0,
+      "intel_end_blorp": 4.0,
+      "intel_begin_render_pass": 1.0,
+      "intel_begin_draw": 51.0,
+      "intel_end_draw": 51.0,
+      "intel_end_render_pass": 1.0,
+      "intel_end_frame": 1.0
+    },
+    "batches_per_frame_histogram": {
+      "9": 3530
+    },
+    "draws_per_frame_histogram": {
+      "51": 3530
+    },
+    "draw_vertex_count_per_frame_histogram": {
+      "4020": 3530
+    },
+    "normalized_signature_sha256_counts": {
+      "1fcbfc22786d3b44ba05112ef99ff5ce0b2e772e95d7fba67a38f53b175e1a30": 3530
+    },
+    "normalization": "Keep batch index, event name, all params except command_buffer_handle and frame; omit timestamps and durations.",
+    "selected_event_parameters": {
+      "intel_end_draw": [
+        {
+          "params": {
+            "count": "8",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 7060,
+          "count_per_frame": 2.0
+        },
+        {
+          "params": {
+            "count": "120",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 3530,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "100",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 3530,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "52",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 3530,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "12",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 81190,
+          "count_per_frame": 23.0
+        },
+        {
+          "params": {
+            "count": "148",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 35300,
+          "count_per_frame": 10.0
+        },
+        {
+          "params": {
+            "count": "152",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 45890,
+          "count_per_frame": 13.0
+        }
+      ],
+      "intel_end_blorp": [
+        {
+          "params": {
+            "dst_fmt": "R32G32B32A32_UINT",
+            "height": "1",
+            "op": "COPY",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_UINT",
+            "width": "7427"
+          },
+          "total_count": 3530,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_AMBIGUATE",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3530,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_COLOR_CLEAR",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3530,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_PARTIAL_RESOLVE",
+            "predicated": "2",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3530,
+          "count_per_frame": 1.0
+        }
+      ],
+      "intel_end_render_pass": [
+        {
+          "params": {
+            "att_count": "1",
+            "height": "750",
+            "msaa": "1",
+            "width": "1000"
+          },
+          "total_count": 3530,
+          "count_per_frame": 1.0
+        }
+      ]
+    },
+    "interval_durations": {
+      "batch_0_duration": {
+        "median_ms": 0.0,
+        "p95_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0
+      },
+      "batch_1_duration": {
+        "median_ms": 0.01875,
+        "p95_ms": 0.047604,
+        "min_ms": 0.007605,
+        "max_ms": 0.079895
+      },
+      "cmd_buffer": {
+        "median_ms": 0.027396,
+        "p95_ms": 3.441927,
+        "min_ms": 0.005156,
+        "max_ms": 4.480781
+      },
+      "batch_2_duration": {
+        "median_ms": 0.0972395,
+        "p95_ms": 0.18125,
+        "min_ms": 0.054792,
+        "max_ms": 0.310625
+      },
+      "blorp": {
+        "median_ms": 0.008438,
+        "p95_ms": 0.092865,
+        "min_ms": 0.00323,
+        "max_ms": 0.223959
+      },
+      "batch_3_duration": {
+        "median_ms": 0.032239,
+        "p95_ms": 0.049375,
+        "min_ms": 0.013542,
+        "max_ms": 0.106823
+      },
+      "batch_4_duration": {
+        "median_ms": 0.012916,
+        "p95_ms": 0.019739,
+        "min_ms": 0.005364,
+        "max_ms": 0.051146
+      },
+      "batch_5_duration": {
+        "median_ms": 3.3486979999999997,
+        "p95_ms": 3.700625,
+        "min_ms": 1.581667,
+        "max_ms": 4.480781
+      },
+      "draw": {
+        "median_ms": 0.116719,
+        "p95_ms": 2.525,
+        "min_ms": 0.044011,
+        "max_ms": 3.536719
+      },
+      "render_pass": {
+        "median_ms": 3.3374474999999997,
+        "p95_ms": 3.688854,
+        "min_ms": 1.576979,
+        "max_ms": 4.466666
+      },
+      "batch_6_duration": {
+        "median_ms": 0.030885,
+        "p95_ms": 0.052135,
+        "min_ms": 0.012083,
+        "max_ms": 0.079063
+      },
+      "batch_7_duration": {
+        "median_ms": 0.012968,
+        "p95_ms": 0.015782,
+        "min_ms": 0.005156,
+        "max_ms": 0.054011
+      },
+      "batch_8_duration": {
+        "median_ms": 0.0,
+        "p95_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0
+      }
+    },
+    "render_pass_six_time_chunk_medians_ms": [
+      3.3200525,
+      3.3126559999999996,
+      3.342708,
+      3.3851560000000003,
+      3.3279685,
+      3.327812
+    ],
+    "timing_caution": "Intervals may overlap. Summing draw/BLORP/render-pass intervals double-counts GPU pipeline work."
+  },
+  {
+    "file": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu-reverse/01-replay-gpu.json.gz",
+    "input_sha256": "dd288da978f00dc5bbddaaaf585ef1ff77a2ced43e174385b265cfd01fbc8d44",
+    "exclude_startup_seconds": 1.0,
+    "total_complete_frames": 3586,
+    "unparsed_tail_characters": 143,
+    "steady_frames": 3526,
+    "event_counts": {
+      "intel_begin_frame": 3526,
+      "intel_begin_cmd_buffer": 24682,
+      "intel_end_cmd_buffer": 24682,
+      "intel_begin_blorp": 14104,
+      "intel_end_blorp": 14104,
+      "intel_begin_render_pass": 3526,
+      "intel_begin_draw": 179826,
+      "intel_end_draw": 179826,
+      "intel_end_render_pass": 3526,
+      "intel_end_frame": 3526
+    },
+    "event_counts_per_frame": {
+      "intel_begin_frame": 1.0,
+      "intel_begin_cmd_buffer": 7.0,
+      "intel_end_cmd_buffer": 7.0,
+      "intel_begin_blorp": 4.0,
+      "intel_end_blorp": 4.0,
+      "intel_begin_render_pass": 1.0,
+      "intel_begin_draw": 51.0,
+      "intel_end_draw": 51.0,
+      "intel_end_render_pass": 1.0,
+      "intel_end_frame": 1.0
+    },
+    "batches_per_frame_histogram": {
+      "9": 3526
+    },
+    "draws_per_frame_histogram": {
+      "51": 3526
+    },
+    "draw_vertex_count_per_frame_histogram": {
+      "4020": 3526
+    },
+    "normalized_signature_sha256_counts": {
+      "1fcbfc22786d3b44ba05112ef99ff5ce0b2e772e95d7fba67a38f53b175e1a30": 3526
+    },
+    "normalization": "Keep batch index, event name, all params except command_buffer_handle and frame; omit timestamps and durations.",
+    "selected_event_parameters": {
+      "intel_end_draw": [
+        {
+          "params": {
+            "count": "8",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 7052,
+          "count_per_frame": 2.0
+        },
+        {
+          "params": {
+            "count": "120",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 3526,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "100",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 3526,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "52",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 3526,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "12",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 81098,
+          "count_per_frame": 23.0
+        },
+        {
+          "params": {
+            "count": "148",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 35260,
+          "count_per_frame": 10.0
+        },
+        {
+          "params": {
+            "count": "152",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 45838,
+          "count_per_frame": 13.0
+        }
+      ],
+      "intel_end_blorp": [
+        {
+          "params": {
+            "dst_fmt": "R32G32B32A32_UINT",
+            "height": "1",
+            "op": "COPY",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_UINT",
+            "width": "7427"
+          },
+          "total_count": 3526,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_AMBIGUATE",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3526,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_COLOR_CLEAR",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3526,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_PARTIAL_RESOLVE",
+            "predicated": "2",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3526,
+          "count_per_frame": 1.0
+        }
+      ],
+      "intel_end_render_pass": [
+        {
+          "params": {
+            "att_count": "1",
+            "height": "750",
+            "msaa": "1",
+            "width": "1000"
+          },
+          "total_count": 3526,
+          "count_per_frame": 1.0
+        }
+      ]
+    },
+    "interval_durations": {
+      "batch_0_duration": {
+        "median_ms": 0.0,
+        "p95_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0
+      },
+      "batch_1_duration": {
+        "median_ms": 0.018594,
+        "p95_ms": 0.047865,
+        "min_ms": 0.010781,
+        "max_ms": 0.083594
+      },
+      "cmd_buffer": {
+        "median_ms": 0.027448,
+        "p95_ms": 3.398282,
+        "min_ms": 0.00552,
+        "max_ms": 4.516875
+      },
+      "batch_2_duration": {
+        "median_ms": 0.0977605,
+        "p95_ms": 0.208854,
+        "min_ms": 0.065886,
+        "max_ms": 0.289948
+      },
+      "blorp": {
+        "median_ms": 0.008385,
+        "p95_ms": 0.094063,
+        "min_ms": 0.003907,
+        "max_ms": 3.071302
+      },
+      "batch_3_duration": {
+        "median_ms": 0.0323435,
+        "p95_ms": 0.053594,
+        "min_ms": 0.020416,
+        "max_ms": 0.10849
+      },
+      "batch_4_duration": {
+        "median_ms": 0.012916,
+        "p95_ms": 0.021459,
+        "min_ms": 0.007239,
+        "max_ms": 0.057188
+      },
+      "batch_5_duration": {
+        "median_ms": 3.32138,
+        "p95_ms": 3.62323,
+        "min_ms": 1.592709,
+        "max_ms": 4.516875
+      },
+      "draw": {
+        "median_ms": 0.116771,
+        "p95_ms": 2.488386,
+        "min_ms": 0.043437,
+        "max_ms": 3.445885
+      },
+      "render_pass": {
+        "median_ms": 3.309063,
+        "p95_ms": 3.611406,
+        "min_ms": 1.586614,
+        "max_ms": 4.492031
+      },
+      "batch_6_duration": {
+        "median_ms": 0.030729,
+        "p95_ms": 0.04974,
+        "min_ms": 0.013021,
+        "max_ms": 3.095208
+      },
+      "batch_7_duration": {
+        "median_ms": 0.012917,
+        "p95_ms": 0.015781,
+        "min_ms": 0.00552,
+        "max_ms": 0.074375
+      },
+      "batch_8_duration": {
+        "median_ms": 0.0,
+        "p95_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0
+      }
+    },
+    "render_pass_six_time_chunk_medians_ms": [
+      3.276718,
+      3.323568,
+      3.3415625,
+      3.351875,
+      3.2972655,
+      3.26487
+    ],
+    "timing_caution": "Intervals may overlap. Summing draw/BLORP/render-pass intervals double-counts GPU pipeline work."
+  },
+  {
+    "file": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu-reverse/02-baseline-gpu.json.gz",
+    "input_sha256": "f89033f744c62359aae059701b710db3d7da5126d82eecd85985b3876e8344f5",
+    "exclude_startup_seconds": 1.0,
+    "total_complete_frames": 3587,
+    "unparsed_tail_characters": 143,
+    "steady_frames": 3527,
+    "event_counts": {
+      "intel_begin_frame": 3527,
+      "intel_begin_cmd_buffer": 24689,
+      "intel_end_cmd_buffer": 24689,
+      "intel_begin_blorp": 14108,
+      "intel_end_blorp": 14108,
+      "intel_begin_render_pass": 3527,
+      "intel_begin_draw": 179877,
+      "intel_end_draw": 179877,
+      "intel_end_render_pass": 3527,
+      "intel_end_frame": 3527
+    },
+    "event_counts_per_frame": {
+      "intel_begin_frame": 1.0,
+      "intel_begin_cmd_buffer": 7.0,
+      "intel_end_cmd_buffer": 7.0,
+      "intel_begin_blorp": 4.0,
+      "intel_end_blorp": 4.0,
+      "intel_begin_render_pass": 1.0,
+      "intel_begin_draw": 51.0,
+      "intel_end_draw": 51.0,
+      "intel_end_render_pass": 1.0,
+      "intel_end_frame": 1.0
+    },
+    "batches_per_frame_histogram": {
+      "9": 3527
+    },
+    "draws_per_frame_histogram": {
+      "51": 3527
+    },
+    "draw_vertex_count_per_frame_histogram": {
+      "4028": 3527
+    },
+    "normalized_signature_sha256_counts": {
+      "6556c36f6c753b60c7ea2aa502c046ebd17e0d80ed12bf8a130628632d0a449f": 3527
+    },
+    "normalization": "Keep batch index, event name, all params except command_buffer_handle and frame; omit timestamps and durations.",
+    "selected_event_parameters": {
+      "intel_end_draw": [
+        {
+          "params": {
+            "count": "8",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 7054,
+          "count_per_frame": 2.0
+        },
+        {
+          "params": {
+            "count": "128",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 3527,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "100",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 3527,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "52",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 3527,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "count": "12",
+            "fs_hash": "0x91e5572b",
+            "vs_hash": "0xc17daab5"
+          },
+          "total_count": 81121,
+          "count_per_frame": 23.0
+        },
+        {
+          "params": {
+            "count": "148",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 35270,
+          "count_per_frame": 10.0
+        },
+        {
+          "params": {
+            "count": "152",
+            "fs_hash": "0x7f513e4a",
+            "vs_hash": "0x1cdecfbf"
+          },
+          "total_count": 45851,
+          "count_per_frame": 13.0
+        }
+      ],
+      "intel_end_blorp": [
+        {
+          "params": {
+            "dst_fmt": "R32G32B32A32_UINT",
+            "height": "1",
+            "op": "COPY",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_UINT",
+            "width": "7441"
+          },
+          "total_count": 3527,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_AMBIGUATE",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3527,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_COLOR_CLEAR",
+            "predicated": "0",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3527,
+          "count_per_frame": 1.0
+        },
+        {
+          "params": {
+            "dst_fmt": "B8G8R8A8_UNORM",
+            "height": "24",
+            "op": "CCS_PARTIAL_RESOLVE",
+            "predicated": "2",
+            "samples": "1",
+            "shader_pipe": "render",
+            "src_fmt": "R32G32B32A32_FLOAT",
+            "width": "16"
+          },
+          "total_count": 3527,
+          "count_per_frame": 1.0
+        }
+      ],
+      "intel_end_render_pass": [
+        {
+          "params": {
+            "att_count": "1",
+            "height": "750",
+            "msaa": "1",
+            "width": "1000"
+          },
+          "total_count": 3527,
+          "count_per_frame": 1.0
+        }
+      ]
+    },
+    "interval_durations": {
+      "batch_0_duration": {
+        "median_ms": 0.0,
+        "p95_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0
+      },
+      "batch_1_duration": {
+        "median_ms": 0.016093,
+        "p95_ms": 0.049375,
+        "min_ms": 0.009844,
+        "max_ms": 0.096614
+      },
+      "cmd_buffer": {
+        "median_ms": 0.023594,
+        "p95_ms": 2.60224,
+        "min_ms": 0.004896,
+        "max_ms": 5.402032
+      },
+      "batch_2_duration": {
+        "median_ms": 0.085677,
+        "p95_ms": 0.252083,
+        "min_ms": 0.053542,
+        "max_ms": 0.300886
+      },
+      "blorp": {
+        "median_ms": 0.007136,
+        "p95_ms": 0.0825,
+        "min_ms": 0.00349,
+        "max_ms": 0.22177
+      },
+      "batch_3_duration": {
+        "median_ms": 0.027187,
+        "p95_ms": 0.053906,
+        "min_ms": 0.016927,
+        "max_ms": 0.110052
+      },
+      "batch_4_duration": {
+        "median_ms": 0.009427,
+        "p95_ms": 0.021406,
+        "min_ms": 0.006615,
+        "max_ms": 0.060208
+      },
+      "batch_5_duration": {
+        "median_ms": 2.545782,
+        "p95_ms": 3.299166,
+        "min_ms": 1.348802,
+        "max_ms": 5.402032
+      },
+      "draw": {
+        "median_ms": 0.095365,
+        "p95_ms": 1.902292,
+        "min_ms": 0.036198,
+        "max_ms": 3.342709
+      },
+      "render_pass": {
+        "median_ms": 2.535521,
+        "p95_ms": 3.288282,
+        "min_ms": 1.337083,
+        "max_ms": 5.393645
+      },
+      "batch_6_duration": {
+        "median_ms": 0.023646,
+        "p95_ms": 0.043021,
+        "min_ms": 0.011719,
+        "max_ms": 0.078906
+      },
+      "batch_7_duration": {
+        "median_ms": 0.010052,
+        "p95_ms": 0.013281,
+        "min_ms": 0.004896,
+        "max_ms": 0.044948
+      },
+      "batch_8_duration": {
+        "median_ms": 0.0,
+        "p95_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0
+      }
+    },
+    "render_pass_six_time_chunk_medians_ms": [
+      2.596302,
+      2.5324475,
+      2.5454165,
+      2.5196875,
+      2.5310675,
+      2.4996095
+    ],
+    "timing_caution": "Intervals may overlap. Summing draw/BLORP/render-pass intervals double-counts GPU pipeline work."
+  }
+]

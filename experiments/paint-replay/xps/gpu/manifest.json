@@ -1,0 +1,115 @@
+{
+  "source_commit": "bbb6a3ff8d1afbf4a1bf1cc7b2998eecf464ea48",
+  "binary_sha256": "1e0f48dceb989715339b6baec63c4482715c437c5c26dcaaad331230bb4bfc1c",
+  "gpu_timing_documentation": "https://docs.mesa3d.org/u_trace.html",
+  "runs": [
+    {
+      "name": "01-baseline",
+      "utc": "2026-10-29T23:16:15.431009+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/01-baseline.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "baseline",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/01-baseline.ndjson",
+        "MESA_GPU_TRACES": "print_json",
+        "MESA_GPU_TRACEFILE": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/01-baseline-gpu.json"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 42050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 40000,
+        "/sys/class/thermal/thermal_zone5/temp": 33050,
+        "/sys/class/thermal/thermal_zone3/temp": 46050,
+        "/sys/class/thermal/thermal_zone1/temp": 73050,
+        "/sys/class/thermal/thermal_zone8/temp": 60000,
+        "/sys/class/thermal/thermal_zone6/temp": 43050,
+        "/sys/class/thermal/thermal_zone4/temp": 42050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "02-replay",
+      "utc": "2026-10-29T23:17:16.701579+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/02-replay.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "replay",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/02-replay.ndjson",
+        "MESA_GPU_TRACES": "print_json",
+        "MESA_GPU_TRACEFILE": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/02-replay-gpu.json"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 44050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 40000,
+        "/sys/class/thermal/thermal_zone5/temp": 33050,
+        "/sys/class/thermal/thermal_zone3/temp": 51050,
+        "/sys/class/thermal/thermal_zone1/temp": 66050,
+        "/sys/class/thermal/thermal_zone8/temp": 66000,
+        "/sys/class/thermal/thermal_zone6/temp": 45050,
+        "/sys/class/thermal/thermal_zone4/temp": 44050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "03-static",
+      "utc": "2026-10-29T23:18:18.000930+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/03-static.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "static",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/03-static.ndjson",
+        "MESA_GPU_TRACES": "print_json",
+        "MESA_GPU_TRACEFILE": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu/03-static-gpu.json"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 44050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 41000,
+        "/sys/class/thermal/thermal_zone5/temp": 33050,
+        "/sys/class/thermal/thermal_zone3/temp": 51050,
+        "/sys/class/thermal/thermal_zone1/temp": 73050,
+        "/sys/class/thermal/thermal_zone8/temp": 66000,
+        "/sys/class/thermal/thermal_zone6/temp": 45050,
+        "/sys/class/thermal/thermal_zone4/temp": 44050
+      },
+      "returncode": 0
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+Run from the codex/paint-replay worktree on XPS, 2026-10-29.
+Source: bbb6a3ff8d1afbf4a1bf1cc7b2998eecf464ea48 (original PR: 9b905de70b8d7956ea3f801977997da3081cda5f).
+Build environment: CARGO_TARGET_DIR=/home/demfabris/dev/ala-native-target CARGO_BUILD_JOBS=4.
+
+python3 experiments/paint-replay/run.py --build --verify-only --output experiments/paint-replay/xps/verify-xps.json
+python3 experiments/paint-replay/run.py --build --cpu 2 --repetitions 5 --samples 120 --output experiments/paint-replay/xps/xps-paint-replay.json
+
+A debug core-test build briefly overlapped the second command's build phase.
+It was interrupted before timing samples began; core-tests.log records the interrupted build.
+The first timing result is preserved as first-attempt.json and first-attempt.summary.json.
+Reported CPU results use a fresh run with no concurrent builds:
+
+python3 experiments/paint-replay/run.py --binary /home/demfabris/dev/ala-native-target/release/deps/paint_replay-f66fe346418627cb --cpu 2 --repetitions 5 --samples 120 --output experiments/paint-replay/xps/xps-paint-replay.json
+
+cargo test --release --locked -p ala --no-default-features --features bench-support,perf-experiments --lib
+cargo fmt --all -- --check
+
+Native live build and captures (commands and per-run environments also saved in manifests):
+cargo bench --locked -p ala-platform --no-default-features --features bench-support,perf-experiments,wayland,x11 --bench paint_replay --no-run --message-format=json
+python3 experiments/paint-replay/xps/collect-live.py NATIVE_BINARY
+python3 experiments/paint-replay/xps/collect-live.py NATIVE_BINARY --profile
+python3 experiments/paint-replay/xps/collect-live.py NATIVE_BINARY --profile --reverse --sample-frequency
+python3 experiments/paint-replay/xps/summarize-live.py
+python3 experiments/paint-replay/xps/gpu-topology.py --exclude-seconds 1 experiments/paint-replay/xps/gpu/01-baseline-gpu.json.gz experiments/paint-replay/xps/gpu/02-replay-gpu.json.gz experiments/paint-replay/xps/gpu-reverse/01-replay-gpu.json.gz experiments/paint-replay/xps/gpu-reverse/02-baseline-gpu.json.gz
+
+The reverse GPU pair investigated a longer replay GPU span, with identical drawing topology.
+Its 47 ms sysfs sampling reads requested/actual GPU frequency and throttle status.
+No GPU clock, power, security, or driver settings were changed.
+
+Additional diagnostic/visual probes, excluded from reported timing summaries:
+ALA_FRAME_STATS=experiments/paint-replay/xps/probe.ndjson MESA_GPU_TRACES=print_json MESA_GPU_TRACEFILE=experiments/paint-replay/xps/probe-gpu-%i.json python3 experiments/paint-replay/run.py --binary NATIVE_BINARY --live baseline --seconds 20
+python3 experiments/paint-replay/run.py --binary NATIVE_BINARY --live replay --seconds 20
+The replay probe was repeated twice while resolving the local capture tool's display access.
+Desktop observations used a temporary local `CUA_DRIVER_RS_ENABLE_WAYLAND=1 cua-driver serve`
+in standard permission mode, then get_desktop_state with screenshot_out_file under /tmp.
+The owned service was stopped before timed captures. Only fixture crops are published.
+
+machine.json stores the machine audit commands and outputs.
+CPU JSON stores exact source/compiler/binary hashes and child commands.
+Each live manifest stores the exact binary hash, commands, environment, UTC start and power mode.
+Each live run lasts 60 seconds. CPU captures alternate baseline/replay five times, then static.
+GPU captures run separately with Mesa ANV u_trace hardware timestamps.

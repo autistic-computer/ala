@@ -1,0 +1,29 @@
+{
+  "capture_method": "cua-driver desktop capture, manually observed region; not an attested window capture",
+  "source_desktop_size": [
+    1920,
+    1200
+  ],
+  "observed_region": [
+    460,
+    245,
+    1460,
+    995
+  ],
+  "crop_size": [
+    1000,
+    750
+  ],
+  "changed_bounds": [
+    0,
+    35,
+    175,
+    65
+  ],
+  "changed_pixels": 5091,
+  "rows_below_effect_identical": true,
+  "sha256": {
+    "replay-desktop-crop.png": "f883bf136689fb4efc2cecc742d6d8676a7fc63033f918a27cf8f4cbcb135e2d",
+    "replay-desktop-crop-2.png": "eef5518d7f79c5405c7709dc61a4595e2d2ba523536a8d6b158a58f55e5273e0"
+  }
+}

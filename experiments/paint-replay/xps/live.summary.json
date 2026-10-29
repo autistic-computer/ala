@@ -1,0 +1,2689 @@
+{
+  "exclude_startup_seconds": 1,
+  "runs": [
+    {
+      "capture": "live",
+      "name": "01-baseline",
+      "mode": "baseline",
+      "total_frames": 3590,
+      "steady_frames": 3531,
+      "startup_draw_wall_ms": 18.868052,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 968,
+        "layout_nodes": 967,
+        "sprites": 909,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22020,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.000321012,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3531,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 4.298911,
+        "p95": 4.80144,
+        "max": 8.212991
+      },
+      "draw_thread_cpu_ms": {
+        "median": 4.292208,
+        "p95": 4.791255,
+        "max": 8.199349
+      },
+      "request_layout_wall_ms": {
+        "median": 1.903739,
+        "p95": 2.144179,
+        "max": 3.90304
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 1.903779,
+        "p95": 2.143792,
+        "max": 3.892898
+      },
+      "prepaint_wall_ms": {
+        "median": 0.760622,
+        "p95": 1.196645,
+        "max": 1.726882
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.759343,
+        "p95": 1.190913,
+        "max": 1.725357
+      },
+      "paint_wall_ms": {
+        "median": 1.169759,
+        "p95": 1.568043,
+        "max": 2.230794
+      },
+      "paint_thread_cpu_ms": {
+        "median": 1.165454,
+        "p95": 1.563344,
+        "max": 2.231112
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.01162,
+        "p95": 0.03809,
+        "max": 0.146583
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.011483,
+        "p95": 0.037988,
+        "max": 0.146151
+      },
+      "present_submit_wall_ms": {
+        "median": 0.723545,
+        "p95": 1.064881,
+        "max": 1.463551
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.724491,
+        "p95": 1.06418,
+        "max": 1.453863
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 2,
+          "p95": 2,
+          "max": 2
+        },
+        "elements": {
+          "median": 968,
+          "p95": 968,
+          "max": 968
+        },
+        "layout_nodes": {
+          "median": 967,
+          "p95": 967,
+          "max": 967
+        },
+        "sprites": {
+          "median": 909,
+          "p95": 909,
+          "max": 909
+        },
+        "quads": {
+          "median": 98,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.6850015,
+        "p95": 16.995173,
+        "max": 31.061812
+      },
+      "draw_hz": 59.83131680682132,
+      "draw_intervals_over_25ms": 6,
+      "process_user_seconds": 18.03,
+      "process_system_seconds": 1.5,
+      "peak_rss_kib": 116600.0,
+      "process_cpu_seconds": 19.53,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "live",
+      "name": "02-replay",
+      "mode": "replay",
+      "total_frames": 3597,
+      "steady_frames": 3538,
+      "startup_draw_wall_ms": 19.776082,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 969,
+        "layout_nodes": 967,
+        "sprites": 907,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22018,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.005907608,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3538,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 0.8129995,
+        "p95": 0.972564,
+        "max": 1.381655
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.811327,
+        "p95": 0.968164,
+        "max": 1.31452
+      },
+      "request_layout_wall_ms": {
+        "median": 0.058843,
+        "p95": 0.162966,
+        "max": 0.337569
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 0.0588655,
+        "p95": 0.162418,
+        "max": 0.337522
+      },
+      "prepaint_wall_ms": {
+        "median": 0.29063,
+        "p95": 0.354335,
+        "max": 0.5266
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.29032250000000004,
+        "p95": 0.354211,
+        "max": 0.523941
+      },
+      "paint_wall_ms": {
+        "median": 0.31917399999999996,
+        "p95": 0.391023,
+        "max": 0.783213
+      },
+      "paint_thread_cpu_ms": {
+        "median": 0.319051,
+        "p95": 0.390459,
+        "max": 0.671459
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.010713,
+        "p95": 0.029373,
+        "max": 0.083204
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.010586499999999999,
+        "p95": 0.029048,
+        "max": 0.082808
+      },
+      "present_submit_wall_ms": {
+        "median": 0.6139745,
+        "p95": 0.817896,
+        "max": 3.922998
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.614595,
+        "p95": 0.818348,
+        "max": 1.339074
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 1.0,
+          "p95": 1,
+          "max": 1
+        },
+        "elements": {
+          "median": 5.0,
+          "p95": 5,
+          "max": 5
+        },
+        "layout_nodes": {
+          "median": 4.0,
+          "p95": 4,
+          "max": 4
+        },
+        "sprites": {
+          "median": 907.0,
+          "p95": 907,
+          "max": 907
+        },
+        "quads": {
+          "median": 98.0,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480.0,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.681496,
+        "p95": 17.120566,
+        "max": 25.839007
+      },
+      "draw_hz": 59.95400196551715,
+      "draw_intervals_over_25ms": 2,
+      "process_user_seconds": 5.2,
+      "process_system_seconds": 1.19,
+      "peak_rss_kib": 115956.0,
+      "process_cpu_seconds": 6.390000000000001,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "live",
+      "name": "03-baseline",
+      "mode": "baseline",
+      "total_frames": 3588,
+      "steady_frames": 3530,
+      "startup_draw_wall_ms": 23.610734,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 968,
+        "layout_nodes": 967,
+        "sprites": 909,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22020,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.011470875,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3530,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 4.272767,
+        "p95": 4.780231,
+        "max": 6.574135
+      },
+      "draw_thread_cpu_ms": {
+        "median": 4.2631499999999996,
+        "p95": 4.771047,
+        "max": 6.571024
+      },
+      "request_layout_wall_ms": {
+        "median": 1.8782735000000002,
+        "p95": 2.122046,
+        "max": 4.020755
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 1.8766845,
+        "p95": 2.120104,
+        "max": 4.023053
+      },
+      "prepaint_wall_ms": {
+        "median": 0.744721,
+        "p95": 1.112255,
+        "max": 1.728202
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.7432099999999999,
+        "p95": 1.110824,
+        "max": 1.726176
+      },
+      "paint_wall_ms": {
+        "median": 1.1721599999999999,
+        "p95": 1.579444,
+        "max": 2.213746
+      },
+      "paint_thread_cpu_ms": {
+        "median": 1.168508,
+        "p95": 1.573466,
+        "max": 2.213858
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.011872,
+        "p95": 0.042332,
+        "max": 0.170119
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.011745,
+        "p95": 0.041155,
+        "max": 0.17008
+      },
+      "present_submit_wall_ms": {
+        "median": 0.7028465,
+        "p95": 1.042612,
+        "max": 1.506907
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.7036389999999999,
+        "p95": 1.040352,
+        "max": 1.507623
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 2.0,
+          "p95": 2,
+          "max": 2
+        },
+        "elements": {
+          "median": 968.0,
+          "p95": 968,
+          "max": 968
+        },
+        "layout_nodes": {
+          "median": 967.0,
+          "p95": 967,
+          "max": 967
+        },
+        "sprites": {
+          "median": 909.0,
+          "p95": 909,
+          "max": 909
+        },
+        "quads": {
+          "median": 98.0,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480.0,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.683096,
+        "p95": 17.000357,
+        "max": 32.211907
+      },
+      "draw_hz": 59.804151391097676,
+      "draw_intervals_over_25ms": 7,
+      "process_user_seconds": 17.85,
+      "process_system_seconds": 1.49,
+      "peak_rss_kib": 115836.0,
+      "process_cpu_seconds": 19.34,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "live",
+      "name": "04-replay",
+      "mode": "replay",
+      "total_frames": 3591,
+      "steady_frames": 3532,
+      "startup_draw_wall_ms": 25.082683,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 969,
+        "layout_nodes": 967,
+        "sprites": 907,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22018,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.010182533,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3532,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 0.8437235000000001,
+        "p95": 1.02592,
+        "max": 1.27989
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.841404,
+        "p95": 1.020913,
+        "max": 1.191363
+      },
+      "request_layout_wall_ms": {
+        "median": 0.0570415,
+        "p95": 0.172845,
+        "max": 0.244241
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 0.057010000000000005,
+        "p95": 0.17293,
+        "max": 0.24508
+      },
+      "prepaint_wall_ms": {
+        "median": 0.292962,
+        "p95": 0.368021,
+        "max": 0.572544
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.292481,
+        "p95": 0.367062,
+        "max": 0.569813
+      },
+      "paint_wall_ms": {
+        "median": 0.33268450000000005,
+        "p95": 0.421737,
+        "max": 0.568015
+      },
+      "paint_thread_cpu_ms": {
+        "median": 0.33265849999999997,
+        "p95": 0.421343,
+        "max": 0.568058
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.01078,
+        "p95": 0.037182,
+        "max": 0.117814
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.010643,
+        "p95": 0.036905,
+        "max": 0.117561
+      },
+      "present_submit_wall_ms": {
+        "median": 0.627275,
+        "p95": 0.898164,
+        "max": 1.198545
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.627812,
+        "p95": 0.898531,
+        "max": 1.198924
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 1.0,
+          "p95": 1,
+          "max": 1
+        },
+        "elements": {
+          "median": 5.0,
+          "p95": 5,
+          "max": 5
+        },
+        "layout_nodes": {
+          "median": 4.0,
+          "p95": 4,
+          "max": 4
+        },
+        "sprites": {
+          "median": 907.0,
+          "p95": 907,
+          "max": 907
+        },
+        "quads": {
+          "median": 98.0,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480.0,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.681525,
+        "p95": 17.013137,
+        "max": 31.521557
+      },
+      "draw_hz": 59.853520006541686,
+      "draw_intervals_over_25ms": 6,
+      "process_user_seconds": 5.46,
+      "process_system_seconds": 1.25,
+      "peak_rss_kib": 115608.0,
+      "process_cpu_seconds": 6.71,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "live",
+      "name": "05-baseline",
+      "mode": "baseline",
+      "total_frames": 3595,
+      "steady_frames": 3537,
+      "startup_draw_wall_ms": 24.479426,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 968,
+        "layout_nodes": 967,
+        "sprites": 909,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22020,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.004730202,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3537,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 3.729934,
+        "p95": 4.504353,
+        "max": 8.227088
+      },
+      "draw_thread_cpu_ms": {
+        "median": 3.719753,
+        "p95": 4.495601,
+        "max": 8.207873
+      },
+      "request_layout_wall_ms": {
+        "median": 1.832873,
+        "p95": 2.112057,
+        "max": 4.546625
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 1.832813,
+        "p95": 2.107519,
+        "max": 4.530816
+      },
+      "prepaint_wall_ms": {
+        "median": 0.699372,
+        "p95": 0.872,
+        "max": 1.892382
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.697896,
+        "p95": 0.868497,
+        "max": 1.890337
+      },
+      "paint_wall_ms": {
+        "median": 0.87743,
+        "p95": 1.31233,
+        "max": 1.848431
+      },
+      "paint_thread_cpu_ms": {
+        "median": 0.873431,
+        "p95": 1.308738,
+        "max": 1.848036
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.01144,
+        "p95": 0.030899,
+        "max": 0.164074
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.011343,
+        "p95": 0.030086,
+        "max": 0.164087
+      },
+      "present_submit_wall_ms": {
+        "median": 0.622923,
+        "p95": 0.96242,
+        "max": 1.656967
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.622017,
+        "p95": 0.960187,
+        "max": 1.489322
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 2,
+          "p95": 2,
+          "max": 2
+        },
+        "elements": {
+          "median": 968,
+          "p95": 968,
+          "max": 968
+        },
+        "layout_nodes": {
+          "median": 967,
+          "p95": 967,
+          "max": 967
+        },
+        "sprites": {
+          "median": 909,
+          "p95": 909,
+          "max": 909
+        },
+        "quads": {
+          "median": 98,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.6787385,
+        "p95": 17.149409,
+        "max": 35.812804
+      },
+      "draw_hz": 59.932172975776425,
+      "draw_intervals_over_25ms": 4,
+      "process_user_seconds": 16.15,
+      "process_system_seconds": 1.44,
+      "peak_rss_kib": 116544.0,
+      "process_cpu_seconds": 17.59,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "live",
+      "name": "06-replay",
+      "mode": "replay",
+      "total_frames": 3588,
+      "steady_frames": 3529,
+      "startup_draw_wall_ms": 19.939863,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 969,
+        "layout_nodes": 967,
+        "sprites": 907,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22018,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.000314384,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3529,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 0.845939,
+        "p95": 1.053356,
+        "max": 1.553163
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.844025,
+        "p95": 1.049745,
+        "max": 1.4843
+      },
+      "request_layout_wall_ms": {
+        "median": 0.060727,
+        "p95": 0.173793,
+        "max": 0.43711
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 0.060613,
+        "p95": 0.176157,
+        "max": 0.436718
+      },
+      "prepaint_wall_ms": {
+        "median": 0.296305,
+        "p95": 0.37688,
+        "max": 0.600872
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.29591,
+        "p95": 0.375067,
+        "max": 0.599112
+      },
+      "paint_wall_ms": {
+        "median": 0.331566,
+        "p95": 0.424745,
+        "max": 0.613097
+      },
+      "paint_thread_cpu_ms": {
+        "median": 0.331694,
+        "p95": 0.424585,
+        "max": 0.613117
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.010656,
+        "p95": 0.035581,
+        "max": 0.341023
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.010537,
+        "p95": 0.03553,
+        "max": 0.11529
+      },
+      "present_submit_wall_ms": {
+        "median": 0.628798,
+        "p95": 0.906804,
+        "max": 1.208365
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.629435,
+        "p95": 0.906885,
+        "max": 1.208731
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 1,
+          "p95": 1,
+          "max": 1
+        },
+        "elements": {
+          "median": 5,
+          "p95": 5,
+          "max": 5
+        },
+        "layout_nodes": {
+          "median": 4,
+          "p95": 4,
+          "max": 4
+        },
+        "sprites": {
+          "median": 907,
+          "p95": 907,
+          "max": 907
+        },
+        "quads": {
+          "median": 98,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.684525,
+        "p95": 16.976293,
+        "max": 31.965885
+      },
+      "draw_hz": 59.799024313875016,
+      "draw_intervals_over_25ms": 8,
+      "process_user_seconds": 5.51,
+      "process_system_seconds": 1.24,
+      "peak_rss_kib": 115876.0,
+      "process_cpu_seconds": 6.75,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "live",
+      "name": "07-baseline",
+      "mode": "baseline",
+      "total_frames": 3589,
+      "steady_frames": 3530,
+      "startup_draw_wall_ms": 20.171264,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 968,
+        "layout_nodes": 967,
+        "sprites": 909,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22020,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.001729111,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3530,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 4.3220670000000005,
+        "p95": 4.75855,
+        "max": 9.032249
+      },
+      "draw_thread_cpu_ms": {
+        "median": 4.3137975,
+        "p95": 4.750816,
+        "max": 9.031069
+      },
+      "request_layout_wall_ms": {
+        "median": 1.885436,
+        "p95": 2.112535,
+        "max": 5.311864
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 1.884591,
+        "p95": 2.113114,
+        "max": 5.314104
+      },
+      "prepaint_wall_ms": {
+        "median": 0.7577555,
+        "p95": 1.11218,
+        "max": 1.6166
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.7560020000000001,
+        "p95": 1.111021,
+        "max": 1.614786
+      },
+      "paint_wall_ms": {
+        "median": 1.2780665,
+        "p95": 1.583272,
+        "max": 1.851102
+      },
+      "paint_thread_cpu_ms": {
+        "median": 1.274421,
+        "p95": 1.575271,
+        "max": 1.835987
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.011568499999999999,
+        "p95": 0.041243,
+        "max": 0.141729
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.011409,
+        "p95": 0.040847,
+        "max": 0.136378
+      },
+      "present_submit_wall_ms": {
+        "median": 0.6928145,
+        "p95": 1.024734,
+        "max": 1.30329
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.6945205,
+        "p95": 1.022221,
+        "max": 1.303762
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 2.0,
+          "p95": 2,
+          "max": 2
+        },
+        "elements": {
+          "median": 968.0,
+          "p95": 968,
+          "max": 968
+        },
+        "layout_nodes": {
+          "median": 967.0,
+          "p95": 967,
+          "max": 967
+        },
+        "sprites": {
+          "median": 909.0,
+          "p95": 909,
+          "max": 909
+        },
+        "quads": {
+          "median": 98.0,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480.0,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.68295,
+        "p95": 16.988579,
+        "max": 31.466204
+      },
+      "draw_hz": 59.81858492265533,
+      "draw_intervals_over_25ms": 8,
+      "process_user_seconds": 18.09,
+      "process_system_seconds": 1.52,
+      "peak_rss_kib": 116824.0,
+      "process_cpu_seconds": 19.61,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "live",
+      "name": "08-replay",
+      "mode": "replay",
+      "total_frames": 3589,
+      "steady_frames": 3531,
+      "startup_draw_wall_ms": 21.834765,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 969,
+        "layout_nodes": 967,
+        "sprites": 907,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22018,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.013104745,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3531,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 0.854958,
+        "p95": 1.044304,
+        "max": 1.5091
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.851738,
+        "p95": 1.04024,
+        "max": 1.505035
+      },
+      "request_layout_wall_ms": {
+        "median": 0.061534,
+        "p95": 0.200121,
+        "max": 0.322871
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 0.061508,
+        "p95": 0.201382,
+        "max": 0.322987
+      },
+      "prepaint_wall_ms": {
+        "median": 0.294344,
+        "p95": 0.390725,
+        "max": 0.829876
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.293851,
+        "p95": 0.389423,
+        "max": 0.826636
+      },
+      "paint_wall_ms": {
+        "median": 0.333737,
+        "p95": 0.42091,
+        "max": 0.607335
+      },
+      "paint_thread_cpu_ms": {
+        "median": 0.333819,
+        "p95": 0.420094,
+        "max": 0.6074
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.011094,
+        "p95": 0.035645,
+        "max": 0.095014
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.010983,
+        "p95": 0.035406,
+        "max": 0.094707
+      },
+      "present_submit_wall_ms": {
+        "median": 0.63105,
+        "p95": 0.913722,
+        "max": 1.278026
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.6314,
+        "p95": 0.913938,
+        "max": 1.278874
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 1,
+          "p95": 1,
+          "max": 1
+        },
+        "elements": {
+          "median": 5,
+          "p95": 5,
+          "max": 5
+        },
+        "layout_nodes": {
+          "median": 4,
+          "p95": 4,
+          "max": 4
+        },
+        "sprites": {
+          "median": 907,
+          "p95": 907,
+          "max": 907
+        },
+        "quads": {
+          "median": 98,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.681629,
+        "p95": 16.990609,
+        "max": 31.954991
+      },
+      "draw_hz": 59.818615188464904,
+      "draw_intervals_over_25ms": 7,
+      "process_user_seconds": 5.57,
+      "process_system_seconds": 1.22,
+      "peak_rss_kib": 116136.0,
+      "process_cpu_seconds": 6.79,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "live",
+      "name": "09-baseline",
+      "mode": "baseline",
+      "total_frames": 3588,
+      "steady_frames": 3529,
+      "startup_draw_wall_ms": 23.656078,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 968,
+        "layout_nodes": 967,
+        "sprites": 909,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22020,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.005533805,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3529,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 4.215388,
+        "p95": 4.739959,
+        "max": 9.097693
+      },
+      "draw_thread_cpu_ms": {
+        "median": 4.206989,
+        "p95": 4.727568,
+        "max": 9.041624
+      },
+      "request_layout_wall_ms": {
+        "median": 1.868998,
+        "p95": 2.113257,
+        "max": 4.754057
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 1.869051,
+        "p95": 2.109588,
+        "max": 4.747652
+      },
+      "prepaint_wall_ms": {
+        "median": 0.74393,
+        "p95": 1.190805,
+        "max": 1.813574
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.742309,
+        "p95": 1.180197,
+        "max": 1.763729
+      },
+      "paint_wall_ms": {
+        "median": 1.140593,
+        "p95": 1.545501,
+        "max": 2.042836
+      },
+      "paint_thread_cpu_ms": {
+        "median": 1.13493,
+        "p95": 1.54211,
+        "max": 2.043096
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.01163,
+        "p95": 0.042517,
+        "max": 0.194136
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.011497,
+        "p95": 0.041844,
+        "max": 0.174912
+      },
+      "present_submit_wall_ms": {
+        "median": 0.733463,
+        "p95": 1.055851,
+        "max": 1.703676
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.733889,
+        "p95": 1.05526,
+        "max": 1.319227
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 2,
+          "p95": 2,
+          "max": 2
+        },
+        "elements": {
+          "median": 968,
+          "p95": 968,
+          "max": 968
+        },
+        "layout_nodes": {
+          "median": 967,
+          "p95": 967,
+          "max": 967
+        },
+        "sprites": {
+          "median": 909,
+          "p95": 909,
+          "max": 909
+        },
+        "quads": {
+          "median": 98,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.684192,
+        "p95": 17.008386,
+        "max": 33.974113
+      },
+      "draw_hz": 59.80353753050652,
+      "draw_intervals_over_25ms": 8,
+      "process_user_seconds": 17.82,
+      "process_system_seconds": 1.49,
+      "peak_rss_kib": 115960.0,
+      "process_cpu_seconds": 19.31,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "live",
+      "name": "10-replay",
+      "mode": "replay",
+      "total_frames": 3590,
+      "steady_frames": 3531,
+      "startup_draw_wall_ms": 21.938776,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 969,
+        "layout_nodes": 967,
+        "sprites": 907,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22018,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.003702637,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3531,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 0.846214,
+        "p95": 1.020876,
+        "max": 1.316846
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.843478,
+        "p95": 1.016401,
+        "max": 1.315877
+      },
+      "request_layout_wall_ms": {
+        "median": 0.058261,
+        "p95": 0.192548,
+        "max": 0.285013
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 0.058183,
+        "p95": 0.1923,
+        "max": 0.302732
+      },
+      "prepaint_wall_ms": {
+        "median": 0.294076,
+        "p95": 0.379004,
+        "max": 0.616819
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.293115,
+        "p95": 0.375887,
+        "max": 0.614352
+      },
+      "paint_wall_ms": {
+        "median": 0.335506,
+        "p95": 0.424948,
+        "max": 0.593744
+      },
+      "paint_thread_cpu_ms": {
+        "median": 0.335705,
+        "p95": 0.424425,
+        "max": 0.593692
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.010651,
+        "p95": 0.036023,
+        "max": 0.095608
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.010551,
+        "p95": 0.035884,
+        "max": 0.095517
+      },
+      "present_submit_wall_ms": {
+        "median": 0.601857,
+        "p95": 0.906122,
+        "max": 1.195022
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.601996,
+        "p95": 0.905492,
+        "max": 1.195919
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 1,
+          "p95": 1,
+          "max": 1
+        },
+        "elements": {
+          "median": 5,
+          "p95": 5,
+          "max": 5
+        },
+        "layout_nodes": {
+          "median": 4,
+          "p95": 4,
+          "max": 4
+        },
+        "sprites": {
+          "median": 907,
+          "p95": 907,
+          "max": 907
+        },
+        "quads": {
+          "median": 98,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.682433500000002,
+        "p95": 16.983104,
+        "max": 34.473396
+      },
+      "draw_hz": 59.83702692657995,
+      "draw_intervals_over_25ms": 7,
+      "process_user_seconds": 5.37,
+      "process_system_seconds": 1.23,
+      "peak_rss_kib": 116252.0,
+      "process_cpu_seconds": 6.6,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "live",
+      "name": "11-static",
+      "mode": "static",
+      "total_frames": 5,
+      "steady_frames": 0,
+      "startup_draw_wall_ms": 20.241711,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 968,
+        "layout_nodes": 967,
+        "sprites": 907,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22018,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 0.088878213,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 0,
+      "steady_window_settings": [],
+      "draw_wall_ms": null,
+      "draw_thread_cpu_ms": null,
+      "request_layout_wall_ms": null,
+      "request_layout_thread_cpu_ms": null,
+      "prepaint_wall_ms": null,
+      "prepaint_thread_cpu_ms": null,
+      "paint_wall_ms": null,
+      "paint_thread_cpu_ms": null,
+      "scene_finish_wall_ms": null,
+      "scene_finish_thread_cpu_ms": null,
+      "present_submit_wall_ms": null,
+      "present_submit_thread_cpu_ms": null,
+      "counts": {
+        "views_rendered": null,
+        "elements": null,
+        "layout_nodes": null,
+        "sprites": null,
+        "quads": null,
+        "paths": null,
+        "glyphs_shaped": null,
+        "shape_calls": null,
+        "hitboxes": null
+      },
+      "draw_interval_ms": null,
+      "draw_hz": null,
+      "draw_intervals_over_25ms": 0,
+      "process_user_seconds": 0.21,
+      "process_system_seconds": 0.08,
+      "peak_rss_kib": 116128.0,
+      "process_cpu_seconds": 0.29,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      }
+    },
+    {
+      "capture": "gpu",
+      "name": "01-baseline",
+      "mode": "baseline",
+      "total_frames": 3593,
+      "steady_frames": 3533,
+      "startup_draw_wall_ms": 21.922153,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 968,
+        "layout_nodes": 967,
+        "sprites": 909,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22020,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.013157173,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3533,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 4.316445,
+        "p95": 4.756669,
+        "max": 6.578203
+      },
+      "draw_thread_cpu_ms": {
+        "median": 4.3088,
+        "p95": 4.746533,
+        "max": 6.57487
+      },
+      "request_layout_wall_ms": {
+        "median": 1.906433,
+        "p95": 2.143349,
+        "max": 3.402336
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 1.907072,
+        "p95": 2.142579,
+        "max": 3.403317
+      },
+      "prepaint_wall_ms": {
+        "median": 0.779854,
+        "p95": 1.229284,
+        "max": 1.71468
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.777829,
+        "p95": 1.225623,
+        "max": 1.708044
+      },
+      "paint_wall_ms": {
+        "median": 1.229576,
+        "p95": 1.563277,
+        "max": 1.901904
+      },
+      "paint_thread_cpu_ms": {
+        "median": 1.226017,
+        "p95": 1.552043,
+        "max": 1.86787
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.011698,
+        "p95": 0.038431,
+        "max": 0.149179
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.011583,
+        "p95": 0.037909,
+        "max": 0.149033
+      },
+      "present_submit_wall_ms": {
+        "median": 0.868509,
+        "p95": 1.214674,
+        "max": 1.602094
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.860484,
+        "p95": 1.206656,
+        "max": 1.591808
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 2,
+          "p95": 2,
+          "max": 2
+        },
+        "elements": {
+          "median": 968,
+          "p95": 968,
+          "max": 968
+        },
+        "layout_nodes": {
+          "median": 967,
+          "p95": 967,
+          "max": 967
+        },
+        "sprites": {
+          "median": 909,
+          "p95": 909,
+          "max": 909
+        },
+        "quads": {
+          "median": 98,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.6824405,
+        "p95": 17.033455,
+        "max": 29.932027
+      },
+      "draw_hz": 59.867419729323146,
+      "draw_intervals_over_25ms": 5,
+      "process_user_seconds": 18.73,
+      "process_system_seconds": 3.0,
+      "peak_rss_kib": 116736.0,
+      "process_cpu_seconds": 21.73,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_timestamps": {
+        "complete_frames": 3591,
+        "incomplete_tail_bytes": 144,
+        "steady_frames": 3531,
+        "batch_span_union_ms": {
+          "median": 2.767916,
+          "p95": 3.541145,
+          "max": 4.301823
+        },
+        "total_batch_span_union_ms": 10312.258549,
+        "last_activity_seconds": 59.980105104
+      }
+    },
+    {
+      "capture": "gpu",
+      "name": "02-replay",
+      "mode": "replay",
+      "total_frames": 3592,
+      "steady_frames": 3533,
+      "startup_draw_wall_ms": 21.720747,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 969,
+        "layout_nodes": 967,
+        "sprites": 907,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22018,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.006738767,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3533,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 0.853792,
+        "p95": 1.049449,
+        "max": 1.257524
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.851438,
+        "p95": 1.042308,
+        "max": 1.253973
+      },
+      "request_layout_wall_ms": {
+        "median": 0.066113,
+        "p95": 0.196194,
+        "max": 0.280519
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 0.066106,
+        "p95": 0.195759,
+        "max": 0.27896
+      },
+      "prepaint_wall_ms": {
+        "median": 0.297634,
+        "p95": 0.39497,
+        "max": 0.579954
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.296898,
+        "p95": 0.392776,
+        "max": 0.577945
+      },
+      "paint_wall_ms": {
+        "median": 0.334738,
+        "p95": 0.413674,
+        "max": 0.587139
+      },
+      "paint_thread_cpu_ms": {
+        "median": 0.334641,
+        "p95": 0.413425,
+        "max": 0.58691
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.010747,
+        "p95": 0.035325,
+        "max": 0.109933
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.01064,
+        "p95": 0.035184,
+        "max": 0.134843
+      },
+      "present_submit_wall_ms": {
+        "median": 0.858738,
+        "p95": 1.135846,
+        "max": 1.43433
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.85643,
+        "p95": 1.12544,
+        "max": 1.435222
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 1,
+          "p95": 1,
+          "max": 1
+        },
+        "elements": {
+          "median": 5,
+          "p95": 5,
+          "max": 5
+        },
+        "layout_nodes": {
+          "median": 4,
+          "p95": 4,
+          "max": 4
+        },
+        "sprites": {
+          "median": 907,
+          "p95": 907,
+          "max": 907
+        },
+        "quads": {
+          "median": 98,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.683752,
+        "p95": 17.000763,
+        "max": 28.907244
+      },
+      "draw_hz": 59.871793906706216,
+      "draw_intervals_over_25ms": 4,
+      "process_user_seconds": 6.23,
+      "process_system_seconds": 2.64,
+      "peak_rss_kib": 116492.0,
+      "process_cpu_seconds": 8.870000000000001,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_timestamps": {
+        "complete_frames": 3590,
+        "incomplete_tail_bytes": 144,
+        "steady_frames": 3530,
+        "batch_span_union_ms": {
+          "median": 3.570703,
+          "p95": 3.935312,
+          "max": 4.735364
+        },
+        "total_batch_span_union_ms": 12507.554599,
+        "last_activity_seconds": 59.973106979
+      }
+    },
+    {
+      "capture": "gpu",
+      "name": "03-static",
+      "mode": "static",
+      "total_frames": 5,
+      "steady_frames": 0,
+      "startup_draw_wall_ms": 20.662563,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 968,
+        "layout_nodes": 967,
+        "sprites": 907,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22018,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 0.088547099,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 0,
+      "steady_window_settings": [],
+      "draw_wall_ms": null,
+      "draw_thread_cpu_ms": null,
+      "request_layout_wall_ms": null,
+      "request_layout_thread_cpu_ms": null,
+      "prepaint_wall_ms": null,
+      "prepaint_thread_cpu_ms": null,
+      "paint_wall_ms": null,
+      "paint_thread_cpu_ms": null,
+      "scene_finish_wall_ms": null,
+      "scene_finish_thread_cpu_ms": null,
+      "present_submit_wall_ms": null,
+      "present_submit_thread_cpu_ms": null,
+      "counts": {
+        "views_rendered": null,
+        "elements": null,
+        "layout_nodes": null,
+        "sprites": null,
+        "quads": null,
+        "paths": null,
+        "glyphs_shaped": null,
+        "shape_calls": null,
+        "hitboxes": null
+      },
+      "draw_interval_ms": null,
+      "draw_hz": null,
+      "draw_intervals_over_25ms": 0,
+      "process_user_seconds": 0.2,
+      "process_system_seconds": 0.09,
+      "peak_rss_kib": 115576.0,
+      "process_cpu_seconds": 0.29000000000000004,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      },
+      "gpu_timestamps": {
+        "complete_frames": 3,
+        "incomplete_tail_bytes": 141,
+        "steady_frames": 0,
+        "batch_span_union_ms": null,
+        "total_batch_span_union_ms": 16.3137,
+        "last_activity_seconds": 0.06161724
+      }
+    },
+    {
+      "capture": "gpu-reverse",
+      "name": "01-replay",
+      "mode": "replay",
+      "total_frames": 3588,
+      "steady_frames": 3529,
+      "startup_draw_wall_ms": 19.000907,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 969,
+        "layout_nodes": 967,
+        "sprites": 907,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22018,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.003571542,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3529,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 0.850694,
+        "p95": 1.044573,
+        "max": 1.328262
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.848004,
+        "p95": 1.040422,
+        "max": 1.323986
+      },
+      "request_layout_wall_ms": {
+        "median": 0.063742,
+        "p95": 0.187502,
+        "max": 0.278915
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 0.063653,
+        "p95": 0.186982,
+        "max": 0.278602
+      },
+      "prepaint_wall_ms": {
+        "median": 0.295712,
+        "p95": 0.394384,
+        "max": 0.6387
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.29509,
+        "p95": 0.392126,
+        "max": 0.637352
+      },
+      "paint_wall_ms": {
+        "median": 0.33403,
+        "p95": 0.416627,
+        "max": 0.651938
+      },
+      "paint_thread_cpu_ms": {
+        "median": 0.334115,
+        "p95": 0.416339,
+        "max": 0.652049
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.010907,
+        "p95": 0.035642,
+        "max": 0.098262
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.010776,
+        "p95": 0.035459,
+        "max": 0.098194
+      },
+      "present_submit_wall_ms": {
+        "median": 0.821851,
+        "p95": 1.12521,
+        "max": 1.738414
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.815802,
+        "p95": 1.115612,
+        "max": 1.739126
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 1,
+          "p95": 1,
+          "max": 1
+        },
+        "elements": {
+          "median": 5,
+          "p95": 5,
+          "max": 5
+        },
+        "layout_nodes": {
+          "median": 4,
+          "p95": 4,
+          "max": 4
+        },
+        "sprites": {
+          "median": 907,
+          "p95": 907,
+          "max": 907
+        },
+        "quads": {
+          "median": 98,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.6843755,
+        "p95": 16.989298,
+        "max": 31.577273
+      },
+      "draw_hz": 59.8005008731909,
+      "draw_intervals_over_25ms": 8,
+      "process_user_seconds": 6.1,
+      "process_system_seconds": 2.64,
+      "peak_rss_kib": 116340.0,
+      "process_cpu_seconds": 8.74,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      },
+      "frequency": {
+        "samples": 1246,
+        "histograms": {
+          "requested_mhz": {
+            "300": 913,
+            "383": 53,
+            "400": 174,
+            "350": 26,
+            "317": 56,
+            "333": 5,
+            "367": 18,
+            "700": 1
+          },
+          "actual_mhz": {
+            "300": 877,
+            "400": 61,
+            "100": 28,
+            "250": 159,
+            "350": 96,
+            "150": 6,
+            "200": 19
+          },
+          "punit_requested_mhz": {
+            "300": 1056,
+            "383": 52,
+            "400": 35,
+            "350": 25,
+            "317": 57,
+            "333": 6,
+            "367": 15
+          },
+          "throttle_status": {
+            "0": 1046,
+            "1": 200
+          }
+        },
+        "requested_mhz_median": 300.0,
+        "actual_mhz_median": 300.0,
+        "throttle_status_nonzero_samples": 200
+      },
+      "gpu_timestamps": {
+        "complete_frames": 3586,
+        "incomplete_tail_bytes": 144,
+        "steady_frames": 3526,
+        "batch_span_union_ms": {
+          "median": 3.543256,
+          "p95": 3.866354,
+          "max": 7.103958
+        },
+        "total_batch_span_union_ms": 12386.469466,
+        "last_activity_seconds": 59.971597292
+      }
+    },
+    {
+      "capture": "gpu-reverse",
+      "name": "02-baseline",
+      "mode": "baseline",
+      "total_frames": 3589,
+      "steady_frames": 3530,
+      "startup_draw_wall_ms": 20.091706,
+      "startup_counts": {
+        "views_rendered": 2,
+        "elements": 968,
+        "layout_nodes": 967,
+        "sprites": 909,
+        "quads": 98,
+        "paths": 0,
+        "glyphs_shaped": 22020,
+        "shape_calls": 482,
+        "hitboxes": 480
+      },
+      "last_draw_seconds": 60.004587497,
+      "last_window_settings": {
+        "viewport_size": {
+          "width": 800.0,
+          "height": 600.0
+        },
+        "scale_factor": 1.25,
+        "accessibility_active": true
+      },
+      "present_submit_samples": 3530,
+      "steady_window_settings": [
+        [
+          800.0,
+          600.0,
+          1.25,
+          true
+        ]
+      ],
+      "draw_wall_ms": {
+        "median": 4.093904500000001,
+        "p95": 4.590975,
+        "max": 8.770954
+      },
+      "draw_thread_cpu_ms": {
+        "median": 4.0865055,
+        "p95": 4.582992,
+        "max": 8.770304
+      },
+      "request_layout_wall_ms": {
+        "median": 1.8613815,
+        "p95": 2.10169,
+        "max": 4.69019
+      },
+      "request_layout_thread_cpu_ms": {
+        "median": 1.861389,
+        "p95": 2.099566,
+        "max": 4.692304
+      },
+      "prepaint_wall_ms": {
+        "median": 0.7434825,
+        "p95": 1.00799,
+        "max": 1.733022
+      },
+      "prepaint_thread_cpu_ms": {
+        "median": 0.7419555,
+        "p95": 1.001031,
+        "max": 1.730879
+      },
+      "paint_wall_ms": {
+        "median": 1.0713585,
+        "p95": 1.477082,
+        "max": 2.024332
+      },
+      "paint_thread_cpu_ms": {
+        "median": 1.0692675,
+        "p95": 1.471285,
+        "max": 2.016771
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.011488499999999999,
+        "p95": 0.038277,
+        "max": 0.143982
+      },
+      "scene_finish_thread_cpu_ms": {
+        "median": 0.011365,
+        "p95": 0.037809,
+        "max": 0.130295
+      },
+      "present_submit_wall_ms": {
+        "median": 0.8621145,
+        "p95": 1.202426,
+        "max": 1.645989
+      },
+      "present_submit_thread_cpu_ms": {
+        "median": 0.855043,
+        "p95": 1.191635,
+        "max": 1.488227
+      },
+      "counts": {
+        "views_rendered": {
+          "median": 2.0,
+          "p95": 2,
+          "max": 2
+        },
+        "elements": {
+          "median": 968.0,
+          "p95": 968,
+          "max": 968
+        },
+        "layout_nodes": {
+          "median": 967.0,
+          "p95": 967,
+          "max": 967
+        },
+        "sprites": {
+          "median": 909.0,
+          "p95": 909,
+          "max": 909
+        },
+        "quads": {
+          "median": 98.0,
+          "p95": 98,
+          "max": 98
+        },
+        "paths": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "glyphs_shaped": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "shape_calls": {
+          "median": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "hitboxes": {
+          "median": 480.0,
+          "p95": 480,
+          "max": 480
+        }
+      },
+      "draw_interval_ms": {
+        "median": 16.686716,
+        "p95": 17.04783,
+        "max": 32.074861
+      },
+      "draw_hz": 59.82115476842854,
+      "draw_intervals_over_25ms": 7,
+      "process_user_seconds": 18.05,
+      "process_system_seconds": 2.72,
+      "peak_rss_kib": 116900.0,
+      "process_cpu_seconds": 20.77,
+      "gpu": {
+        "is_software_emulated": false,
+        "device_name": "Intel(R) Iris(R) Plus Graphics (ICL GT2)",
+        "driver_name": "Intel open-source Mesa driver",
+        "driver_info": "Mesa 26.0.8-1ubuntu0.3"
+      },
+      "frequency": {
+        "samples": 1246,
+        "histograms": {
+          "requested_mhz": {
+            "350": 63,
+            "317": 28,
+            "400": 727,
+            "300": 182,
+            "417": 66,
+            "383": 159,
+            "367": 10,
+            "333": 9,
+            "883": 1,
+            "450": 1
+          },
+          "actual_mhz": {
+            "350": 160,
+            "300": 585,
+            "250": 38,
+            "150": 7,
+            "450": 58,
+            "100": 61,
+            "400": 325,
+            "200": 11,
+            "900": 1
+          },
+          "punit_requested_mhz": {
+            "350": 57,
+            "317": 27,
+            "300": 597,
+            "400": 318,
+            "417": 67,
+            "383": 160,
+            "367": 8,
+            "333": 10,
+            "883": 1,
+            "450": 1
+          },
+          "throttle_status": {
+            "0": 1072,
+            "1": 174
+          }
+        },
+        "requested_mhz_median": 400.0,
+        "actual_mhz_median": 300.0,
+        "throttle_status_nonzero_samples": 174
+      },
+      "gpu_timestamps": {
+        "complete_frames": 3587,
+        "incomplete_tail_bytes": 144,
+        "steady_frames": 3527,
+        "batch_span_union_ms": {
+          "median": 2.738073,
+          "p95": 3.51896,
+          "max": 5.561823
+        },
+        "total_batch_span_union_ms": 10231.505942,
+        "last_activity_seconds": 59.972969271
+      }
+    }
+  ],
+  "modes": {
+    "baseline": {
+      "runs": 5,
+      "total_frames": [
+        3590,
+        3588,
+        3595,
+        3589,
+        3588
+      ],
+      "steady_frames": [
+        3531,
+        3530,
+        3537,
+        3530,
+        3529
+      ],
+      "startup_draw_wall_ms": {
+        "median": 23.610734,
+        "p95": 24.479426,
+        "max": 24.479426
+      },
+      "process_cpu_seconds": {
+        "median": 19.34,
+        "p95": 19.61,
+        "max": 19.61
+      },
+      "peak_rss_kib": {
+        "median": 116544.0,
+        "p95": 116824.0,
+        "max": 116824.0
+      },
+      "draw_hz": {
+        "median": 59.81858492265533,
+        "p95": 59.932172975776425,
+        "max": 59.932172975776425
+      },
+      "draw_wall_ms": {
+        "median": 4.272767,
+        "p95": 4.75855
+      },
+      "request_layout_wall_ms": {
+        "median": 1.8782735000000002,
+        "p95": 2.113257
+      },
+      "prepaint_wall_ms": {
+        "median": 0.744721,
+        "p95": 1.112255
+      },
+      "paint_wall_ms": {
+        "median": 1.169759,
+        "p95": 1.568043
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.01162,
+        "p95": 0.041243
+      },
+      "present_submit_wall_ms": {
+        "median": 0.7028465,
+        "p95": 1.042612
+      }
+    },
+    "replay": {
+      "runs": 5,
+      "total_frames": [
+        3597,
+        3591,
+        3588,
+        3589,
+        3590
+      ],
+      "steady_frames": [
+        3538,
+        3532,
+        3529,
+        3531,
+        3531
+      ],
+      "startup_draw_wall_ms": {
+        "median": 21.834765,
+        "p95": 25.082683,
+        "max": 25.082683
+      },
+      "process_cpu_seconds": {
+        "median": 6.71,
+        "p95": 6.79,
+        "max": 6.79
+      },
+      "peak_rss_kib": {
+        "median": 115956.0,
+        "p95": 116252.0,
+        "max": 116252.0
+      },
+      "draw_hz": {
+        "median": 59.83702692657995,
+        "p95": 59.95400196551715,
+        "max": 59.95400196551715
+      },
+      "draw_wall_ms": {
+        "median": 0.845939,
+        "p95": 1.02592
+      },
+      "request_layout_wall_ms": {
+        "median": 0.058843,
+        "p95": 0.173793
+      },
+      "prepaint_wall_ms": {
+        "median": 0.294076,
+        "p95": 0.37688
+      },
+      "paint_wall_ms": {
+        "median": 0.33268450000000005,
+        "p95": 0.421737
+      },
+      "scene_finish_wall_ms": {
+        "median": 0.010713,
+        "p95": 0.035645
+      },
+      "present_submit_wall_ms": {
+        "median": 0.627275,
+        "p95": 0.906122
+      }
+    },
+    "static": {
+      "runs": 1,
+      "total_frames": [
+        5
+      ],
+      "steady_frames": [
+        0
+      ],
+      "startup_draw_wall_ms": {
+        "median": 20.241711,
+        "p95": 20.241711,
+        "max": 20.241711
+      },
+      "process_cpu_seconds": {
+        "median": 0.29,
+        "p95": 0.29,
+        "max": 0.29
+      },
+      "peak_rss_kib": {
+        "median": 116128.0,
+        "p95": 116128.0,
+        "max": 116128.0
+      },
+      "draw_hz": null,
+      "draw_wall_ms": null,
+      "request_layout_wall_ms": null,
+      "prepaint_wall_ms": null,
+      "paint_wall_ms": null,
+      "scene_finish_wall_ms": null,
+      "present_submit_wall_ms": null
+    }
+  }
+}

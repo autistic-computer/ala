@@ -1,0 +1,16 @@
+Verifying this experiment...
+{
+  "case": "verification",
+  "animation_frames": 24,
+  "equal_pixels": 46080000,
+  "distinct_animation_images": 17,
+  "scene_comparisons": 24,
+  "distinct_scenes": 17,
+  "pixel_checks_available": true,
+  "cached_input_checks": 2,
+  "wall_seconds": 1.0213191319999169,
+  "command": [
+    "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-f66fe346418627cb",
+    "--verify"
+  ]
+}

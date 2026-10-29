@@ -1,0 +1,15 @@
+{
+  "RUSTFLAGS": null,
+  "CARGO_ENCODED_RUSTFLAGS": null,
+  "RUSTC_WRAPPER": null,
+  "CARGO_BUILD_TARGET": null,
+  "CARGO_PROFILE_RELEASE_DEBUG": null,
+  "CARGO_PROFILE_RELEASE_LTO": null,
+  "WGPU_BACKEND": null,
+  "VK_DRIVER_FILES": null,
+  "VK_ICD_FILENAMES": null,
+  "MESA_VK_DEVICE_SELECT": null,
+  "XDG_SESSION_TYPE": "wayland",
+  "DISPLAY": ":0",
+  "WAYLAND_DISPLAY": "wayland-0"
+}

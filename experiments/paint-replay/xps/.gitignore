@@ -1,0 +1,10 @@
+# Keep local uncompressed captures; publish their gzip copies.
+live/*.ndjson
+gpu/*.ndjson
+gpu/*-gpu*.json
+gpu-reverse/*.ndjson
+gpu-reverse/*-gpu*.json
+gpu-reverse/*.frequency.json
+probe.ndjson
+probe-gpu-*.json
+core-tests-release.log

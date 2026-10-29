@@ -1,0 +1,381 @@
+{
+  "source_commit": "bbb6a3ff8d1afbf4a1bf1cc7b2998eecf464ea48",
+  "binary_sha256": "1e0f48dceb989715339b6baec63c4482715c437c5c26dcaaad331230bb4bfc1c",
+  "gpu_timing_documentation": "https://docs.mesa3d.org/u_trace.html",
+  "runs": [
+    {
+      "name": "01-baseline",
+      "utc": "2026-10-29T23:05:05.842383+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/01-baseline.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "baseline",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/01-baseline.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 43050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 44000,
+        "/sys/class/thermal/thermal_zone5/temp": 35050,
+        "/sys/class/thermal/thermal_zone3/temp": 46050,
+        "/sys/class/thermal/thermal_zone1/temp": 52050,
+        "/sys/class/thermal/thermal_zone8/temp": 58000,
+        "/sys/class/thermal/thermal_zone6/temp": 44050,
+        "/sys/class/thermal/thermal_zone4/temp": 44050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "02-replay",
+      "utc": "2026-10-29T23:06:06.249002+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/02-replay.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "replay",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/02-replay.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 44050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 42000,
+        "/sys/class/thermal/thermal_zone5/temp": 34050,
+        "/sys/class/thermal/thermal_zone3/temp": 51050,
+        "/sys/class/thermal/thermal_zone1/temp": 62050,
+        "/sys/class/thermal/thermal_zone8/temp": 75000,
+        "/sys/class/thermal/thermal_zone6/temp": 45050,
+        "/sys/class/thermal/thermal_zone4/temp": 44050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "03-baseline",
+      "utc": "2026-10-29T23:07:06.675716+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/03-baseline.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "baseline",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/03-baseline.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 44050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 41000,
+        "/sys/class/thermal/thermal_zone5/temp": 34050,
+        "/sys/class/thermal/thermal_zone3/temp": 51050,
+        "/sys/class/thermal/thermal_zone1/temp": 60050,
+        "/sys/class/thermal/thermal_zone8/temp": 66000,
+        "/sys/class/thermal/thermal_zone6/temp": 45050,
+        "/sys/class/thermal/thermal_zone4/temp": 45050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "04-replay",
+      "utc": "2026-10-29T23:08:07.122878+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/04-replay.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "replay",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/04-replay.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 46050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 39000,
+        "/sys/class/thermal/thermal_zone5/temp": 35050,
+        "/sys/class/thermal/thermal_zone3/temp": 54050,
+        "/sys/class/thermal/thermal_zone1/temp": 66050,
+        "/sys/class/thermal/thermal_zone8/temp": 72000,
+        "/sys/class/thermal/thermal_zone6/temp": 46050,
+        "/sys/class/thermal/thermal_zone4/temp": 46050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "05-baseline",
+      "utc": "2026-10-29T23:09:07.573920+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/05-baseline.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "baseline",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/05-baseline.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 44050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 40000,
+        "/sys/class/thermal/thermal_zone5/temp": 34050,
+        "/sys/class/thermal/thermal_zone3/temp": 49050,
+        "/sys/class/thermal/thermal_zone1/temp": 61050,
+        "/sys/class/thermal/thermal_zone8/temp": 70000,
+        "/sys/class/thermal/thermal_zone6/temp": 45050,
+        "/sys/class/thermal/thermal_zone4/temp": 45050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "06-replay",
+      "utc": "2026-10-29T23:10:08.006257+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/06-replay.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "replay",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/06-replay.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 44050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 40000,
+        "/sys/class/thermal/thermal_zone5/temp": 34050,
+        "/sys/class/thermal/thermal_zone3/temp": 50050,
+        "/sys/class/thermal/thermal_zone1/temp": 62050,
+        "/sys/class/thermal/thermal_zone8/temp": 68000,
+        "/sys/class/thermal/thermal_zone6/temp": 45050,
+        "/sys/class/thermal/thermal_zone4/temp": 45050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "07-baseline",
+      "utc": "2026-10-29T23:11:08.426848+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/07-baseline.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "baseline",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/07-baseline.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 43050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 41000,
+        "/sys/class/thermal/thermal_zone5/temp": 34050,
+        "/sys/class/thermal/thermal_zone3/temp": 47050,
+        "/sys/class/thermal/thermal_zone1/temp": 55050,
+        "/sys/class/thermal/thermal_zone8/temp": 70000,
+        "/sys/class/thermal/thermal_zone6/temp": 44050,
+        "/sys/class/thermal/thermal_zone4/temp": 44050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "08-replay",
+      "utc": "2026-10-29T23:12:08.856308+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/08-replay.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "replay",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/08-replay.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 44050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 41000,
+        "/sys/class/thermal/thermal_zone5/temp": 34050,
+        "/sys/class/thermal/thermal_zone3/temp": 51050,
+        "/sys/class/thermal/thermal_zone1/temp": 63050,
+        "/sys/class/thermal/thermal_zone8/temp": 66000,
+        "/sys/class/thermal/thermal_zone6/temp": 45050,
+        "/sys/class/thermal/thermal_zone4/temp": 44050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "09-baseline",
+      "utc": "2026-10-29T23:13:09.292285+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/09-baseline.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "baseline",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/09-baseline.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 44050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 40000,
+        "/sys/class/thermal/thermal_zone5/temp": 33050,
+        "/sys/class/thermal/thermal_zone3/temp": 51050,
+        "/sys/class/thermal/thermal_zone1/temp": 59050,
+        "/sys/class/thermal/thermal_zone8/temp": 67000,
+        "/sys/class/thermal/thermal_zone6/temp": 45050,
+        "/sys/class/thermal/thermal_zone4/temp": 44050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "10-replay",
+      "utc": "2026-10-29T23:14:09.734648+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/10-replay.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "replay",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/10-replay.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 45050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 40000,
+        "/sys/class/thermal/thermal_zone5/temp": 34050,
+        "/sys/class/thermal/thermal_zone3/temp": 53050,
+        "/sys/class/thermal/thermal_zone1/temp": 65050,
+        "/sys/class/thermal/thermal_zone8/temp": 72000,
+        "/sys/class/thermal/thermal_zone6/temp": 46050,
+        "/sys/class/thermal/thermal_zone4/temp": 45050
+      },
+      "returncode": 0
+    },
+    {
+      "name": "11-static",
+      "utc": "2026-10-29T23:15:10.174111+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/11-static.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "static",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/live/11-static.ndjson"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 45050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 38000,
+        "/sys/class/thermal/thermal_zone5/temp": 33050,
+        "/sys/class/thermal/thermal_zone3/temp": 51050,
+        "/sys/class/thermal/thermal_zone1/temp": 61050,
+        "/sys/class/thermal/thermal_zone8/temp": 66000,
+        "/sys/class/thermal/thermal_zone6/temp": 46050,
+        "/sys/class/thermal/thermal_zone4/temp": 45050
+      },
+      "returncode": 0
+    }
+  ]
+}
