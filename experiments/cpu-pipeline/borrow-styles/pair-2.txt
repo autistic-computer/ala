@@ -1,0 +1,8 @@
+Observed mean changes; negative is faster. Repeat interleaved A/B runs before claiming a gain.
+ui_cpu/grid/100: -7.38%
+ui_cpu/grid/1000: -3.07%
+ui_cpu/grid/10000: -6.87%
+ui_cpu/idle_no_redraw: +0.52% (mean confidence intervals overlap)
+ui_cpu/text_churn/50: -2.86% (mean confidence intervals overlap)
+ui_cpu/text_warm/50: -1.06%
+ui_cpu/text_warm/500: -2.35%

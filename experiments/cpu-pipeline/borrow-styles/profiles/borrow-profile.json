@@ -1,0 +1,795 @@
+{
+  "metadata": {
+    "schema_version": 1,
+    "commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "worktree_sha256": "3038a9cb9f7ebb49b6fb5d3fb58b7bad5bd512f3987b4853b0b2d80f95f90cb9",
+    "dirty": true,
+    "machine": {
+      "system": "Linux-6.18.55-x86_64-with-glibc2.41",
+      "host": "fd56cdf262a0",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "logical_cpus": 5,
+      "affinity": [
+        0
+      ],
+      "cpu_quota": "400000 100000",
+      "governor": null
+    },
+    "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "features": "bench-support,font-kit,wayland,x11",
+    "rustflags": "-C force-frame-pointers=yes",
+    "bench": "ui_cpu",
+    "filter": "^ui_cpu/grid/10000$",
+    "binary": "/workspace/.cloud-setup/target/perf-results/style-borrowed/benchmark",
+    "binary_sha256": "bb8d05322a9c4475bde602f700b31402cf8c28cbd7dc4713890cc209e70caa27",
+    "renderer": "none (CPU UI pipeline only)",
+    "runtime": {
+      "VK_DRIVER_FILES": "/workspace/.ala-perf/sysroot/usr/share/vulkan/icd.d/lvp_icd.json",
+      "VK_ICD_FILENAMES": null,
+      "LP_NUM_THREADS": "4",
+      "ALA_PERF_SYSROOT": "/workspace/.ala-perf/sysroot"
+    },
+    "variant": "/workspace/.cloud-setup/target/perf-results/style-borrowed",
+    "command": [
+      "perf",
+      "record",
+      "-e",
+      "cpu-clock:u",
+      "-F",
+      "499",
+      "--call-graph",
+      "dwarf,16384",
+      "-o",
+      "/workspace/ala/target/perf-results/borrow-profile/perf.data",
+      "--",
+      "/workspace/.cloud-setup/target/perf-results/style-borrowed/benchmark",
+      "--bench",
+      "--profile-time",
+      "10",
+      "^ui_cpu/grid/10000$"
+    ],
+    "seconds": 10,
+    "event": "cpu-clock:u",
+    "perf": "perf version 6.12.107"
+  },
+  "recorded_samples": 4813,
+  "lost_samples": 0,
+  "total_cpu_clock_sample_weight": 9645290504,
+  "leaf_functions": [
+    {
+      "symbol": "__memmove_avx512_unaligned_erms",
+      "sample_weight": 1424849688,
+      "percent": 14.772491169748598
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::flexbox::compute_flexbox_layout::<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>",
+      "sample_weight": 867735464,
+      "percent": 8.99646789943902
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::Style as ala[19492d470db44ba3]::refineable::Refineable>::refine",
+      "sample_weight": 759519032,
+      "percent": 7.874506544774569
+    },
+    {
+      "symbol": "<slotmap[20049c4fb81311b9]::basic::SlotMap<slotmap[20049c4fb81311b9]::DefaultKey, alloc[12ca63220423dfc2]::vec::Vec<taffy[c1f23ef5926276af]::tree::node::NodeId>>>::try_insert_with_key::<<slotmap[20049c4fb81311b9]::basic::SlotMap<slotmap[20049c4fb81311b9]::DefaultKey, alloc[12ca63220423dfc2]::vec::Vec<taffy[c1f23ef5926276af]::tree::node::NodeId>>>::insert::{closure#0}, slotmap[20049c4fb81311b9]::util::Never>",
+      "sample_weight": 521042080,
+      "percent": 5.402036152088095
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::filter::Filter<core[a9090a07a7fa7517]::iter::adapters::filter::Filter<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::enumerate::Enumerate<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyTreeChildIter>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#0}>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#1}>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#2}>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#3}> as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::next",
+      "sample_weight": 490981960,
+      "percent": 5.090380220236859
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::bounds_tree::BoundsTree<ala[19492d470db44ba3]::geometry::ScaledPixels>>::insert",
+      "sample_weight": 436873744,
+      "percent": 4.529399542904633
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div>>::paint",
+      "sample_weight": 258517032,
+      "percent": 2.6802410139206314
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}> as taffy[c1f23ef5926276af]::tree::traits::CacheTree>::cache_get",
+      "sample_weight": 232464928,
+      "percent": 2.410139206316227
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div>>::prepaint",
+      "sample_weight": 188376752,
+      "percent": 1.9530438396010803
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::geometry::Rect<taffy[c1f23ef5926276af]::style::dimension::LengthPercentage> as taffy[c1f23ef5926276af]::util::resolve::ResolveOrZero<core[a9090a07a7fa7517]::option::Option<f32>, taffy[c1f23ef5926276af]::geometry::Rect<f32>>>::resolve_or_zero::<taffy[c1f23ef5926276af]::compute::flexbox::perform_absolute_layout_on_absolute_children<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#2}>",
+      "sample_weight": 170340680,
+      "percent": 1.7660502804903386
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::leaf::compute_leaf_layout::<<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}::{closure#1}, taffy[c1f23ef5926276af]::style::Style, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}::{closure#0}>",
+      "sample_weight": 164328656,
+      "percent": 1.7037190941200915
+    },
+    {
+      "symbol": "ceilf",
+      "sample_weight": 158316632,
+      "percent": 1.641387907749844
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint",
+      "sample_weight": 152304608,
+      "percent": 1.579056721379597
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::layout_bounds",
+      "sample_weight": 134268536,
+      "percent": 1.3920631622688553
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::compute_style_internal",
+      "sample_weight": 116232464,
+      "percent": 1.2050696031581134
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::Style as core[a9090a07a7fa7517]::default::Default>::default",
+      "sample_weight": 112224448,
+      "percent": 1.163515478911282
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::Style as ala[19492d470db44ba3]::taffy::ToTaffy<taffy[c1f23ef5926276af]::style::Style>>::to_taffy",
+      "sample_weight": 112224448,
+      "percent": 1.163515478911282
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::map::HashMap<ala[19492d470db44ba3]::taffy::LayoutId, ala[19492d470db44ba3]::geometry::Bounds<ala[19492d470db44ba3]::geometry::Pixels>, rustc_hash[4524cdd11449678d]::FxBuildHasher>>::insert",
+      "sample_weight": 112224448,
+      "percent": 1.163515478911282
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::element::AnyElement: 2: usize]> as core[a9090a07a7fa7517]::iter::traits::collect::Extend<ala[19492d470db44ba3]::element::AnyElement>>::extend::<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::ops::range::Range<i32>, <ui_cpu[6aec32a9d909eb5]::Grid as ala[19492d470db44ba3]::element::Render>::render::{closure#0}::{closure#0}>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::ParentElement>::children<ala[19492d470db44ba3]::elements::div::Div, core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::ops::range::Range<i32>, <ui_cpu[6aec32a9d909eb5]::Grid as ala[19492d470db44ba3]::element::Render>::render::{closure#0}::{closure#0}>>::{closure#0}>>",
+      "sample_weight": 112224448,
+      "percent": 1.163515478911282
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::map::HashMap<ala[19492d470db44ba3]::taffy::LayoutId, ala[19492d470db44ba3]::geometry::Point<f32>, rustc_hash[4524cdd11449678d]::FxBuildHasher>>::insert",
+      "sample_weight": 102204408,
+      "percent": 1.059630168294203
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<alloc[12ca63220423dfc2]::boxed::Box<ala[19492d470db44ba3]::style::StyleRefinement>>",
+      "sample_weight": 102204408,
+      "percent": 1.059630168294203
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::flexbox::calculate_flex_item::<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>",
+      "sample_weight": 102204408,
+      "percent": 1.059630168294203
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div>>::request_layout",
+      "sample_weight": 96192384,
+      "percent": 0.9972989819239559
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::largest_border_interior",
+      "sample_weight": 94188376,
+      "percent": 0.9765219198005402
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::request_layout::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout::{closure#1}::{closure#0}>::{closure#0}",
+      "sample_weight": 94188376,
+      "percent": 0.9765219198005402
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::should_insert_hitbox",
+      "sample_weight": 88176352,
+      "percent": 0.914190733430293
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::paint_drop_shadows_with_smoothing",
+      "sample_weight": 88176352,
+      "percent": 0.914190733430293
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::paint_keyboard_listeners",
+      "sample_weight": 74148296,
+      "percent": 0.7687512985663827
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::bounds_tree::Grid<ala[19492d470db44ba3]::geometry::ScaledPixels>>::add",
+      "sample_weight": 68136272,
+      "percent": 0.7064201121961354
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::tree::cache::Cache>::store",
+      "sample_weight": 64128256,
+      "percent": 0.664865987949304
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::scene::PaintOperation>",
+      "sample_weight": 64128256,
+      "percent": 0.664865987949304
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::Fill as core[a9090a07a7fa7517]::convert::From<ala[19492d470db44ba3]::color::Rgba>>::from",
+      "sample_weight": 62124248,
+      "percent": 0.6440889258258882
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::compute_child_layout::{closure#0}",
+      "sample_weight": 62124248,
+      "percent": 0.6440889258258882
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::TextStyleRefinement as ala[19492d470db44ba3]::refineable::Refineable>::refine",
+      "sample_weight": 60120240,
+      "percent": 0.6233118637024725
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::Style>::paint::<<ala[19492d470db44ba3]::elements::div::Interactivity>::paint<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}::{closure#1}::{closure#0}>",
+      "sample_weight": 58116232,
+      "percent": 0.6025348015790567
+    },
+    {
+      "symbol": "_int_malloc",
+      "sample_weight": 58116232,
+      "percent": 0.6025348015790567
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::arena::Arena>::alloc::drop::<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div>>",
+      "sample_weight": 52104208,
+      "percent": 0.5402036152088094
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::paint::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}::{closure#1}::{closure#0}::{closure#0}::{closure#0}::{closure#0}",
+      "sample_weight": 50100200,
+      "percent": 0.5194265530853938
+    },
+    {
+      "symbol": "floorf",
+      "sample_weight": 44088176,
+      "percent": 0.4570953667151465
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}::{closure#0}::{closure#0}",
+      "sample_weight": 42084168,
+      "percent": 0.4363183045917307
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::new",
+      "sample_weight": 42084168,
+      "percent": 0.4363183045917307
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::tree::cache::CacheKey as core[a9090a07a7fa7517]::convert::From<&taffy[c1f23ef5926276af]::tree::layout::LayoutInput>>::from",
+      "sample_weight": 42084168,
+      "percent": 0.4363183045917307
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::scene::Scene>::place_primitive",
+      "sample_weight": 38076152,
+      "percent": 0.39476418034489924
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::geometry::Rect<taffy[c1f23ef5926276af]::style::dimension::LengthPercentageAuto> as taffy[c1f23ef5926276af]::util::resolve::ResolveOrZero<core[a9090a07a7fa7517]::option::Option<f32>, taffy[c1f23ef5926276af]::geometry::Rect<f32>>>::resolve_or_zero::<taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#3}::{closure#6}>",
+      "sample_weight": 38076152,
+      "percent": 0.39476418034489924
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::geometry::Rect<taffy[c1f23ef5926276af]::style::dimension::LengthPercentageAuto>>::zip_size::<core[a9090a07a7fa7517]::option::Option<f32>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#3}::{closure#5}, core[a9090a07a7fa7517]::option::Option<f32>>",
+      "sample_weight": 38076152,
+      "percent": 0.39476418034489924
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::slice::sort::stable::drift::sort::<ala[19492d470db44ba3]::scene::Quad, <[ala[19492d470db44ba3]::scene::Quad]>::sort_by_key<u32, <ala[19492d470db44ba3]::scene::Scene>::finish::{closure#1}>::{closure#0}>",
+      "sample_weight": 38076152,
+      "percent": 0.39476418034489924
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::bounds_tree::Grid<ala[19492d470db44ba3]::geometry::ScaledPixels>>::spans",
+      "sample_weight": 36072144,
+      "percent": 0.3739871182214835
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_image_cache::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout::{closure#1}, ala[19492d470db44ba3]::taffy::LayoutId>",
+      "sample_weight": 34068136,
+      "percent": 0.3532100560980677
+    },
+    {
+      "symbol": "unlink_chunk.isra.0",
+      "sample_weight": 34068136,
+      "percent": 0.3532100560980677
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::geometry::Rect<taffy[c1f23ef5926276af]::style::dimension::LengthPercentageAuto> as taffy[c1f23ef5926276af]::util::resolve::ResolveOrZero<core[a9090a07a7fa7517]::option::Option<f32>, taffy[c1f23ef5926276af]::geometry::Rect<f32>>>::resolve_or_zero::<&<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}::{closure#0}>",
+      "sample_weight": 34068136,
+      "percent": 0.3532100560980677
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}::{closure#0}",
+      "sample_weight": 32064128,
+      "percent": 0.332432993974652
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::key_dispatch::DispatchTree>::push_node",
+      "sample_weight": 32064128,
+      "percent": 0.332432993974652
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::paint_quad",
+      "sample_weight": 32064128,
+      "percent": 0.332432993974652
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::geometry::Edges<ala[19492d470db44ba3]::geometry::Length> as ala[19492d470db44ba3]::taffy::ToTaffy<taffy[c1f23ef5926276af]::geometry::Rect<taffy[c1f23ef5926276af]::style::dimension::LengthPercentageAuto>>>::to_taffy",
+      "sample_weight": 32064128,
+      "percent": 0.332432993974652
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::StyleRefinement as core[a9090a07a7fa7517]::default::Default>::default",
+      "sample_weight": 32064128,
+      "percent": 0.332432993974652
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::id",
+      "sample_weight": 30060120,
+      "percent": 0.31165593185123625
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout::{closure#1}::{closure#0}::{closure#0}",
+      "sample_weight": 30060120,
+      "percent": 0.31165593185123625
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::prepaint::<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::window::Hitbox>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}>::{closure#0}::{closure#1}::{closure#0}::{closure#0}",
+      "sample_weight": 28056112,
+      "percent": 0.2908788697278205
+    },
+    {
+      "symbol": "_int_free_create_chunk",
+      "sample_weight": 28056112,
+      "percent": 0.2908788697278205
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::geometry::Rect<taffy[c1f23ef5926276af]::style::dimension::LengthPercentage> as taffy[c1f23ef5926276af]::util::resolve::ResolveOrZero<core[a9090a07a7fa7517]::option::Option<f32>, taffy[c1f23ef5926276af]::geometry::Rect<f32>>>::resolve_or_zero::<&<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}::{closure#0}>",
+      "sample_weight": 28056112,
+      "percent": 0.2908788697278205
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::key_dispatch::DispatchNode>",
+      "sample_weight": 28056112,
+      "percent": 0.2908788697278205
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::geometry::Edges<ala[19492d470db44ba3]::geometry::DefiniteLength> as ala[19492d470db44ba3]::taffy::ToTaffy<taffy[c1f23ef5926276af]::geometry::Rect<taffy[c1f23ef5926276af]::style::dimension::LengthPercentage>>>::to_taffy",
+      "sample_weight": 26052104,
+      "percent": 0.2701018076044047
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::Vec<taffy[c1f23ef5926276af]::style::grid::GridTemplateComponent<alloc[12ca63220423dfc2]::string::String>> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 26052104,
+      "percent": 0.2701018076044047
+    },
+    {
+      "symbol": "_int_free_merge_chunk",
+      "sample_weight": 26052104,
+      "percent": 0.2701018076044047
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::prepaint::<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::window::Hitbox>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}>::{closure#0}::{closure#1}::{closure#0}",
+      "sample_weight": 24048096,
+      "percent": 0.24932474548098899
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::key_dispatch::DispatchTree>::pop_node",
+      "sample_weight": 24048096,
+      "percent": 0.24932474548098899
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::paint::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}",
+      "sample_weight": 22044088,
+      "percent": 0.22854768335757325
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::paint::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}::{closure#1}::{closure#0}::{closure#0}",
+      "sample_weight": 22044088,
+      "percent": 0.22854768335757325
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::layout_bounds",
+      "sample_weight": 22044088,
+      "percent": 0.22854768335757325
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::IntoElement>::into_any_element",
+      "sample_weight": 22044088,
+      "percent": 0.22854768335757325
+    },
+    {
+      "symbol": "malloc",
+      "sample_weight": 22044088,
+      "percent": 0.22854768335757325
+    },
+    {
+      "symbol": "ala[19492d470db44ba3]::elements::div::div",
+      "sample_weight": 22044088,
+      "percent": 0.22854768335757325
+    },
+    {
+      "symbol": "cfree@GLIBC_2.2.5",
+      "sample_weight": 20040080,
+      "percent": 0.2077706212341575
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout",
+      "sample_weight": 20040080,
+      "percent": 0.2077706212341575
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::into_iter::IntoIter<alloc[12ca63220423dfc2]::boxed::Box<dyn for<'a, 'b, 'c, 'd> core[a9090a07a7fa7517]::ops::function::Fn<(&'a ala[19492d470db44ba3]::interactive::MousePressureEvent, ala[19492d470db44ba3]::window::DispatchPhase, &'b ala[19492d470db44ba3]::window::Hitbox, &'c mut ala[19492d470db44ba3]::window::Window, &'d mut ala[19492d470db44ba3]::app::App), Output = ()>>> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 20040080,
+      "percent": 0.2077706212341575
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::paint_inset_shadows_with_smoothing",
+      "sample_weight": 20040080,
+      "percent": 0.2077706212341575
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::request_layout",
+      "sample_weight": 20040080,
+      "percent": 0.2077706212341575
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::element::AnyElement: 2: usize]> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 20040080,
+      "percent": 0.2077706212341575
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::clear",
+      "sample_weight": 20040080,
+      "percent": 0.2077706212341575
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<taffy[c1f23ef5926276af]::tree::layout::DetailedLayoutInfo>",
+      "sample_weight": 20040080,
+      "percent": 0.2077706212341575
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::prepaint::<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::window::Hitbox>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}>::{closure#0}",
+      "sample_weight": 20040080,
+      "percent": 0.2077706212341575
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::prepaint::<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::window::Hitbox>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}>::{closure#0}::{closure#1}",
+      "sample_weight": 18036072,
+      "percent": 0.18699355911074175
+    },
+    {
+      "symbol": "<slotmap[20049c4fb81311b9]::basic::SlotMap<slotmap[20049c4fb81311b9]::DefaultKey, taffy[c1f23ef5926276af]::tree::taffy_tree::NodeData>>::try_insert_with_key::<<slotmap[20049c4fb81311b9]::basic::SlotMap<slotmap[20049c4fb81311b9]::DefaultKey, taffy[c1f23ef5926276af]::tree::taffy_tree::NodeData>>::insert::{closure#0}, slotmap[20049c4fb81311b9]::util::Never>",
+      "sample_weight": 18036072,
+      "percent": 0.18699355911074175
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::element::ElementDrawPhase<ala[19492d470db44ba3]::elements::div::DivFrameState, core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::window::Hitbox>>>",
+      "sample_weight": 18036072,
+      "percent": 0.18699355911074175
+    },
+    {
+      "symbol": "_int_free_chunk",
+      "sample_weight": 18036072,
+      "percent": 0.18699355911074175
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::Vec<&mut taffy[c1f23ef5926276af]::compute::flexbox::FlexItem> as alloc[12ca63220423dfc2]::vec::spec_from_iter_nested::SpecFromIterNested<&mut taffy[c1f23ef5926276af]::compute::flexbox::FlexItem, core[a9090a07a7fa7517]::iter::adapters::filter::Filter<core[a9090a07a7fa7517]::slice::iter::IterMut<taffy[c1f23ef5926276af]::compute::flexbox::FlexItem>, taffy[c1f23ef5926276af]::compute::flexbox::resolve_flexible_lengths::{closure#4}>>>::from_iter",
+      "sample_weight": 18036072,
+      "percent": 0.18699355911074175
+    },
+    {
+      "symbol": "_int_realloc",
+      "sample_weight": 18036072,
+      "percent": 0.18699355911074175
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_optional_element_state::<ala[19492d470db44ba3]::elements::div::InteractiveElementState, ala[19492d470db44ba3]::taffy::LayoutId, <ala[19492d470db44ba3]::elements::div::Interactivity>::request_layout<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout::{closure#1}::{closure#0}>::{closure#0}>",
+      "sample_weight": 16032064,
+      "percent": 0.166216496987326
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_image_cache::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}, ()>",
+      "sample_weight": 16032064,
+      "percent": 0.166216496987326
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::key_dispatch::DispatchTree>::set_active_node",
+      "sample_weight": 16032064,
+      "percent": 0.166216496987326
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::Vec<taffy[c1f23ef5926276af]::compute::flexbox::FlexItem> as alloc[12ca63220423dfc2]::vec::spec_from_iter::SpecFromIter<taffy[c1f23ef5926276af]::compute::flexbox::FlexItem, core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::filter::Filter<core[a9090a07a7fa7517]::iter::adapters::filter::Filter<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::enumerate::Enumerate<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyTreeChildIter>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#0}>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#1}>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#2}>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#3}>>>::from_iter",
+      "sample_weight": 16032064,
+      "percent": 0.166216496987326
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<taffy[c1f23ef5926276af]::tree::taffy_tree::NodeData>",
+      "sample_weight": 16032064,
+      "percent": 0.166216496987326
+    },
+    {
+      "symbol": "ala[19492d470db44ba3]::window::with_element_arena::<ala[19492d470db44ba3]::arena::ArenaBox<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div>>, <ala[19492d470db44ba3]::element::AnyElement>::new<ala[19492d470db44ba3]::elements::div::Div>::{closure#0}>::{closure#0}",
+      "sample_weight": 14028056,
+      "percent": 0.14543943486391026
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::clamp_scroll_position",
+      "sample_weight": 14028056,
+      "percent": 0.14543943486391026
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::taffy::LayoutId: 2: usize]> as core[a9090a07a7fa7517]::iter::traits::collect::Extend<ala[19492d470db44ba3]::taffy::LayoutId>>::extend::<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::slice::iter::IterMut<ala[19492d470db44ba3]::element::AnyElement>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout::{closure#1}::{closure#0}::{closure#0}::{closure#0}>>",
+      "sample_weight": 14028056,
+      "percent": 0.14543943486391026
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::geometry::Size<taffy[c1f23ef5926276af]::style::dimension::Dimension> as taffy[c1f23ef5926276af]::util::resolve::MaybeResolve<taffy[c1f23ef5926276af]::geometry::Size<core[a9090a07a7fa7517]::option::Option<f32>>, taffy[c1f23ef5926276af]::geometry::Size<core[a9090a07a7fa7517]::option::Option<f32>>>>::maybe_resolve::<taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#3}::{closure#2}>",
+      "sample_weight": 14028056,
+      "percent": 0.14543943486391026
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::into_iter::IntoIter<(core[a9090a07a7fa7517]::any::TypeId, alloc[12ca63220423dfc2]::boxed::Box<dyn for<'a, 'b, 'c> core[a9090a07a7fa7517]::ops::function::Fn<(&'a dyn core[a9090a07a7fa7517]::any::Any, ala[19492d470db44ba3]::window::DispatchPhase, &'b mut ala[19492d470db44ba3]::window::Window, &'c mut ala[19492d470db44ba3]::app::App), Output = ()>>)> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 10020040,
+      "percent": 0.10388531061707874
+    },
+    {
+      "symbol": "ala[19492d470db44ba3]::taffy::border_widths_to_taffy",
+      "sample_weight": 10020040,
+      "percent": 0.10388531061707874
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_text_style::<<ala[19492d470db44ba3]::elements::div::Interactivity>::paint<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}::{closure#1}::{closure#0}::{closure#0}, ()>",
+      "sample_weight": 8016032,
+      "percent": 0.083108248493663
+    },
+    {
+      "symbol": "ala[19492d470db44ba3]::window::with_element_arena_erased",
+      "sample_weight": 8016032,
+      "percent": 0.083108248493663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div> as ala[19492d470db44ba3]::element::ElementObject>::paint",
+      "sample_weight": 8016032,
+      "percent": 0.083108248493663
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::scene::Primitive>",
+      "sample_weight": 8016032,
+      "percent": 0.083108248493663
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::style::TextStyleRefinement>",
+      "sample_weight": 6012024,
+      "percent": 0.062331186370247246
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::elements::div::InteractiveElementState>>",
+      "sample_weight": 6012024,
+      "percent": 0.062331186370247246
+    },
+    {
+      "symbol": "__rustc[9d087a5ab36ea756]::__rust_no_alloc_shim_is_unstable_v2",
+      "sample_weight": 6012024,
+      "percent": 0.062331186370247246
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div> as ala[19492d470db44ba3]::element::ElementObject>::prepaint",
+      "sample_weight": 6012024,
+      "percent": 0.062331186370247246
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_optional_element_state::<ala[19492d470db44ba3]::elements::div::InteractiveElementState, core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::window::Hitbox>, <ala[19492d470db44ba3]::elements::div::Interactivity>::prepaint<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::window::Hitbox>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}>::{closure#0}>",
+      "sample_weight": 6012024,
+      "percent": 0.062331186370247246
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::scene::Scene>::insert_primitive::<ala[19492d470db44ba3]::scene::Quad>",
+      "sample_weight": 6012024,
+      "percent": 0.062331186370247246
+    },
+    {
+      "symbol": "__rustc[9d087a5ab36ea756]::__rust_alloc",
+      "sample_weight": 6012024,
+      "percent": 0.062331186370247246
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::elements::div::Aria>",
+      "sample_weight": 6012024,
+      "percent": 0.062331186370247246
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[12ca63220423dfc2]::alloc::Global>",
+      "sample_weight": 6012024,
+      "percent": 0.062331186370247246
+    },
+    {
+      "symbol": "__memset_avx512_unaligned_erms",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_optional_element_state::<ala[19492d470db44ba3]::elements::div::InteractiveElementState, (), <ala[19492d470db44ba3]::elements::div::Interactivity>::paint<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}>",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div> as ala[19492d470db44ba3]::element::ElementObject>::request_layout",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::raw::RawTable<(ala[19492d470db44ba3]::app::entity_map::HandleId, core[a9090a07a7fa7517]::option::Option<backtrace[c754a3dcbd962bbd]::capture::Backtrace>)>>::remove_entry::<hashbrown[ec5eb3d1610e94b1]::map::equivalent_key<ala[19492d470db44ba3]::app::entity_map::HandleId, ala[19492d470db44ba3]::app::entity_map::HandleId, core[a9090a07a7fa7517]::option::Option<backtrace[c754a3dcbd962bbd]::capture::Backtrace>>::{closure#0}>",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "__rustc[9d087a5ab36ea756]::__rust_dealloc",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::draw",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::raw_vec::RawVecInner>::finish_grow",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "malloc_consolidate",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "__rustc[9d087a5ab36ea756]::__rust_realloc",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::flexbox::determine_container_main_size::<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#0}::{closure#1}",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "<fontdb[522db155ebbe510a]::Database>::load_font_file_impl",
+      "sample_weight": 4008016,
+      "percent": 0.0415541242468315
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::paint_hover_group_handler",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::arena::Chunk>::allocate",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<roxmltree[cc4ba9107852f2f9]::parse::Context>::append_node",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "__readlink",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "alloc_perturb",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::taffy::LayoutId: 2: usize]>>::try_grow",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::element::AnyElement: 2: usize]>>::try_grow",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::element::AnyElement: 2: usize]> as core[a9090a07a7fa7517]::iter::traits::collect::Extend<ala[19492d470db44ba3]::element::AnyElement>>::extend::<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::ops::range::Range<usize>, <ui_cpu[6aec32a9d909eb5]::Grid as ala[19492d470db44ba3]::element::Render>::render::{closure#0}>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::ParentElement>::children<ala[19492d470db44ba3]::elements::div::Div, core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::ops::range::Range<usize>, <ui_cpu[6aec32a9d909eb5]::Grid as ala[19492d470db44ba3]::element::Render>::render::{closure#0}>>::{closure#0}>>",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "std[c29fa2d9dbea2b0e]::thread::functions::available_parallelism",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::arena::Arena>::force_clear",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::raw::RawTable<(ala[19492d470db44ba3]::app::entity_map::EntityId, ala[19492d470db44ba3]::key_dispatch::DispatchNodeId)>>::remove_entry::<hashbrown[ec5eb3d1610e94b1]::map::equivalent_key<ala[19492d470db44ba3]::app::entity_map::EntityId, ala[19492d470db44ba3]::app::entity_map::EntityId, ala[19492d470db44ba3]::key_dispatch::DispatchNodeId>::{closure#0}>",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::flexbox::calculate_layout_line::<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "_int_free_maybe_consolidate.part.0",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::element::ElementDrawPhase<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::element::AnyElement>, core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::element::AnyElement>>>",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<std[c29fa2d9dbea2b0e]::hash::random::RandomState as core[a9090a07a7fa7517]::hash::BuildHasher>::hash_one::<&ala[19492d470db44ba3]::window::WindowId>",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::scene::Scene>::finish",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::style::Style as core[a9090a07a7fa7517]::clone::Clone>::clone",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "ala[19492d470db44ba3]::window::with_element_arena::<ala[19492d470db44ba3]::arena::ArenaBox<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::view::ViewElement<ala[19492d470db44ba3]::view::AnyView>>>, <ala[19492d470db44ba3]::element::AnyElement>::new<ala[19492d470db44ba3]::view::ViewElement<ala[19492d470db44ba3]::view::AnyView>>::{closure#0}>::{closure#0}",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::platform::test::window::TestWindow as ala[19492d470db44ba3]::platform::PlatformWindow>::draw",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::ffi::c_str::CStr>::from_bytes_with_nul",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "fontdb[522db155ebbe510a]::parse_face_info",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<ttf_parser[ab30ac93695dd42]::tables::name::NamesIter as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::next",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::string::String>::from_utf16",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    },
+    {
+      "symbol": "<std[c29fa2d9dbea2b0e]::sys::fs::unix::ReadDir as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::next",
+      "sample_weight": 2004008,
+      "percent": 0.02077706212341575
+    }
+  ]
+}

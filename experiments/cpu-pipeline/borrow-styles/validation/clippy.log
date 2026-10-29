@@ -1,0 +1,4 @@
+   Compiling ala v0.1.0 (/workspace/ala/crates/ala)
+   Compiling ala-macros v0.1.0 (/workspace/ala/crates/ala-macros)
+    Checking ala-platform v0.1.0 (/workspace/ala/crates/ala-platform)
+    Finished `perf` profile [optimized + debuginfo] target(s) in 10.62s

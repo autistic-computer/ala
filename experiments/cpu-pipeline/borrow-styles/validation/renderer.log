@@ -1,0 +1,11 @@
+   Compiling ala-platform v0.1.0 (/workspace/ala/crates/ala-platform)
+    Finished `perf` profile [optimized + debuginfo] target(s) in 9.73s
+     Running unittests src/ala_platform.rs (target/perf/deps/ala_platform-c2072176291322bd)
+
+running 4 tests
+test wgpu::wgpu_renderer::tests::headless_renderer_draws_quads_with_distinct_colors ... ok
+test wgpu::wgpu_renderer::tests::headless_renderer_rejects_invalid_sizes ... ok
+test wgpu::wgpu_renderer::tests::headless_renderer_reuses_target_for_same_size ... ok
+test wgpu::wgpu_renderer::tests::headless_renderer_captures_each_requested_size ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 0.18s

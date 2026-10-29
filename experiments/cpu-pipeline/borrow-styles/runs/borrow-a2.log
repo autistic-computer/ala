@@ -1,0 +1,190 @@
+Gnuplot not found, using plotters backend
+Benchmarking ui_cpu/grid/100
+Benchmarking ui_cpu/grid/100: Warming up for 1.0000 s
+Benchmarking ui_cpu/grid/100: Collecting 30 samples in estimated 3.0655 s (17k iterations)
+Benchmarking ui_cpu/grid/100: Analyzing
+ui_cpu/grid/100         time:   [173.01 µs 174.25 µs 175.84 µs]
+Found 2 outliers among 30 measurements (6.67%)
+  1 (3.33%) high mild
+  1 (3.33%) high severe
+ala bench report (all observed iterations): ui_cpu/grid
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 25396
+    mean: 0.171ms
+    p50: 0.161ms
+    p90: 0.192ms
+    p95: 0.214ms
+    p99: 0.259ms
+    max: 5.231ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  window draw:
+    samples: 25396
+    mean: 0.170ms
+    p50: 0.160ms
+    p90: 0.191ms
+    p95: 0.212ms
+    p99: 0.257ms
+    max: 5.226ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/grid/1000
+Benchmarking ui_cpu/grid/1000: Warming up for 1.0000 s
+Benchmarking ui_cpu/grid/1000: Collecting 30 samples in estimated 3.3205 s (1860 iterations)
+Benchmarking ui_cpu/grid/1000: Analyzing
+ui_cpu/grid/1000        time:   [1.7675 ms 1.7789 ms 1.7964 ms]
+Found 2 outliers among 30 measurements (6.67%)
+  1 (3.33%) high mild
+  1 (3.33%) high severe
+ala bench report (all observed iterations): ui_cpu/grid
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 2883
+    mean: 1.739ms
+    p50: 1.713ms
+    p90: 1.807ms
+    p95: 1.849ms
+    p99: 2.064ms
+    max: 4.772ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  window draw:
+    samples: 2883
+    mean: 1.737ms
+    p50: 1.712ms
+    p90: 1.805ms
+    p95: 1.847ms
+    p99: 2.059ms
+    max: 4.768ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/grid/10000
+Benchmarking ui_cpu/grid/10000: Warming up for 1.0000 s
+Benchmarking ui_cpu/grid/10000: Collecting 30 samples in estimated 3.0398 s (120 iterations)
+Benchmarking ui_cpu/grid/10000: Analyzing
+ui_cpu/grid/10000       time:   [25.475 ms 25.804 ms 26.151 ms]
+ala bench report (all observed iterations): ui_cpu/grid
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 183
+    mean: 24.874ms
+    p50: 24.183ms
+    p90: 28.099ms
+    p95: 29.000ms
+    p99: 30.032ms
+    max: 30.228ms
+    frame budget overruns total: 434
+    frame budget overruns max: 3
+  window draw:
+    samples: 183
+    mean: 24.868ms
+    p50: 24.166ms
+    p90: 28.099ms
+    p95: 29.000ms
+    p99: 30.015ms
+    max: 30.228ms
+    frame budget overruns total: 434
+    frame budget overruns max: 3
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/text_warm/50
+Benchmarking ui_cpu/text_warm/50: Warming up for 1.0000 s
+Benchmarking ui_cpu/text_warm/50: Collecting 30 samples in estimated 3.2048 s (6045 iterations)
+Benchmarking ui_cpu/text_warm/50: Analyzing
+ui_cpu/text_warm/50     time:   [521.80 µs 525.87 µs 529.31 µs]
+Found 1 outliers among 30 measurements (3.33%)
+  1 (3.33%) high mild
+ala bench report (all observed iterations): ui_cpu/text
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 8092
+    mean: 0.521ms
+    p50: 0.513ms
+    p90: 0.541ms
+    p95: 0.569ms
+    p99: 0.721ms
+    max: 1.725ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  window draw:
+    samples: 8092
+    mean: 0.520ms
+    p50: 0.512ms
+    p90: 0.540ms
+    p95: 0.568ms
+    p99: 0.721ms
+    max: 1.725ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/text_warm/500
+Benchmarking ui_cpu/text_warm/500: Warming up for 1.0000 s
+Benchmarking ui_cpu/text_warm/500: Collecting 30 samples in estimated 3.3265 s (1395 iterations)
+Benchmarking ui_cpu/text_warm/500: Analyzing
+ui_cpu/text_warm/500    time:   [2.3974 ms 2.4140 ms 2.4298 ms]
+Found 2 outliers among 30 measurements (6.67%)
+  2 (6.67%) high mild
+ala bench report (all observed iterations): ui_cpu/text
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 1906
+    mean: 2.376ms
+    p50: 2.324ms
+    p90: 2.517ms
+    p95: 2.617ms
+    p99: 3.342ms
+    max: 3.578ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  window draw:
+    samples: 1906
+    mean: 2.374ms
+    p50: 2.322ms
+    p90: 2.515ms
+    p95: 2.615ms
+    p99: 3.340ms
+    max: 3.576ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/text_churn/50
+Benchmarking ui_cpu/text_churn/50: Warming up for 1.0000 s
+Benchmarking ui_cpu/text_churn/50: Collecting 30 samples in estimated 3.1469 s (1860 iterations)
+Benchmarking ui_cpu/text_churn/50: Analyzing
+ui_cpu/text_churn/50    time:   [1.6628 ms 1.6814 ms 1.7097 ms]
+Found 3 outliers among 30 measurements (10.00%)
+  1 (3.33%) high mild
+  2 (6.67%) high severe
+ala bench report (all observed iterations): ui_cpu/text
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 2883
+    mean: 1.692ms
+    p50: 1.630ms
+    p90: 1.794ms
+    p95: 2.157ms
+    p99: 2.664ms
+    max: 3.422ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  window draw:
+    samples: 2883
+    mean: 1.691ms
+    p50: 1.629ms
+    p90: 1.792ms
+    p95: 2.152ms
+    p99: 2.662ms
+    max: 3.418ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/idle_no_redraw
+Benchmarking ui_cpu/idle_no_redraw: Warming up for 1.0000 s
+Benchmarking ui_cpu/idle_no_redraw: Collecting 30 samples in estimated 3.0000 s (32M iterations)
+Benchmarking ui_cpu/idle_no_redraw: Analyzing
+ui_cpu/idle_no_redraw   time:   [92.099 ns 92.460 ns 92.917 ns]
+Found 2 outliers among 30 measurements (6.67%)
+  1 (3.33%) high mild
+  1 (3.33%) high severe

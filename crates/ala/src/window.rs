@@ -5369,6 +5369,18 @@ impl Window {
         children: impl IntoIterator<Item = LayoutId>,
         cx: &mut App,
     ) -> LayoutId {
+        self.request_layout_ref(&style, children, cx)
+    }
+
+    // Internal callers can keep the full paint/text style in place while only
+    // its layout properties are converted for Taffy.
+    #[must_use]
+    pub(crate) fn request_layout_ref(
+        &mut self,
+        style: &Style,
+        children: impl IntoIterator<Item = LayoutId>,
+        cx: &mut App,
+    ) -> LayoutId {
         self.invalidator.debug_assert_prepaint();
 
         cx.layout_id_buffer.clear();
@@ -5396,7 +5408,7 @@ impl Window {
         self.layout_engine
             .as_mut()
             .unwrap()
-            .request_measured_layout(style, rem_size, scale_factor, measure)
+            .request_measured_layout(&style, rem_size, scale_factor, measure)
     }
 
     pub fn compute_layout(
