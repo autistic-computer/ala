@@ -1,0 +1,283 @@
+{
+  "metadata": {
+    "experimental": true,
+    "utc": "2026-10-29T22:11:22.099340+00:00",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "text_backend": "not used (Taffy-only)",
+    "cpuinfo": "AMD EPYC 9V45 96-Core Processor",
+    "cpu_affinity": [
+      2
+    ],
+    "source_commit": "90aaf1496bc6a36028ee5a471e13c2c9a7ec8c4b",
+    "baseline_commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "build_command": null,
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "71cc4073652219a0580dabeb01a3feb04168e60128bd8debaa1b30868ba9571d",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "measurements": "Taffy kernel style update + compute + layout reads; no ALA reconciliation, text or GPU work. Separate allocation passes.",
+    "allocation_note": "Separate instrumented processes count allocation requests, not retained memory or RSS. Counting disabled in timing runs.",
+    "layout_scope": "Taffy kernel only; stable fixture identities, no ALA reconciliation or view work",
+    "source_sha256": {
+      "crates/ala-platform/benches/retained_layout.rs": "b39edc428b8ba217f33c0779d3392ce0db09c1ac4b1ecb91ca85348164fa8ea9",
+      "crates/ala-platform/benches/retained_layout/kernel.rs": "e81cfc3eb43885292a6f411e509012ea86f34d19d5815976f24a75e9088ff121",
+      "Cargo.lock": "22bcce4174fb32338080580e032826d4b503493e5e5691704f4026d0918ec550",
+      "experiments/retained-layout/run.py": "6983de32cf1c233ed036fd2b5e106dd4d33de46fe1adf24dba82ea6bcd212e52"
+    },
+    "relevant_environment": {
+      "VK_DRIVER_FILES": "/tmp/ala-sysroot/usr/share/vulkan/icd.d/lvp_icd.json",
+      "LP_NUM_THREADS": "2",
+      "CARGO_PROFILE_RELEASE_DEBUG": "0"
+    }
+  },
+  "verification": {
+    "case": "verification",
+    "layout": {
+      "frames": 128,
+      "exact_node_geometry_comparisons": 499328,
+      "scope": "Taffy kernel with fixture-provided stable identities"
+    },
+    "wall_seconds": 0.29199643500032835,
+    "command": [
+      "/workspace/ala-perf-target/release/deps/retained_layout-74a6da6bc1299138",
+      "--verify"
+    ]
+  },
+  "summary": [
+    {
+      "name": "layout/0",
+      "modes": {
+        "rebuild": {
+          "median_ms": 1.518662,
+          "p95_ms": 1.556167,
+          "run_medians_ms": [
+            1.5085365,
+            1.5164835,
+            1.518662,
+            1.52417,
+            1.525557
+          ],
+          "thread_cpu_median_ms": 1.5188555,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 5782360.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "retained": {
+          "median_ms": 0.087441,
+          "p95_ms": 0.102974,
+          "run_medians_ms": [
+            0.08652,
+            0.087441,
+            0.0878365,
+            0.087446,
+            0.086259
+          ],
+          "thread_cpu_median_ms": 0.0875905,
+          "paired_speedup_range": [
+            17.28964610384066,
+            17.685771919451884
+          ],
+          "median_allocated_bytes": 0.0,
+          "speedup_vs_baseline": 17.36784803467481
+        },
+        "write-all": {
+          "median_ms": 1.3869595,
+          "p95_ms": 1.421737,
+          "run_medians_ms": [
+            1.3869595,
+            1.3865195,
+            1.3903745,
+            1.3824075,
+            1.3884015
+          ],
+          "thread_cpu_median_ms": 1.387139,
+          "paired_speedup_range": [
+            1.0876572098896904,
+            1.1025475483893137
+          ],
+          "median_allocated_bytes": 5750680.0,
+          "speedup_vs_baseline": 1.094957711454444
+        }
+      }
+    },
+    {
+      "name": "layout/1",
+      "modes": {
+        "rebuild": {
+          "median_ms": 1.5118285,
+          "p95_ms": 1.584467,
+          "run_medians_ms": [
+            1.4928195,
+            1.5189735,
+            1.5118285,
+            1.498283,
+            1.522018
+          ],
+          "thread_cpu_median_ms": 1.512035,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 5782360.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "retained": {
+          "median_ms": 0.143996,
+          "p95_ms": 0.162003,
+          "run_medians_ms": [
+            0.142564,
+            0.144226,
+            0.143996,
+            0.1435555,
+            0.144842
+          ],
+          "thread_cpu_median_ms": 0.14416,
+          "paired_speedup_range": [
+            10.436959921424117,
+            10.53189785475573
+          ],
+          "median_allocated_bytes": 286584.0,
+          "speedup_vs_baseline": 10.49910066946304
+        },
+        "write-all": {
+          "median_ms": 1.3854535,
+          "p95_ms": 1.438248,
+          "run_medians_ms": [
+            1.382474,
+            1.380496,
+            1.3889835,
+            1.3892195,
+            1.3854535
+          ],
+          "thread_cpu_median_ms": 1.3857165,
+          "paired_speedup_range": [
+            1.0785070321860584,
+            1.100309961057475
+          ],
+          "median_allocated_bytes": 5750680.0,
+          "speedup_vs_baseline": 1.0912156200117868
+        }
+      }
+    },
+    {
+      "name": "layout/64",
+      "modes": {
+        "rebuild": {
+          "median_ms": 1.508388,
+          "p95_ms": 1.548604,
+          "run_medians_ms": [
+            1.511217,
+            1.508388,
+            1.551733,
+            1.491052,
+            1.5054835
+          ],
+          "thread_cpu_median_ms": 1.508675,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 5782360.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "retained": {
+          "median_ms": 0.148453,
+          "p95_ms": 0.165889,
+          "run_medians_ms": [
+            0.148453,
+            0.149785,
+            0.1483225,
+            0.149865,
+            0.148278
+          ],
+          "thread_cpu_median_ms": 0.148577,
+          "paired_speedup_range": [
+            9.949301037600508,
+            10.461885418597987
+          ],
+          "median_allocated_bytes": 286584.0,
+          "speedup_vs_baseline": 10.160710797356739
+        },
+        "write-all": {
+          "median_ms": 1.3894695,
+          "p95_ms": 1.426831,
+          "run_medians_ms": [
+            1.379555,
+            1.3894695,
+            1.395488,
+            1.3823285,
+            1.4000035
+          ],
+          "thread_cpu_median_ms": 1.3896625,
+          "paired_speedup_range": [
+            1.0753426687861851,
+            1.1119644167488363
+          ],
+          "median_allocated_bytes": 5750680.0,
+          "speedup_vs_baseline": 1.0855855418200975
+        }
+      }
+    },
+    {
+      "name": "layout/3840",
+      "modes": {
+        "rebuild": {
+          "median_ms": 1.523578,
+          "p95_ms": 1.551237,
+          "run_medians_ms": [
+            1.523578,
+            1.532747,
+            1.509793,
+            1.5497795,
+            1.523575
+          ],
+          "thread_cpu_median_ms": 1.523768,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 5782360.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "retained": {
+          "median_ms": 1.40014,
+          "p95_ms": 1.457186,
+          "run_medians_ms": [
+            1.3917915,
+            1.3944805,
+            1.4096835,
+            1.404642,
+            1.40014
+          ],
+          "thread_cpu_median_ms": 1.400404,
+          "paired_speedup_range": [
+            1.0710155861227006,
+            1.1033270399147967
+          ],
+          "median_allocated_bytes": 5750680.0,
+          "speedup_vs_baseline": 1.0881611838816119
+        },
+        "write-all": {
+          "median_ms": 1.3964045,
+          "p95_ms": 1.4338,
+          "run_medians_ms": [
+            1.487315,
+            1.386624,
+            1.398372,
+            1.385278,
+            1.3964045
+          ],
+          "thread_cpu_median_ms": 1.3966035,
+          "paired_speedup_range": [
+            1.0243815197184187,
+            1.1187498105073495
+          ],
+          "median_allocated_bytes": 5750680.0,
+          "speedup_vs_baseline": 1.0910721069718696
+        }
+      }
+    }
+  ]
+}
