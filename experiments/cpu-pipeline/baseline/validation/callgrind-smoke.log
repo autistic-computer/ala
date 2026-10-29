@@ -1,0 +1,45 @@
+==16112== Callgrind, a call-graph generating cache profiler
+==16112== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==16112== Using Valgrind-3.24.0 and LibVEX; rerun with -h for copyright info
+==16112== Command: target/perf/deps/ui_cpu-bfcc3592a6dd1551 --test ^ui_cpu/grid/100$
+==16112==
+==16112== For interactive control, run 'callgrind_control -h'.
+==16113==
+==16113== Events    : Ir
+==16113== Collected : 1450914
+==16113==
+==16113== I   refs:      1,450,914
+Gnuplot not found or not usable, using plotters backend
+`gnuplot --version` failed with error message:
+
+Testing ui_cpu/grid/100
+Success
+ala bench report (all observed iterations): ui_cpu/grid
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 1
+    mean: 13.718ms
+    p50: 13.722ms
+    p90: 13.722ms
+    p95: 13.722ms
+    p99: 13.722ms
+    max: 13.722ms
+    frame budget overruns total: 1
+    frame budget overruns max: 1
+  window draw:
+    samples: 1
+    mean: 10.973ms
+    p50: 10.977ms
+    p90: 10.977ms
+    p95: 10.977ms
+    p99: 10.977ms
+    max: 10.977ms
+    frame budget overruns total: 1
+    frame budget overruns max: 1
+  invalidations per frame: mean 1.00, max 1
+
+==16112==
+==16112== Events    : Ir
+==16112== Collected : 32916633
+==16112==
+==16112== I   refs:      32,916,633
