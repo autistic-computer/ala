@@ -490,6 +490,7 @@ raw-window-handle.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 criterion.workspace = true
 smallvec = { workspace = true, features = ["union", "const_new"] }
 unicode-properties = "=0.1.3"
@@ -511,3 +512,8 @@ windows-registry.workspace = true
 
 [package.metadata.cargo-shear]
 ignored = ["bitflags", "x11-clipboard"]
+
+[[bench]]
+name = "segmented_shaping"
+harness = false
+required-features = ["bench-support"]
