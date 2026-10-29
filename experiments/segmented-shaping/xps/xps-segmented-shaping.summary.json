@@ -1,0 +1,881 @@
+{
+  "metadata": {
+    "experimental": true,
+    "utc": "2026-10-29T23:51:12.350028+00:00",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43",
+    "text_backend": "cosmic-text",
+    "cpuinfo": "Intel(R) Core(TM) i7-1065G7 CPU @ 1.30GHz",
+    "cpu_affinity": [
+      2
+    ],
+    "source_commit": "c34cd002d05e3153cdb1ad34c29c8645d20cf0b7",
+    "baseline_commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "build_command": null,
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "9740b44e4cda9c81dd5eba11c602089217fc77e38e6e1fe41eb55e5f037b5871",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "measurements": "Main-thread text edit + layout + draw + arena clear; no GPU submission. Separate allocation passes.",
+    "allocation_note": "Separate instrumented processes count allocation requests, not retained memory or RSS. Counting disabled in timing runs.",
+    "shaping_scope": "Benchmark-only decorator around the native platform text system; semantic differences block merging",
+    "donor_commits": {
+      "segment_helpers": "mesa-hills-research/gpui@30d883237d5f913f2d11cfcb938bd7697da88aa6"
+    },
+    "source_sha256": {
+      "crates/ala-platform/benches/segmented_shaping.rs": "dc73d96ccbd7e5f5537fa017f08aa04f62eaca706d8e80b30f869a990cc256ca",
+      "crates/ala-platform/benches/segmented_shaping/segments.rs": "ce8d156c7dd573ef04001afbd91451bb3f0abbd66c1620eca20e5559a9932eab",
+      "crates/ala-platform/benches/segmented_shaping/text.rs": "3c5a5de425bfa5cf6e09778fbdb99d637ccec1f8fecd9aa24066c63bcc88f95d",
+      "Cargo.lock": "347067dbf6987e80711aa345c8838a8baca28532a2af1e0eacb01d590272f483",
+      "experiments/segmented-shaping/run.py": "493835d5e91ae3573ef75dab6c12a77a63c57770c8cbbe62bf289cdd6a97d25a"
+    },
+    "relevant_environment": {}
+  },
+  "verification": {
+    "case": "verification",
+    "text": {
+      "paragraphs": 80,
+      "wrap_comparisons": 400,
+      "wrap_differences": 5,
+      "max_glyph_x_drift_px": 0.318359375,
+      "max_glyph_y_drift_px": 0.0,
+      "exact_line_layouts_equivalent": false,
+      "fallback_cases": 10,
+      "verified_fallback_cases": 10,
+      "font_invalidation": true,
+      "external_font_generation_tested": false,
+      "glyph_identity_equivalent": true,
+      "ascii_probe": {
+        "text_unit": "hello ",
+        "repetitions": 700,
+        "text_bytes": 4200,
+        "segment_cuts": [
+          2052,
+          4104
+        ],
+        "max_glyph_x_drift_px": 0.458984375,
+        "baseline_width_px": 27462.044921875,
+        "segmented_width_px": 27462.494140625,
+        "layout_equivalent": false,
+        "warm_cache_raw_calls": 0
+      },
+      "first_layout_difference": {
+        "seed": 1,
+        "generator_seed": 2,
+        "text": "up brown and is another keeps Hello, x=1; why brown which brown na\u00efve na\u00efve and na\u00efve na\u00efve one a another (really) x=1; jumps na\u00efve over a https://example.com/a/b brown which matters. x=1; arrive one a keeps while the jumps and jumps another r\u00e9sum\u00e9 caf\u00e9 which up r\u00e9sum\u00e9 and another streaming layout, matters. why a up the the caching tokens tokens streaming brown a brown world! world! the fox arrive the \u2014 matters. jumps na\u00efve with streaming is a after 123,456 and na\u00efve quick after renderer which a renderer one It's x=1; with \u2014 https://example.com/a/b caf\u00e9 world! x=1; na\u00efve na\u00efve \u2014 dog 123,456 caf\u00e9 brown 123,456 up is a matters. lazy dog x=1; a r\u00e9sum\u00e9 fox layout, which caching matters. (really) caf\u00e9 It's while na\u00efve a fox matters. na\u00efve It's streaming after one renderer caf\u00e9 one why after na\u00efve https://example.com/a/b another a the another \u2014 layout, is over which and 123,456 na\u00efve na\u00efve a na\u00efve jumps the matters. x=1; which \u2014 brown https://example.com/a/b brown lazy matters. matters. which streaming why x=1; another fox x=1; one the Hello, It's It's lazy the \u2014 and one which while fine another r\u00e9sum\u00e9 (really) streaming x=1; arrive is r\u00e9sum\u00e9 brown after tokens na\u00efve caf\u00e9 x=1; is another (really) quick why r\u00e9sum\u00e9 world! while layout, world! layout, It's the 123,456 quick jumps the the brown streaming fine matters. quick why renderer caching is renderer r\u00e9sum\u00e9 one up one (really) keeps caching why lazy quick is over na\u00efve Hello, x=1; dog arrive the It's up and the is brown fine a https://example.com/a/b why is arrive r\u00e9sum\u00e9 after layout, 123,456 why renderer jumps x=1; world! 123,456 streaming matters. the world! jumps r\u00e9sum\u00e9 streaming another 123,456 caf\u00e9 r\u00e9sum\u00e9 up caching why lazy after tokens renderer x=1; It's is dog lazy over matters. and streaming the matters. It's fox matters. while up dog is \u2014 quick fox and with fine world! na\u00efve fine with It's tokens https://example.com/a/b quick arrive which jumps layout, keeps brown a dog 123,456 fine \u2014 t",
+        "text_bytes": 2037,
+        "font": "IBM Plex Sans",
+        "font_size_px": 16,
+        "baseline_width_px": 14246.8271484375,
+        "segmented_width_px": 14246.77734375,
+        "first_position_difference": {
+          "glyph_ordinal": 214,
+          "baseline_byte_index": 219,
+          "segmented_byte_index": 219,
+          "baseline_font_id": "FontId(0)",
+          "segmented_font_id": "FontId(0)",
+          "baseline_glyph_id": "GlyphId(26)",
+          "segmented_glyph_id": "GlyphId(26)",
+          "baseline_x_px": 1565.02490234375,
+          "segmented_x_px": 1565.02392578125,
+          "baseline_x_bits": 1153671372,
+          "segmented_x_bits": 1153671364,
+          "baseline_y_px": 0.0,
+          "segmented_y_px": 0.0
+        },
+        "segment_cuts": [
+          {
+            "cut_byte": 219,
+            "native_prefix_width_px": 1565.02392578125,
+            "summed_segment_width_px": 1565.02392578125,
+            "baseline_next_glyph_x_px": 1565.02490234375,
+            "segmented_next_glyph_x_px": 1565.02392578125
+          },
+          {
+            "cut_byte": 428,
+            "native_prefix_width_px": 3054.49267578125,
+            "summed_segment_width_px": 3054.495849609375,
+            "baseline_next_glyph_x_px": 3054.491455078125,
+            "segmented_next_glyph_x_px": 3054.495849609375
+          },
+          {
+            "cut_byte": 625,
+            "native_prefix_width_px": 4406.87255859375,
+            "summed_segment_width_px": 4406.8798828125,
+            "baseline_next_glyph_x_px": 4406.87109375,
+            "segmented_next_glyph_x_px": 4406.8798828125
+          },
+          {
+            "cut_byte": 882,
+            "native_prefix_width_px": 6169.1728515625,
+            "summed_segment_width_px": 6169.18408203125,
+            "baseline_next_glyph_x_px": 6169.16845703125,
+            "segmented_next_glyph_x_px": 6169.18408203125
+          },
+          {
+            "cut_byte": 1099,
+            "native_prefix_width_px": 7702.04931640625,
+            "summed_segment_width_px": 7702.064453125,
+            "baseline_next_glyph_x_px": 7702.0419921875,
+            "segmented_next_glyph_x_px": 7702.064453125
+          },
+          {
+            "cut_byte": 1732,
+            "native_prefix_width_px": 12130.662109375,
+            "summed_segment_width_px": 12130.6337890625,
+            "baseline_next_glyph_x_px": 12130.642578125,
+            "segmented_next_glyph_x_px": 12130.6337890625
+          }
+        ]
+      },
+      "first_wrap_difference": {
+        "seed": 18,
+        "generator_seed": 19,
+        "text": "over keeps keeps x=1; another r\u00e9sum\u00e9 arrive lazy It's x=1; matters. up the na\u00efve up 123,456 Hello, na\u00efve up caching caching fine world! quick after the quick caf\u00e9 arrive the the over caf\u00e9 dog fox arrive which one over 123,456 na\u00efve It's tokens layout, streaming caf\u00e9 while which another brown (really) quick https://example.com/a/b after up streaming caf\u00e9 caching caching one caf\u00e9 caf\u00e9 is is tokens over after why matters. dog dog fine fine brown fox after the na\u00efve and https://example.com/a/b which https://example.com/a/b streaming over (really) r\u00e9sum\u00e9 another over a after arrive keeps renderer caf\u00e9 123,456 It's It's caf\u00e9 is world! fine caf\u00e9 fox https://example.com/a/b https://example.com/a/b https://example.com/a/b quick na\u00efve lazy up x=1; quick x=1; 123,456 jumps is after fine https://example.com/a/b with and brown why the dog matters. keeps is another renderer and jumps Hello, a another (really) lazy jumps layout, (really) jumps arrive with is over world! Hello, after r\u00e9sum\u00e9 is dog over is world! dog another x=1; the r\u00e9sum\u00e9 another matters. renderer jumps tokens fox and brown the streaming arrive lazy Hello, dog arrive \u2014 brown the 123,456 fox after and fine another quick a tokens It's It's lazy with is another Hello, arrive streaming Hello, lazy keeps brown over brown after jumps tokens is which the na\u00efve world! why streaming world! caching keeps one world! 123,456 jumps with a lazy after fox brown the layout, and Hello, jumps keeps \u2014 the Hello, up brown matters. with while It's which jumps over x=1; \u2014 layout, and a why brown layout, quick the which the (really) x=1; https://example.com/a/b is keeps and the renderer caf\u00e9 and caf\u00e9 and 123,456 the why x=1; world! keeps caf\u00e9 over fine caf\u00e9 fine over Hello, x=1; layout, na\u00efve https://example.com/a/b fox renderer after one with the the arrive another one keeps It's x=1; after caf\u00e9 renderer lazy and quick lazy tokens layout, after brown which fox dog fine na\u00efve which lazy r\u00e9sum\u00e9 up keeps fine tokens world! r\u00e9sum\u00e9 while is over renderer keeps https://example.com/a/b \u2014 which Hello, caf\u00e9 tokens fox fine lazy \u2014 123,456 after another renderer streaming keeps x=1; quick lazy 123,456 the https://example.com/a/b keeps and (really) the arrive r\u00e9sum\u00e9 a matters. fox jumps the It's Hello, after https://example.com/a/b the lazy the dog after arrive caching streaming one jumps fox brown arrive brown one r\u00e9sum\u00e9 x=1; is world! the caching (really) tokens tokens with up after the another quick r\u00e9sum\u00e9 arrive world! after and with renderer na\u00efve fine while https://example.com/a/b (really) while fox Hello, the arrive Hello, dog up tokens up st",
+        "text_bytes": 2666,
+        "font": "IBM Plex Sans",
+        "font_size_px": 16,
+        "wrap_width_px": 200.0,
+        "line_ordinal": 0,
+        "boundary_ordinal": 68,
+        "baseline_byte_index": 1754,
+        "segmented_byte_index": 1759,
+        "baseline_boundary_x_px": 12297.6533203125,
+        "segmented_boundary_x_px": 12332.65234375,
+        "baseline_wrap_byte_indices": [
+          [
+            22,
+            51,
+            77,
+            102,
+            128,
+            156,
+            183,
+            209,
+            232,
+            259,
+            287,
+            310,
+            335,
+            359,
+            385,
+            415,
+            442,
+            468,
+            490,
+            513,
+            537,
+            561,
+            585,
+            613,
+            643,
+            674,
+            699,
+            723,
+            746,
+            772,
+            794,
+            812,
+            834,
+            856,
+            882,
+            908,
+            932,
+            955,
+            981,
+            1010,
+            1036,
+            1062,
+            1088,
+            1109,
+            1136,
+            1163,
+            1185,
+            1208,
+            1238,
+            1261,
+            1290,
+            1313,
+            1341,
+            1363,
+            1388,
+            1413,
+            1441,
+            1463,
+            1490,
+            1515,
+            1543,
+            1571,
+            1595,
+            1623,
+            1650,
+            1673,
+            1701,
+            1727,
+            1754,
+            1779,
+            1805,
+            1833,
+            1861,
+            1887,
+            1911,
+            1937,
+            1963,
+            1986,
+            2009,
+            2032,
+            2055,
+            2080,
+            2108,
+            2133,
+            2155,
+            2180,
+            2204,
+            2229,
+            2255,
+            2282,
+            2308,
+            2333,
+            2361,
+            2386,
+            2413,
+            2440,
+            2468,
+            2496,
+            2523,
+            2552,
+            2579,
+            2603,
+            2633,
+            2661
+          ]
+        ],
+        "segmented_wrap_byte_indices": [
+          [
+            22,
+            51,
+            77,
+            102,
+            128,
+            156,
+            183,
+            209,
+            232,
+            259,
+            287,
+            310,
+            335,
+            359,
+            385,
+            415,
+            442,
+            468,
+            490,
+            513,
+            537,
+            561,
+            585,
+            613,
+            643,
+            674,
+            699,
+            723,
+            746,
+            772,
+            794,
+            812,
+            834,
+            856,
+            882,
+            908,
+            932,
+            955,
+            981,
+            1010,
+            1036,
+            1062,
+            1088,
+            1109,
+            1136,
+            1163,
+            1185,
+            1208,
+            1238,
+            1261,
+            1290,
+            1313,
+            1341,
+            1363,
+            1388,
+            1413,
+            1441,
+            1463,
+            1490,
+            1515,
+            1543,
+            1571,
+            1595,
+            1623,
+            1650,
+            1673,
+            1701,
+            1727,
+            1759,
+            1786,
+            1810,
+            1838,
+            1865,
+            1893,
+            1917,
+            1943,
+            1968,
+            1995,
+            2016,
+            2046,
+            2068,
+            2095,
+            2124,
+            2147,
+            2164,
+            2185,
+            2208,
+            2232,
+            2255,
+            2282,
+            2308,
+            2333,
+            2361,
+            2386,
+            2413,
+            2440,
+            2468,
+            2496,
+            2523,
+            2552,
+            2579,
+            2603,
+            2633,
+            2661
+          ]
+        ],
+        "segment_cuts": [
+          513,
+          761,
+          932,
+          1233,
+          1459,
+          2396
+        ]
+      },
+      "max_drift_case": {
+        "seed": 78,
+        "generator_seed": 79,
+        "text_bytes": 4884,
+        "glyph_ordinal": 4524,
+        "byte_index": 4661,
+        "baseline_x_px": 32761.443359375,
+        "segmented_x_px": 32761.76171875
+      },
+      "layout_equivalent": false,
+      "pixel_equivalence": "not established for segmented text"
+    },
+    "wall_seconds": 0.5660773750059889,
+    "command": [
+      "/home/demfabris/dev/ala-native-target/release/deps/segmented_shaping-6561ccc396247396",
+      "--verify"
+    ]
+  },
+  "correctness_blocked": true,
+  "summary": [
+    {
+      "name": "text/2000/append",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.6425175,
+          "p95_ms": 1.868385,
+          "run_medians_ms": [
+            1.6654625,
+            1.637462,
+            1.630209,
+            1.643529,
+            1.6425175
+          ],
+          "thread_cpu_median_ms": 1.643095,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 2011470.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.654749,
+          "p95_ms": 0.761836,
+          "run_medians_ms": [
+            0.673054,
+            0.6636835,
+            0.654689,
+            0.653772,
+            0.654749
+          ],
+          "thread_cpu_median_ms": 0.655337,
+          "paired_speedup_range": [
+            2.4672332519943616,
+            2.513917696077532
+          ],
+          "median_allocated_bytes": 604094.0,
+          "speedup_vs_baseline": 2.508621624469835
+        }
+      }
+    },
+    {
+      "name": "text/2000/middle",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.355545,
+          "p95_ms": 1.609336,
+          "run_medians_ms": [
+            1.37329,
+            1.355176,
+            1.355545,
+            1.3515495,
+            1.360103
+          ],
+          "thread_cpu_median_ms": 1.356259,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 1382865.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.6647655,
+          "p95_ms": 0.789197,
+          "run_medians_ms": [
+            0.6681405,
+            0.6626785,
+            0.6647655,
+            0.6641835,
+            0.6689845
+          ],
+          "thread_cpu_median_ms": 0.665291,
+          "paired_speedup_range": [
+            2.033085968359506,
+            2.0553910442489265
+          ],
+          "median_allocated_bytes": 667617.0,
+          "speedup_vs_baseline": 2.0391325963817315
+        }
+      }
+    },
+    {
+      "name": "text/2000/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.360448,
+          "p95_ms": 1.426303,
+          "run_medians_ms": [
+            1.360448,
+            1.373925,
+            1.3524075,
+            1.3642375,
+            1.353848
+          ],
+          "thread_cpu_median_ms": 1.3611485,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 1379590.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 1.439401,
+          "p95_ms": 1.710949,
+          "run_medians_ms": [
+            1.439401,
+            1.4658905,
+            1.447737,
+            1.4317055,
+            1.4283385
+          ],
+          "thread_cpu_median_ms": 1.4401565,
+          "paired_speedup_range": [
+            0.9341527501196695,
+            0.9528757834624509
+          ],
+          "median_allocated_bytes": 1606955.0,
+          "speedup_vs_baseline": 0.9451487111652694
+        }
+      }
+    },
+    {
+      "name": "text/2000/unchanged",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.5108505,
+          "p95_ms": 0.530874,
+          "run_medians_ms": [
+            0.514664,
+            0.5069425,
+            0.512527,
+            0.509347,
+            0.5108505
+          ],
+          "thread_cpu_median_ms": 0.511306,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 383724.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.502633,
+          "p95_ms": 0.518069,
+          "run_medians_ms": [
+            0.508638,
+            0.502633,
+            0.4991215,
+            0.5062,
+            0.500139
+          ],
+          "thread_cpu_median_ms": 0.5030815,
+          "paired_speedup_range": [
+            1.0062169103121297,
+            1.0268581898395481
+          ],
+          "median_allocated_bytes": 383724.0,
+          "speedup_vs_baseline": 1.0163489066575413
+        }
+      }
+    },
+    {
+      "name": "text/20000/append",
+      "modes": {
+        "baseline": {
+          "median_ms": 8.937027,
+          "p95_ms": 9.849747,
+          "run_medians_ms": [
+            8.9448075,
+            8.925663,
+            9.033352,
+            8.9246765,
+            8.937027
+          ],
+          "thread_cpu_median_ms": 8.927499,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 12617194.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 1.036076,
+          "p95_ms": 1.163185,
+          "run_medians_ms": [
+            1.061519,
+            1.036076,
+            1.036104,
+            1.028095,
+            1.0303135
+          ],
+          "thread_cpu_median_ms": 1.036621,
+          "paired_speedup_range": [
+            8.426422419193628,
+            8.718576513554623
+          ],
+          "median_allocated_bytes": 966252.0,
+          "speedup_vs_baseline": 8.625841154509901
+        }
+      }
+    },
+    {
+      "name": "text/20000/middle",
+      "modes": {
+        "baseline": {
+          "median_ms": 8.749286,
+          "p95_ms": 9.351432,
+          "run_medians_ms": [
+            8.6902865,
+            8.707954,
+            8.84402,
+            8.749286,
+            8.752527
+          ],
+          "thread_cpu_median_ms": 8.7468925,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 12495986.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 1.2307975,
+          "p95_ms": 1.383429,
+          "run_medians_ms": [
+            1.2330995,
+            1.2307975,
+            1.228101,
+            1.2235595,
+            1.23328
+          ],
+          "thread_cpu_median_ms": 1.231434,
+          "paired_speedup_range": [
+            7.0475144138814425,
+            7.201378388259598
+          ],
+          "median_allocated_bytes": 1271191.0,
+          "speedup_vs_baseline": 7.108631598617969
+        }
+      }
+    },
+    {
+      "name": "text/20000/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 8.8694645,
+          "p95_ms": 9.744461,
+          "run_medians_ms": [
+            8.861259,
+            8.8694645,
+            8.842667,
+            9.1773425,
+            9.0584645
+          ],
+          "thread_cpu_median_ms": 8.8710325,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 12492710.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 9.385421,
+          "p95_ms": 9.897857,
+          "run_medians_ms": [
+            9.2977715,
+            9.385421,
+            9.37032,
+            9.3886725,
+            9.4492215
+          ],
+          "thread_cpu_median_ms": 9.385353,
+          "paired_speedup_range": [
+            0.9436889028336278,
+            0.9774909605165161
+          ],
+          "median_allocated_bytes": 12130242.0,
+          "speedup_vs_baseline": 0.9450257479126403
+        }
+      }
+    },
+    {
+      "name": "text/20000/unchanged",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.742054,
+          "p95_ms": 0.877717,
+          "run_medians_ms": [
+            0.809351,
+            0.742054,
+            0.737271,
+            0.8848095,
+            0.7387935
+          ],
+          "thread_cpu_median_ms": 0.7425895,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 420012.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.7299715,
+          "p95_ms": 0.771911,
+          "run_medians_ms": [
+            0.7318635,
+            0.7299,
+            0.7299715,
+            0.733561,
+            0.729207
+          ],
+          "thread_cpu_median_ms": 0.730427,
+          "paired_speedup_range": [
+            1.0099997054679533,
+            1.2061839438029012
+          ],
+          "median_allocated_bytes": 420012.0,
+          "speedup_vs_baseline": 1.0165520160718604
+        }
+      }
+    },
+    {
+      "name": "text/100000/append",
+      "modes": {
+        "baseline": {
+          "median_ms": 46.772593,
+          "p95_ms": 50.304349,
+          "run_medians_ms": [
+            46.185019,
+            46.8132145,
+            46.6048385,
+            46.774252,
+            46.772593
+          ],
+          "thread_cpu_median_ms": 46.7304875,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 53048770.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 3.0895315,
+          "p95_ms": 3.611979,
+          "run_medians_ms": [
+            3.05997,
+            3.0604225,
+            3.0895315,
+            3.156699,
+            3.10931
+          ],
+          "thread_cpu_median_ms": 3.09029,
+          "paired_speedup_range": [
+            14.81745709679637,
+            15.296324118647016
+          ],
+          "median_allocated_bytes": 2902436.0,
+          "speedup_vs_baseline": 15.139056844055482
+        }
+      }
+    },
+    {
+      "name": "text/100000/middle",
+      "modes": {
+        "baseline": {
+          "median_ms": 46.6381135,
+          "p95_ms": 48.38398,
+          "run_medians_ms": [
+            46.6015625,
+            46.293561,
+            46.6381135,
+            47.1758155,
+            46.913196
+          ],
+          "thread_cpu_median_ms": 46.6178585,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 52927554.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 3.2364315,
+          "p95_ms": 3.697852,
+          "run_medians_ms": [
+            3.2364315,
+            3.253701,
+            3.2522275,
+            3.2312545,
+            3.2219525
+          ],
+          "thread_cpu_median_ms": 3.2341395,
+          "paired_speedup_range": [
+            14.227970240658253,
+            14.599845199441889
+          ],
+          "median_allocated_bytes": 3054314.0,
+          "speedup_vs_baseline": 14.41035087564807
+        }
+      }
+    },
+    {
+      "name": "text/100000/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 46.7921685,
+          "p95_ms": 48.66442,
+          "run_medians_ms": [
+            46.4311965,
+            46.8575,
+            46.7921685,
+            46.614012,
+            47.1788605
+          ],
+          "thread_cpu_median_ms": 46.7705745,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 52920454.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 47.1454805,
+          "p95_ms": 48.763359,
+          "run_medians_ms": [
+            46.717725,
+            46.7740425,
+            47.4810455,
+            47.20751,
+            47.1454805
+          ],
+          "thread_cpu_median_ms": 47.136574,
+          "paired_speedup_range": [
+            0.9854915368281012,
+            1.0017842695550636
+          ],
+          "median_allocated_bytes": 59077039.0,
+          "speedup_vs_baseline": 0.9925059200531428
+        }
+      }
+    },
+    {
+      "name": "text/100000/unchanged",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.53024,
+          "p95_ms": 1.677361,
+          "run_medians_ms": [
+            1.548144,
+            1.565559,
+            1.5267745,
+            1.53024,
+            1.523272
+          ],
+          "thread_cpu_median_ms": 1.529358,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 420012.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 1.521686,
+          "p95_ms": 1.617754,
+          "run_medians_ms": [
+            1.5201565,
+            1.5215425,
+            1.522177,
+            1.531252,
+            1.521686
+          ],
+          "thread_cpu_median_ms": 1.522168,
+          "paired_speedup_range": [
+            0.9993391029040288,
+            1.028928866594262
+          ],
+          "median_allocated_bytes": 420012.0,
+          "speedup_vs_baseline": 1.0056213962670353
+        }
+      }
+    }
+  ]
+}
