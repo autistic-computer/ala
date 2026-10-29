@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "experimental": true,
+    "utc": "2026-10-29T22:15:41.864573+00:00",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "text_backend": "cosmic-text",
+    "cpuinfo": "AMD EPYC 9V45 96-Core Processor",
+    "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "source_commit": "d47957e1ba349f1d0312f42c495ddb96a0727340",
+    "baseline_commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "build_command": [
+      "cargo",
+      "bench",
+      "--locked",
+      "-p",
+      "ala-platform",
+      "--no-default-features",
+      "--features",
+      "bench-support",
+      "--bench",
+      "segmented_shaping",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "tracked_diff_sha256": "e5ddb3c2c1858b1c0fd09bb044fc5b09fff750f68bfb1ae54bf2f9ac30a49fee",
+    "binary_sha256": "d76470d2e58eae2c952da7bf1f356ca8f62589c46441d09b588080448148f56b",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "measurements": "Main-thread text edit + layout + draw + arena clear; no GPU submission. Separate allocation passes.",
+    "allocation_note": "Separate instrumented processes count allocation requests, not retained memory or RSS. Counting disabled in timing runs.",
+    "shaping_scope": "Benchmark-only decorator around the native platform text system; semantic differences block merging",
+    "donor_commits": {
+      "segment_helpers": "mesa-hills-research/gpui@30d883237d5f913f2d11cfcb938bd7697da88aa6"
+    },
+    "source_sha256": {
+      "crates/ala-platform/benches/segmented_shaping.rs": "39c42fbc59b1b7085a88253256f150972ff917a8d4b1ab64893c91050b17ae74",
+      "crates/ala-platform/benches/segmented_shaping/segments.rs": "c79996376b941f5af7824b9f04cf8084be1451e8380ed0381a0251ff25e1bd92",
+      "crates/ala-platform/benches/segmented_shaping/text.rs": "1a06394e2e08c894114b9dbb88962fd7811c928c78f017cc8535802b1b89c270",
+      "Cargo.lock": "347067dbf6987e80711aa345c8838a8baca28532a2af1e0eacb01d590272f483",
+      "experiments/segmented-shaping/run.py": "b0b244978fac846567bdcd23f3d409412a0612edab7b1a68d5551436c0da13bd"
+    },
+    "relevant_environment": {
+      "CARGO_PROFILE_RELEASE_DEBUG": "0"
+    }
+  },
+  "verification": {
+    "case": "verification",
+    "text": {
+      "paragraphs": 80,
+      "wrap_comparisons": 400,
+      "wrap_differences": 5,
+      "max_glyph_x_drift_px": 0.318359375,
+      "max_glyph_y_drift_px": 0.0,
+      "exact_line_layouts_equivalent": false,
+      "fallback_cases": 10,
+      "font_invalidation": true,
+      "glyph_identity_equivalent": true,
+      "layout_equivalent": false,
+      "pixel_equivalence": "not established for segmented text"
+    },
+    "wall_seconds": 0.6500233749998188,
+    "command": [
+      "/workspace/ala-perf-target/release/deps/segmented_shaping-6561ccc396247396",
+      "--verify"
+    ]
+  },
+  "runs": [],
+  "summary": []
+}

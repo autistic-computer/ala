@@ -43,6 +43,16 @@ pub struct ExperimentalTextSystem {
 }
 
 impl ExperimentalTextSystem {
+    pub fn baseline(&self) -> Arc<Self> {
+        Arc::new(Self {
+            inner: self.inner.clone(),
+            segmented: false,
+            cache: Mutex::default(),
+            calls: AtomicUsize::new(0),
+            bytes_shaped: AtomicUsize::new(0),
+        })
+    }
+
     pub fn new(segmented: bool) -> Arc<Self> {
         #[cfg(target_os = "linux")]
         let inner: Arc<dyn PlatformTextSystem> =

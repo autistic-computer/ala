@@ -1,0 +1,549 @@
+{
+  "metadata": {
+    "experimental": true,
+    "utc": "2026-10-29T22:08:57.186953+00:00",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "text_backend": "cosmic-text",
+    "cpuinfo": "AMD EPYC 9V45 96-Core Processor",
+    "cpu_affinity": [
+      2
+    ],
+    "source_commit": "d47957e1ba349f1d0312f42c495ddb96a0727340",
+    "baseline_commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "build_command": null,
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "e656858ce824dbe03f4a729dd58975e0b495cfa712177aa9ce60e42285ffe2d1",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "measurements": "Main-thread text edit + layout + draw + arena clear; no GPU submission. Separate allocation passes.",
+    "allocation_note": "Separate instrumented processes count allocation requests, not retained memory or RSS. Counting disabled in timing runs.",
+    "shaping_scope": "Benchmark-only decorator around the native platform text system; semantic differences block merging",
+    "donor_commits": {
+      "segment_helpers": "mesa-hills-research/gpui@30d883237d5f913f2d11cfcb938bd7697da88aa6"
+    },
+    "source_sha256": {
+      "crates/ala-platform/benches/segmented_shaping.rs": "77a87233c8d24d32355766869d183fd692f41c55fc1423d9fdd561f4407fbb6e",
+      "crates/ala-platform/benches/segmented_shaping/segments.rs": "c79996376b941f5af7824b9f04cf8084be1451e8380ed0381a0251ff25e1bd92",
+      "crates/ala-platform/benches/segmented_shaping/text.rs": "d6867c828c01db29f80338582fde20dc31d6714e82bf9a7e63c94ce6802e610f",
+      "Cargo.lock": "347067dbf6987e80711aa345c8838a8baca28532a2af1e0eacb01d590272f483",
+      "experiments/segmented-shaping/run.py": "b0b244978fac846567bdcd23f3d409412a0612edab7b1a68d5551436c0da13bd"
+    },
+    "relevant_environment": {
+      "VK_DRIVER_FILES": "/tmp/ala-sysroot/usr/share/vulkan/icd.d/lvp_icd.json",
+      "LP_NUM_THREADS": "2",
+      "CARGO_PROFILE_RELEASE_DEBUG": "0"
+    }
+  },
+  "verification": {
+    "case": "verification",
+    "text": {
+      "paragraphs": 80,
+      "wrap_comparisons": 400,
+      "wrap_differences": 5,
+      "max_glyph_x_drift_px": 0.318359375,
+      "fallback_cases": 10,
+      "font_invalidation": true,
+      "glyph_identity_equivalent": true,
+      "layout_equivalent": false,
+      "pixel_equivalence": "not established for segmented text"
+    },
+    "wall_seconds": 0.28677764899975955,
+    "command": [
+      "/workspace/ala-perf-target/release/deps/segmented_shaping-6561ccc396247396",
+      "--verify"
+    ]
+  },
+  "summary": [
+    {
+      "name": "text/2000/append",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.1382595,
+          "p95_ms": 1.260122,
+          "run_medians_ms": [
+            1.1382595,
+            1.1403175,
+            1.141635,
+            1.129521,
+            1.136657
+          ],
+          "thread_cpu_median_ms": 1.1385235,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 2011470.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.4471325,
+          "p95_ms": 0.499305,
+          "run_medians_ms": [
+            0.4461665,
+            0.454644,
+            0.4471325,
+            0.445029,
+            0.4544085
+          ],
+          "thread_cpu_median_ms": 0.4473225,
+          "paired_speedup_range": [
+            2.501399071540255,
+            2.5532364567549886
+          ],
+          "median_allocated_bytes": 604094.0,
+          "speedup_vs_baseline": 2.5456872403594013
+        }
+      }
+    },
+    {
+      "name": "text/2000/middle",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.943178,
+          "p95_ms": 1.000323,
+          "run_medians_ms": [
+            0.943499,
+            0.934335,
+            0.939683,
+            0.943178,
+            0.9474945
+          ],
+          "thread_cpu_median_ms": 0.9434125,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 1382865.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.4639475,
+          "p95_ms": 0.498805,
+          "run_medians_ms": [
+            0.4640725,
+            0.463136,
+            0.4639475,
+            0.4649445,
+            0.4611685
+          ],
+          "thread_cpu_median_ms": 0.4641775,
+          "paired_speedup_range": [
+            2.0174095729979964,
+            2.054551644355588
+          ],
+          "median_allocated_bytes": 667617.0,
+          "speedup_vs_baseline": 2.032941227186266
+        }
+      }
+    },
+    {
+      "name": "text/2000/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.959217,
+          "p95_ms": 0.987795,
+          "run_medians_ms": [
+            0.957595,
+            0.959217,
+            0.97093,
+            0.958446,
+            0.962442
+          ],
+          "thread_cpu_median_ms": 0.959446,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 1379590.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 1.000048,
+          "p95_ms": 1.042857,
+          "run_medians_ms": [
+            0.993784,
+            1.0052055,
+            0.9974345,
+            1.00793,
+            1.000048
+          ],
+          "thread_cpu_median_ms": 0.999295,
+          "paired_speedup_range": [
+            0.9509053208060083,
+            0.9734273278094953
+          ],
+          "median_allocated_bytes": 1606955.0,
+          "speedup_vs_baseline": 0.9591709597939299
+        }
+      }
+    },
+    {
+      "name": "text/2000/unchanged",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.3483655,
+          "p95_ms": 0.369332,
+          "run_medians_ms": [
+            0.3483655,
+            0.3433725,
+            0.34827,
+            0.354349,
+            0.354109
+          ],
+          "thread_cpu_median_ms": 0.348545,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 383724.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.3459665,
+          "p95_ms": 0.365216,
+          "run_medians_ms": [
+            0.3459665,
+            0.3470635,
+            0.342321,
+            0.345566,
+            0.3471885
+          ],
+          "thread_cpu_median_ms": 0.3461465,
+          "paired_speedup_range": [
+            0.9893650585555669,
+            1.0254162735917307
+          ],
+          "median_allocated_bytes": 383724.0,
+          "speedup_vs_baseline": 1.0069341973861632
+        }
+      }
+    },
+    {
+      "name": "text/20000/append",
+      "modes": {
+        "baseline": {
+          "median_ms": 6.530089,
+          "p95_ms": 6.97976,
+          "run_medians_ms": [
+            6.440721,
+            6.5777755,
+            6.558777,
+            6.515022,
+            6.530089
+          ],
+          "thread_cpu_median_ms": 6.5304705,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 12617194.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.694021,
+          "p95_ms": 0.787325,
+          "run_medians_ms": [
+            0.7013115,
+            0.691973,
+            0.698888,
+            0.694021,
+            0.6874765
+          ],
+          "thread_cpu_median_ms": 0.694235,
+          "paired_speedup_range": [
+            9.183823450777579,
+            9.50582681694228
+          ],
+          "median_allocated_bytes": 966252.0,
+          "speedup_vs_baseline": 9.409065431737657
+        }
+      }
+    },
+    {
+      "name": "text/20000/middle",
+      "modes": {
+        "baseline": {
+          "median_ms": 6.318333,
+          "p95_ms": 6.760944,
+          "run_medians_ms": [
+            6.318333,
+            6.339089,
+            6.294622,
+            6.368568,
+            6.257942
+          ],
+          "thread_cpu_median_ms": 6.31864,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 12495986.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.829233,
+          "p95_ms": 0.879133,
+          "run_medians_ms": [
+            0.8250915,
+            0.823189,
+            0.829233,
+            0.8388325,
+            0.829548
+          ],
+          "thread_cpu_median_ms": 0.829462,
+          "paired_speedup_range": [
+            7.543797345060201,
+            7.700648332278493
+          ],
+          "median_allocated_bytes": 1271191.0,
+          "speedup_vs_baseline": 7.6194905412592115
+        }
+      }
+    },
+    {
+      "name": "text/20000/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 6.3337975,
+          "p95_ms": 6.495173,
+          "run_medians_ms": [
+            6.3312415,
+            6.298007,
+            6.3365895,
+            6.3337975,
+            6.3503435
+          ],
+          "thread_cpu_median_ms": 6.3340625,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 12492710.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 6.705258,
+          "p95_ms": 6.877127,
+          "run_medians_ms": [
+            6.665491,
+            6.707679,
+            6.663623,
+            6.7636275,
+            6.705258
+          ],
+          "thread_cpu_median_ms": 6.7056065,
+          "paired_speedup_range": [
+            0.9364497823098625,
+            0.9509225686987394
+          ],
+          "median_allocated_bytes": 12130242.0,
+          "speedup_vs_baseline": 0.9446016096621487
+        }
+      }
+    },
+    {
+      "name": "text/20000/unchanged",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.5177525,
+          "p95_ms": 0.546025,
+          "run_medians_ms": [
+            0.5208075,
+            0.5109025,
+            0.513091,
+            0.5177525,
+            0.5179435
+          ],
+          "thread_cpu_median_ms": 0.517997,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 420012.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.509055,
+          "p95_ms": 0.563421,
+          "run_medians_ms": [
+            0.509055,
+            0.508349,
+            0.518139,
+            0.507022,
+            0.5115285
+          ],
+          "thread_cpu_median_ms": 0.5093095,
+          "paired_speedup_range": [
+            0.9902574405709664,
+            1.0230868963078645
+          ],
+          "median_allocated_bytes": 420012.0,
+          "speedup_vs_baseline": 1.0170855801435994
+        }
+      }
+    },
+    {
+      "name": "text/100000/append",
+      "modes": {
+        "baseline": {
+          "median_ms": 31.8434015,
+          "p95_ms": 33.526449,
+          "run_medians_ms": [
+            32.19229,
+            31.8434015,
+            31.6787625,
+            32.091167,
+            31.805471
+          ],
+          "thread_cpu_median_ms": 31.8452635,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 53048770.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 1.8908475,
+          "p95_ms": 2.262057,
+          "run_medians_ms": [
+            1.862561,
+            1.8908475,
+            1.9091345,
+            1.8827055,
+            1.9190395
+          ],
+          "thread_cpu_median_ms": 1.8911505,
+          "paired_speedup_range": [
+            16.573640615526674,
+            17.28388493048013
+          ],
+          "median_allocated_bytes": 2902436.0,
+          "speedup_vs_baseline": 16.840808949426116
+        }
+      }
+    },
+    {
+      "name": "text/100000/middle",
+      "modes": {
+        "baseline": {
+          "median_ms": 31.782246,
+          "p95_ms": 32.860616,
+          "run_medians_ms": [
+            31.646153,
+            31.901234,
+            31.782246,
+            31.913212,
+            31.6632645
+          ],
+          "thread_cpu_median_ms": 31.7844175,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 52927554.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 1.961093,
+          "p95_ms": 2.139093,
+          "run_medians_ms": [
+            1.964267,
+            1.961093,
+            1.959996,
+            1.963822,
+            1.953556
+          ],
+          "thread_cpu_median_ms": 1.9613705,
+          "paired_speedup_range": [
+            16.110922293150576,
+            16.26706841541936
+          ],
+          "median_allocated_bytes": 3054314.0,
+          "speedup_vs_baseline": 16.206394087378825
+        }
+      }
+    },
+    {
+      "name": "text/100000/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 31.381969,
+          "p95_ms": 32.571545,
+          "run_medians_ms": [
+            31.786174,
+            31.806163,
+            31.1221765,
+            31.381969,
+            31.328969
+          ],
+          "thread_cpu_median_ms": 31.3830845,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 52920454.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 31.7524055,
+          "p95_ms": 32.338575,
+          "run_medians_ms": [
+            31.906045,
+            31.677135,
+            31.649502,
+            32.0167585,
+            31.7524055
+          ],
+          "thread_cpu_median_ms": 31.752886,
+          "paired_speedup_range": [
+            0.9801732114761087,
+            1.0040732218996447
+          ],
+          "median_allocated_bytes": 59077039.0,
+          "speedup_vs_baseline": 0.988333592552539
+        }
+      }
+    },
+    {
+      "name": "text/100000/unchanged",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.990747,
+          "p95_ms": 1.015474,
+          "run_medians_ms": [
+            0.992009,
+            0.9942525,
+            0.990747,
+            0.985479,
+            0.9796955
+          ],
+          "thread_cpu_median_ms": 0.990948,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 420012.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.9825295,
+          "p95_ms": 1.061152,
+          "run_medians_ms": [
+            0.986185,
+            0.9822895,
+            0.9825295,
+            0.9771515,
+            0.98972
+          ],
+          "thread_cpu_median_ms": 0.982736,
+          "paired_speedup_range": [
+            0.9898713777634078,
+            1.0121786907016719
+          ],
+          "median_allocated_bytes": 420012.0,
+          "speedup_vs_baseline": 1.0083636165631669
+        }
+      }
+    }
+  ]
+}

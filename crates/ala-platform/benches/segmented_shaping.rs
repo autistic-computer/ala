@@ -204,14 +204,17 @@ fn text() -> Value {
 
 fn verify_shaping() -> Value {
     let system = ExperimentalTextSystem::new(true);
-    let baseline = ExperimentalTextSystem::new(false);
+    // Share the native font registry so cross-platform font IDs are comparable.
+    let baseline = system.baseline();
     let font = system.font_id(&font("IBM Plex Sans")).unwrap();
     let baseline_font = baseline.font_id(&ala::font("IBM Plex Sans")).unwrap();
     assert_eq!(font, baseline_font);
     let a_window = WindowTextSystem::new(Arc::new(TextSystem::new(baseline.clone())));
     let b_window = WindowTextSystem::new(Arc::new(TextSystem::new(system.clone())));
     let mut identities_equal = true;
+    let mut layouts_equal = true;
     let mut max_drift = 0.0f32;
+    let mut max_y_drift = 0.0f32;
     let mut wrap_differences = 0;
     let mut compared = 0;
     let mut fallback_cases = 0;
@@ -232,6 +235,7 @@ fn verify_shaping() -> Value {
         }];
         let a = baseline.layout_line(&text, px(16.), &runs);
         let b = system.layout_line(&text, px(16.), &runs);
+        layouts_equal &= format!("{a:?}") == format!("{b:?}");
         assert_eq!(a.len, b.len);
         let a_glyphs: Vec<_> = a
             .runs
@@ -247,6 +251,7 @@ fn verify_shaping() -> Value {
         for ((af, a), (bf, b)) in a_glyphs.iter().zip(&b_glyphs) {
             identities_equal &= (af, a.id, a.index, a.is_emoji) == (bf, b.id, b.index, b.is_emoji);
             max_drift = max_drift.max(f32::from(a.position.x - b.position.x).abs());
+            max_y_drift = max_y_drift.max(f32::from(a.position.y - b.position.y).abs());
         }
         for width in [200., 300., 500., 700., 1000.] {
             let text_runs = [TextRun {
@@ -293,9 +298,10 @@ fn verify_shaping() -> Value {
         .unwrap();
     assert_eq!(system.retained_glyphs(), 0);
     json!({"paragraphs":80, "wrap_comparisons":compared, "wrap_differences":wrap_differences,
-        "max_glyph_x_drift_px":max_drift, "fallback_cases":fallback_cases,
+        "max_glyph_x_drift_px":max_drift, "max_glyph_y_drift_px":max_y_drift,
+        "exact_line_layouts_equivalent":layouts_equal, "fallback_cases":fallback_cases,
         "font_invalidation":true, "glyph_identity_equivalent":identities_equal,
-        "layout_equivalent":wrap_differences == 0 && identities_equal,
+        "layout_equivalent":wrap_differences == 0 && layouts_equal,
         "pixel_equivalence":"not established for segmented text"})
 }
 
