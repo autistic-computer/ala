@@ -1,0 +1,177 @@
+{
+  "metadata": {
+    "experimental": true,
+    "utc": "2026-10-29T22:08:52.335865+00:00",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "text_backend": "cosmic-text",
+    "cpuinfo": "AMD EPYC 9V45 96-Core Processor",
+    "cpu_affinity": [
+      2
+    ],
+    "source_commit": "775e0e62de664b3b1fc102fd40fea935a2c2d775",
+    "baseline_commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "build_command": null,
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "c36b56845b27ee76f8672518f1e86467fdb8378c46355af0fa31585b7d93adb7",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "measurements": "Main-thread elapsed update + draw + arena clear, without GPU submission; thread CPU time also recorded. Allocation passes are separate.",
+    "allocation_note": "Separate instrumented processes count allocation requests, not retained memory or RSS. Counting disabled in timing runs.",
+    "paint_scope": "Manually driven opacity replay, not the donor animation scheduler or a production animation API",
+    "donor_commits": {
+      "paint_records": "mesa-hills-research/gpui@eb63578acb9637ba72146dfafc07e4e1cb03d16b"
+    },
+    "source_sha256": {
+      "crates/ala-platform/benches/paint_replay.rs": "10c135e86e4e4fb707de9b818c44bd433b707746e1d8eb865b769aafd8043f18",
+      "crates/ala/src/scene.rs": "ed2485014c7d4d5c5b285575b3480c45c81b260d310f338a4834af4d399d92db",
+      "crates/ala/src/window.rs": "dcdb1a369cf3e9b301abb9057f72278d3544806a05d82f2168f0b014074a4df7",
+      "crates/ala/src/window/perf_experiments.rs": "d2d4330cca85d4e719353aff5565a61d15688a60a1e07fdd7027533be8598ce9",
+      "Cargo.lock": "347067dbf6987e80711aa345c8838a8baca28532a2af1e0eacb01d590272f483",
+      "experiments/paint-replay/run.py": "c8d6210050f1d306b97cb7feef64a085861dcb30fe025c074dbf5fa966fdc8f1"
+    },
+    "relevant_environment": {
+      "VK_DRIVER_FILES": "/tmp/ala-sysroot/usr/share/vulkan/icd.d/lvp_icd.json",
+      "LP_NUM_THREADS": "2",
+      "CARGO_PROFILE_RELEASE_DEBUG": "0"
+    }
+  },
+  "verification": {
+    "case": "verification",
+    "animation_frames": 24,
+    "equal_pixels": 46080000,
+    "distinct_animation_images": 17,
+    "scene_comparisons": 24,
+    "distinct_scenes": 17,
+    "pixel_checks_available": true,
+    "cached_input_checks": 2,
+    "wall_seconds": 1.689983876000042,
+    "command": [
+      "/workspace/ala-perf-target/release/deps/paint_replay-f66fe346418627cb",
+      "--verify"
+    ]
+  },
+  "summary": [
+    {
+      "name": "animation/30",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.292547,
+          "p95_ms": 0.317524,
+          "run_medians_ms": [
+            0.292547,
+            0.292812,
+            0.2961525,
+            0.291195,
+            0.291856
+          ],
+          "thread_cpu_median_ms": 0.292716,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 454660.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "replay": {
+          "median_ms": 0.078307,
+          "p95_ms": 0.093289,
+          "run_medians_ms": [
+            0.077466,
+            0.07721,
+            0.0794385,
+            0.078307,
+            0.078868
+          ],
+          "thread_cpu_median_ms": 0.078462,
+          "paired_speedup_range": [
+            3.700562965968454,
+            3.792410309545396
+          ],
+          "median_allocated_bytes": 128752.0,
+          "speedup_vs_baseline": 3.7358984509686235
+        }
+      }
+    },
+    {
+      "name": "animation/120",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.591979,
+          "p95_ms": 0.637131,
+          "run_medians_ms": [
+            0.591979,
+            0.5942825,
+            0.5890545,
+            0.5911175,
+            0.600777
+          ],
+          "thread_cpu_median_ms": 0.5922035,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 1042924.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "replay": {
+          "median_ms": 0.0935745,
+          "p95_ms": 0.109033,
+          "run_medians_ms": [
+            0.093129,
+            0.093745,
+            0.095087,
+            0.0935745,
+            0.0933645
+          ],
+          "thread_cpu_median_ms": 0.093715,
+          "paired_speedup_range": [
+            6.194900459579122,
+            6.434747682470318
+          ],
+          "median_allocated_bytes": 128752.0,
+          "speedup_vs_baseline": 6.326285473072258
+        }
+      }
+    },
+    {
+      "name": "animation/480",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.7912895,
+          "p95_ms": 1.894489,
+          "run_medians_ms": [
+            1.800168,
+            1.786307,
+            1.806522,
+            1.7912895,
+            1.78149
+          ],
+          "thread_cpu_median_ms": 1.7911865,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 3395980.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "replay": {
+          "median_ms": 0.157235,
+          "p95_ms": 0.175201,
+          "run_medians_ms": [
+            0.157235,
+            0.1574205,
+            0.1569595,
+            0.156323,
+            0.157395
+          ],
+          "thread_cpu_median_ms": 0.157405,
+          "paired_speedup_range": [
+            11.31859334794625,
+            11.50947855975586
+          ],
+          "median_allocated_bytes": 128752.0,
+          "speedup_vs_baseline": 11.3924348904506
+        }
+      }
+    }
+  ]
+}
