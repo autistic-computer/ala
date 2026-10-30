@@ -1,0 +1,40 @@
+{
+  "headRevision": "307bee633693f13a67c3afe98c0ac098e978e8f4",
+  "checks": [
+    {
+      "id": 123764225453,
+      "name": "ubuntu-24.04",
+      "head_sha": "307bee633693f13a67c3afe98c0ac098e978e8f4",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autistic-computer/ala/actions/runs/40964150618/job/123764225453",
+      "output": {
+        "title": null,
+        "summary": null,
+        "text": null,
+        "annotations_count": 0
+      }
+    },
+    {
+      "id": 123764225171,
+      "name": "macos-15",
+      "head_sha": "307bee633693f13a67c3afe98c0ac098e978e8f4",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autistic-computer/ala/actions/runs/40964150618/job/123764225171",
+      "output": {
+        "title": null,
+        "summary": null,
+        "text": null,
+        "annotations_count": 1
+      }
+    }
+  ],
+  "statuses": [],
+  "annotations": [],
+  "hasMore": false,
+  "job": null,
+  "jobs": [],
+  "log": null,
+  "logTruncated": false
+}

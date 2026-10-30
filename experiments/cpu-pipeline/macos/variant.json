@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "commit": "307bee633693f13a67c3afe98c0ac098e978e8f4",
+  "worktree_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "dirty": false,
+  "machine": {
+    "system": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "host": "macbook",
+    "cpu": "arm",
+    "logical_cpus": 16,
+    "affinity": null,
+    "cpu_quota": null,
+    "governor": null
+  },
+  "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "features": "bench-support,font-kit,wayland,x11",
+  "rustflags": "-C force-frame-pointers=yes",
+  "bench": "ui_cpu",
+  "filter": "",
+  "binary": "/Users/demfabris/dev/ala/target/perf-results/mac-original/benchmark",
+  "binary_sha256": "114c214431c2ba4a75b8f4bfaf20efcdddfa58ab1c6bf2ce55cf124c1a1ce576",
+  "renderer": "none (CPU UI pipeline only)",
+  "runtime": {
+    "VK_DRIVER_FILES": null,
+    "VK_ICD_FILENAMES": null,
+    "LP_NUM_THREADS": null,
+    "ALA_PERF_SYSROOT": null
+  }
+}

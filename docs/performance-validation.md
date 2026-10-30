@@ -1,8 +1,7 @@
 # Real-machine validation for the CPU performance drafts
 
 The committed cloud evidence covers Linux CPU work and software Vulkan pixels.
-Apple Silicon, native Linux GPU, Windows, and production application performance
-remain pending. Compare each machine with itself using the same fonts, display
+[Apple Silicon CPU execution](../experiments/cpu-pipeline/macos/README.md) now supplements it. Native Linux GPU, Windows and production application performance remain pending. Compare each machine with itself using the same fonts, display
 scale, compiler, features, and workload. Do not compare numbers across platforms
 as evidence for this change.
 
@@ -71,8 +70,7 @@ frame pacing. Headless submission timing alone does not establish those metrics.
 
 Install Xcode Command Line Tools, the pinned Rust toolchain, and Python 3.11+.
 Run the full CPU protocol and repository tests. Confirm the native text backend,
-font availability, and output scale before interpreting the text cases. This
-workflow has not been run on macOS by this chat.
+font availability, and output scale before interpreting the text cases. [Apple Silicon execution and repeated baseline results](../experiments/cpu-pipeline/macos/README.md) now cover this CPU workflow. Application-level gates below remain open.
 
 Exercise the actual application on Metal with Time Profiler and Metal System
 Trace or Xcode GPU capture. Record scrolling, resizing, text updates, idle
