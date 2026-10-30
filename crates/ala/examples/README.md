@@ -1,10 +1,8 @@
 <p align="center">
 <samp>
-       //      {{{{     &gt;&gt;        <br>
-      //     {{           &gt;&gt;      <br>
-     //    {{{              &gt;&gt;    <br>
-    //       {{           &gt;&gt;      <br>
-   //          {{{{     &gt;&gt;        <br>
+               ▄██▜█▄▖            <br>
+            ▀▄██████              <br>
+              ▀▜▀▜▀               <br>
                                   <br>
 ---                               <br>
 name: ala examples                <br>
