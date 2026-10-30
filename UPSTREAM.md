@@ -1,12 +1,12 @@
-# ala: the fork of Zed's GPUI
+# ala: the fork of GPUI
 
-ala is Zed's GPUI, split out of [zed-industries/zed][upstream] on 2026-10-05 and owned since. It
+ala is GPUI, split out of its upstream repository on 2026-10-05 and owned since. It
 is not a patch branch: nothing gets rebased onto upstream, and upstream fixes come in by hand when
 we want them. [zebrilus][zebrilus] carries ala as the git subtree `libs/ala` and edits it there;
 penna and nidus build on it as a git dependency.
 
-- Forked from: `zed-industries/zed` at `933d8d9381`, limited to the gpui crates.
-- The 89 commits after that one are the old `demfabris/zed` `zz-patches` branch (tip
+- Forked from: upstream at `933d8d9381`, limited to the gpui crates.
+- The 89 commits after that one are the old patch fork's `zz-patches` branch (tip
   `5a00ac89a4`), replayed under new IDs. That fork stays up as an archive and zebrilus's knowledge
   pages cite its commit IDs; the same commits exist here with the same subjects.
 - Upstream license: Apache-2.0, retained as `LICENSE-APACHE`. Third-party notices are in `NOTICE`.
@@ -15,7 +15,7 @@ penna and nidus build on it as a git dependency.
 
 ```
 crates/
-  ala/            gpui core, with Zed's utility crates as modules: collections, util,
+  ala/            gpui core, with upstream's utility crates as modules: collections, util,
                   sum_tree, scheduler, http_client, refineable
   ala-macros/     ala's macros and the Refineable derive
   ala-platform/   every backend as a module built only for its target: apple (Metal),
@@ -24,11 +24,11 @@ third_party/
   cosmic-text/    cosmic-text with ala's patches
 ```
 
-The ios and android backends have no Zed counterpart.
+The ios and android backends have no upstream counterpart.
 
-## Zed paths in ala
+## Upstream paths in ala
 
-| Zed | ala |
+| Upstream | ala |
 |---|---|
 | `crates/gpui/src/` | `crates/ala/src/` |
 | `crates/gpui_macros/src/` | `crates/ala-macros/src/` |
@@ -41,14 +41,14 @@ The ios and android backends have no Zed counterpart.
 | `gpui::`, `gpui_<x>::`, `collections::` | `ala::`, `ala_platform::<x>::`, `ala::collections::` (`crate::` inside the crate) |
 | `tooling/perf`, screen capture (`scap`, ScreenCaptureKit), tracy, `zlog`, `ztracing`, `util_macros` | removed: skip upstream patches that only touch them |
 
-## Pulling a fix from upstream Zed
+## Pulling a fix from upstream
 
 Export the patch, map its paths and identifiers with the table above, then apply it. A backend's
 root file moved down one directory, so a patch to `crates/gpui_wgpu/src/gpui_wgpu.rs` lands in
 `crates/ala-platform/src/wgpu.rs`, and `crate::` paths inside a backend become `crate::<x>::`.
 
 ```bash
-git -C <zed-checkout> format-patch -1 <sha> --stdout -- crates/gpui crates/gpui_wgpu \
+git -C <upstream-checkout> format-patch -1 <sha> --stdout -- crates/gpui crates/gpui_wgpu \
   | sed -e 's#crates/gpui_wgpu/src/#crates/ala-platform/src/wgpu/#g' -e 's#crates/gpui/#crates/ala/#g' \
         -e 's/\bgpui_wgpu::/ala_platform::wgpu::/g' -e 's/\bgpui::/ala::/g' > fix.patch
 git am -3 fix.patch
@@ -95,7 +95,7 @@ pixels.
 
 - GPU-facing structs must stay a multiple of 8 bytes (const-asserted in `scene.rs`), or every draw
   fails wgpu's binding-size check while Metal silently reads at a skew.
-- ala ships wgpu 30; Zed still pinned 29 at the split. Upstream wgpu code written against 29 needs
+- ala ships wgpu 30; upstream still pinned 29 at the split. Upstream wgpu code written against 29 needs
   `color_space: SurfaceColorSpace::Auto` on both `SurfaceConfiguration`s and
   `Queue::present(frame)` instead of `frame.present()`. The `apply_limit_buckets` change only
   compiles against 30.
@@ -138,6 +138,5 @@ Each backend compiles for its own target only. From macOS:
   reports `missing_const_for_thread_local` there for `thread_local!`s that are already `const`,
   so ala allows it on Android.
 
-[upstream]: https://github.com/zed-industries/zed
 [zebrilus]: https://github.com/autistic-computer/zebrilus
 [reference]: https://github.com/autistic-computer/zebrilus/blob/main/knowledge/references/ala.md
