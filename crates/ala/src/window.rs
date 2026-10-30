@@ -2666,6 +2666,10 @@ impl Window {
         }
     }
 
+    pub fn default_corner_smoothing(&self) -> f32 {
+        self.default_corner_smoothing
+    }
+
     pub fn set_adaptive_corner_fraction(&mut self, fraction: Option<f32>) {
         debug_assert!(
             fraction.is_none_or(|fraction| (0.0..0.5).contains(&fraction)),
