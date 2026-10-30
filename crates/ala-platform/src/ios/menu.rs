@@ -3,7 +3,7 @@ use ala::{Action, Menu, MenuItem, SharedString};
 use objc::{class, msg_send, sel, sel_impl};
 
 #[derive(Clone, Debug, PartialEq, ala::Action)]
-#[action(namespace = zz_ios, no_json)]
+#[action(namespace = ala_ios, no_json)]
 pub struct MenuCommand {
     pub id: SharedString,
     pub shortcut: Option<SharedString>,
@@ -148,7 +148,7 @@ fn element(item: &Item) -> Option<id> {
                     class!(UIKeyCommand),
                     commandWithTitle: ns_string(title)
                     image: nil
-                    action: sel!(zzMenuCommand:)
+                    action: sel!(alaMenuCommand:)
                     input: ns_string(input)
                     modifierFlags: *flags
                     propertyList: property
@@ -157,7 +157,7 @@ fn element(item: &Item) -> Option<id> {
                     class!(UICommand),
                     commandWithTitle: ns_string(title)
                     image: nil
-                    action: sel!(zzMenuCommand:)
+                    action: sel!(alaMenuCommand:)
                     propertyList: property
                 ],
             })

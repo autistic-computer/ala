@@ -144,7 +144,7 @@ impl Platform for IosPlatform {
         self.0.lock().finish_launching = Some(on_finish_launching);
         PLATFORM.store(self as *const _ as *mut IosPlatform, Ordering::Release);
         unsafe {
-            UIApplicationMain(0, std::ptr::null_mut(), nil, ns_string("ZZAlaAppDelegate"));
+            UIApplicationMain(0, std::ptr::null_mut(), nil, ns_string("AlaAppDelegate"));
         }
     }
 
@@ -423,14 +423,14 @@ impl PlatformKeyboardLayout for IosKeyboardLayout {
 }
 
 fn register_delegate_classes() {
-    let mut decl = ClassDecl::new("ZZAlaAppDelegate", class!(UIResponder)).unwrap();
+    let mut decl = ClassDecl::new("AlaAppDelegate", class!(UIResponder)).unwrap();
     unsafe {
         decl.add_method(
             sel!(buildMenuWithBuilder:),
             build_menu as extern "C" fn(&Object, Sel, id),
         );
         decl.add_method(
-            sel!(zzMenuCommand:),
+            sel!(alaMenuCommand:),
             menu_command as extern "C" fn(&Object, Sel, id),
         );
         decl.add_method(
@@ -443,7 +443,7 @@ fn register_delegate_classes() {
 }
 
 fn register_scene_delegate_class() {
-    let mut decl = ClassDecl::new("ZZAlaSceneDelegate", class!(NSObject)).unwrap();
+    let mut decl = ClassDecl::new("AlaSceneDelegate", class!(NSObject)).unwrap();
     unsafe {
         for name in ["UISceneDelegate", "UIWindowSceneDelegate"] {
             if let Some(protocol) = Protocol::get(name) {
@@ -613,7 +613,7 @@ extern "C" fn scene_did_enter_background(_: &Object, _: Sel, _: id) {
         let expired = block2::RcBlock::new(end_background_task);
         let task: usize = msg_send![
             application,
-            beginBackgroundTaskWithName: ns_string("zz connection")
+            beginBackgroundTaskWithName: ns_string("ala background")
             expirationHandler: &*expired as *const block2::Block<dyn Fn()> as id
         ];
         BACKGROUND_TASK.store(task, Ordering::Release);

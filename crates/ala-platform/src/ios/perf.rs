@@ -27,10 +27,10 @@ impl Perf {
     }
 
     pub(crate) fn from_env() -> Self {
-        let log = std::env::var("ZZ_ALA_FRAME_LOG")
+        let log = std::env::var("ALA_FRAME_LOG")
             .is_ok_and(|value| !value.is_empty() && value != "0")
             .then(FrameLog::default);
-        let bench = std::env::var("ZZ_ALA_BENCH")
+        let bench = std::env::var("ALA_BENCH")
             .ok()
             .and_then(|value| Bench::parse(&value));
         Self {
@@ -84,7 +84,7 @@ impl Perf {
             self.bench = None;
             log.flush();
             log.report("total", &log.total);
-            eprintln!("[zz-ios] bench done");
+            eprintln!("[ala-ios] bench done");
         }
     }
 
@@ -137,7 +137,7 @@ impl FrameLog {
         let start = *self.window_start.get_or_insert(timestamp);
         if timestamp - start >= LINK_REPORT {
             eprintln!(
-                "[zz-ios] link: ticks={} draws={} touch_moves={} over {:.1}s",
+                "[ala-ios] link: ticks={} draws={} touch_moves={} over {:.1}s",
                 self.window_ticks,
                 self.window_draws,
                 self.window_touches,
@@ -185,7 +185,7 @@ impl FrameLog {
         let mut intervals = samples.intervals.clone();
         let mut cpu = samples.cpu.clone();
         eprintln!(
-            "[zz-ios] frames {label}: n={} hz={:.0} interval p50={:.2} p95={:.2} max={:.2} dropped={} cpu p50={:.2} p95={:.2} max={:.2}",
+            "[ala-ios] frames {label}: n={} hz={:.0} interval p50={:.2} p95={:.2} max={:.2} dropped={} cpu p50={:.2} p95={:.2} max={:.2}",
             cpu.len(),
             if samples.period > 0.0 {
                 1000.0 / samples.period

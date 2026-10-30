@@ -13,11 +13,11 @@ static REGISTER_CLASSES: Once = Once::new();
 static mut POSITION_CLASS: *const Class = ptr::null();
 static mut RANGE_CLASS: *const Class = ptr::null();
 
-const INDEX_IVAR: &str = "zzIndex";
-const START_IVAR: &str = "zzStart";
-const END_IVAR: &str = "zzEnd";
-const DELEGATE_IVAR: &str = "zzInputDelegate";
-const TOKENIZER_IVAR: &str = "zzTokenizer";
+const INDEX_IVAR: &str = "alaIndex";
+const START_IVAR: &str = "alaStart";
+const END_IVAR: &str = "alaEnd";
+const DELEGATE_IVAR: &str = "alaInputDelegate";
+const TOKENIZER_IVAR: &str = "alaTokenizer";
 
 const DIRECTION_LEFT: isize = 3;
 const DIRECTION_UP: isize = 4;
@@ -158,11 +158,11 @@ pub(crate) fn composing(this: &Object) -> bool {
 
 fn register_classes() {
     unsafe {
-        let mut position = ClassDecl::new("ZZTextPosition", class!(UITextPosition)).unwrap();
+        let mut position = ClassDecl::new("AlaTextPosition", class!(UITextPosition)).unwrap();
         position.add_ivar::<usize>(INDEX_IVAR);
         POSITION_CLASS = position.register();
 
-        let mut range = ClassDecl::new("ZZTextRange", class!(UITextRange)).unwrap();
+        let mut range = ClassDecl::new("AlaTextRange", class!(UITextRange)).unwrap();
         range.add_ivar::<usize>(START_IVAR);
         range.add_ivar::<usize>(END_IVAR);
         range.add_method(

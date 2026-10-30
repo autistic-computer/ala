@@ -30,7 +30,7 @@ use std::{
     time::Instant,
 };
 
-const STATE_IVAR: &str = "zzWindowState";
+const STATE_IVAR: &str = "alaWindowState";
 static REGISTER_VIEW: Once = Once::new();
 static mut VIEW_CLASS: *const Class = ptr::null();
 static mut CONTROLLER_CLASS: *const Class = ptr::null();
@@ -232,12 +232,12 @@ impl IosWindow {
                 class!(UITraitPreferredContentSizeCategory) as *const Class as id,
                 class!(UITraitAccessibilityContrast) as *const Class as id,
             ]);
-            let _: id = msg_send![native_view, registerForTraitChanges: traits withAction: sel!(zzAppearanceChanged)];
+            let _: id = msg_send![native_view, registerForTraitChanges: traits withAction: sel!(alaAppearanceChanged)];
             let center: id = msg_send![class!(NSNotificationCenter), defaultCenter];
             let _: () = msg_send![
                 center,
                 addObserver: native_view
-                selector: sel!(zzAccessibilityChanged:)
+                selector: sel!(alaAccessibilityChanged:)
                 name: UIAccessibilityReduceMotionStatusDidChangeNotification
                 object: nil
             ];
@@ -257,7 +257,7 @@ impl IosWindow {
             let display_link: id = msg_send![
                 class!(CADisplayLink),
                 displayLinkWithTarget: native_view
-                selector: sel!(zzStep:)
+                selector: sel!(alaStep:)
             ];
             let link = state.borrow().display_link.clone();
             link.attach(display_link);
@@ -265,7 +265,7 @@ impl IosWindow {
             let _: () =
                 msg_send![display_link, addToRunLoop: run_loop forMode: NSRunLoopCommonModes];
             eprintln!(
-                "[zz-ios] window open: bounds {}x{} scale {}",
+                "[ala-ios] window open: bounds {}x{} scale {}",
                 screen_bounds.size.width, screen_bounds.size.height, scale
             );
 
@@ -651,7 +651,7 @@ unsafe fn get_window_state(object: &Object) -> Rc<RefCell<IosWindowState>> {
 }
 
 fn register_view_class() {
-    let mut decl = ClassDecl::new("ZZAlaView", class!(UIView)).unwrap();
+    let mut decl = ClassDecl::new("AlaView", class!(UIView)).unwrap();
     decl.add_ivar::<*mut c_void>(STATE_IVAR);
     unsafe {
         decl.add_protocol(Protocol::get("UIKeyInput").unwrap());
@@ -660,19 +660,19 @@ fn register_view_class() {
         if let Some(protocol) = Protocol::get("UIPointerInteractionDelegate") {
             decl.add_protocol(protocol);
         }
-        decl.add_method(sel!(zzHover:), hover as extern "C" fn(&Object, Sel, id));
-        decl.add_method(sel!(zzScroll:), scroll as extern "C" fn(&Object, Sel, id));
-        decl.add_method(sel!(zzWheel:), wheel as extern "C" fn(&Object, Sel, id));
+        decl.add_method(sel!(alaHover:), hover as extern "C" fn(&Object, Sel, id));
+        decl.add_method(sel!(alaScroll:), scroll as extern "C" fn(&Object, Sel, id));
+        decl.add_method(sel!(alaWheel:), wheel as extern "C" fn(&Object, Sel, id));
         decl.add_method(
             sel!(pointerInteraction:styleForRegion:),
             pointer_style as extern "C" fn(&Object, Sel, id, id) -> id,
         );
         decl.add_method(
-            sel!(zzAppearanceChanged),
+            sel!(alaAppearanceChanged),
             appearance_changed as extern "C" fn(&Object, Sel),
         );
         decl.add_method(
-            sel!(zzAccessibilityChanged:),
+            sel!(alaAccessibilityChanged:),
             accessibility_changed as extern "C" fn(&Object, Sel, id),
         );
         decl.add_method(
@@ -692,12 +692,12 @@ fn register_view_class() {
             input_accessory_view as extern "C" fn(&Object, Sel) -> id,
         );
         decl.add_method(
-            sel!(zzAccessoryKey:),
+            sel!(alaAccessoryKey:),
             accessory_key as extern "C" fn(&Object, Sel, id),
         );
-        decl.add_method(sel!(zzDone:), done as extern "C" fn(&Object, Sel, id));
+        decl.add_method(sel!(alaDone:), done as extern "C" fn(&Object, Sel, id));
         decl.add_method(
-            sel!(zzHardwareKeyboardChanged:),
+            sel!(alaHardwareKeyboardChanged:),
             hardware_keyboard_changed as extern "C" fn(&Object, Sel, id),
         );
         let traits: [(Sel, extern "C" fn(&Object, Sel) -> isize); 9] = [
@@ -759,7 +759,7 @@ fn register_view_class() {
             sel!(layerClass),
             layer_class as extern "C" fn(&Class, Sel) -> *const Class,
         );
-        decl.add_method(sel!(zzStep:), step as extern "C" fn(&Object, Sel, id));
+        decl.add_method(sel!(alaStep:), step as extern "C" fn(&Object, Sel, id));
         decl.add_method(
             sel!(layoutSubviews),
             layout_subviews as extern "C" fn(&Object, Sel),
@@ -782,7 +782,7 @@ fn register_view_class() {
         );
         VIEW_CLASS = decl.register();
     }
-    let mut decl = ClassDecl::new("ZZAlaViewController", class!(UIViewController)).unwrap();
+    let mut decl = ClassDecl::new("AlaViewController", class!(UIViewController)).unwrap();
     unsafe {
         decl.add_method(
             sel!(preferredStatusBarStyle),
@@ -1965,14 +1965,14 @@ static CURSOR_STYLE: std::sync::Mutex<CursorStyle> = std::sync::Mutex::new(Curso
 unsafe fn install_pointer_input(view: id) -> id {
     unsafe {
         let hover: id = msg_send![class!(UIHoverGestureRecognizer), alloc];
-        let hover: id = msg_send![hover, initWithTarget: view action: sel!(zzHover:)];
+        let hover: id = msg_send![hover, initWithTarget: view action: sel!(alaHover:)];
         let _: () = msg_send![hover, setCancelsTouchesInView: false as BOOL];
         let _: () = msg_send![view, addGestureRecognizer: hover];
         let _: () = msg_send![hover, release];
 
         for (action, mask) in [
-            (sel!(zzWheel:), UI_SCROLL_TYPE_MASK_DISCRETE),
-            (sel!(zzScroll:), UI_SCROLL_TYPE_MASK_CONTINUOUS),
+            (sel!(alaWheel:), UI_SCROLL_TYPE_MASK_DISCRETE),
+            (sel!(alaScroll:), UI_SCROLL_TYPE_MASK_CONTINUOUS),
         ] {
             let scroll: id = msg_send![class!(UIPanGestureRecognizer), alloc];
             let scroll: id = msg_send![scroll, initWithTarget: view action: action];
@@ -2345,7 +2345,7 @@ unsafe fn accessory_view(view: id) -> id {
         let _: () = msg_send![
             button,
             addTarget: view
-            action: sel!(zzAccessoryKey:)
+            action: sel!(alaAccessoryKey:)
             forControlEvents: 1usize << 6
         ];
         if matches!(key, AccessoryKey::Hide) {
@@ -2393,7 +2393,7 @@ unsafe fn done_bar(view: id) -> id {
     let space: id = msg_send![space, initWithBarButtonSystemItem: 5isize target: nil action: nil];
     let done: id = msg_send![class!(UIBarButtonItem), alloc];
     let done: id =
-        msg_send![done, initWithBarButtonSystemItem: 0isize target: view action: sel!(zzDone:)];
+        msg_send![done, initWithBarButtonSystemItem: 0isize target: view action: sel!(alaDone:)];
     let _: () = msg_send![toolbar, setItems: ns_array(&[space, done])];
     let _: () = msg_send![space, release];
     let _: () = msg_send![done, release];
@@ -2464,7 +2464,7 @@ unsafe fn observe_hardware_keyboard(view: id) {
         let _: () = msg_send![
             center,
             addObserver: view
-            selector: sel!(zzHardwareKeyboardChanged:)
+            selector: sel!(alaHardwareKeyboardChanged:)
             name: name
             object: nil
         ];
