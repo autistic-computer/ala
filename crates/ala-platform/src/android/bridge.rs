@@ -96,13 +96,13 @@ pub fn set_status_bar_on_dark(dark: Option<bool>) {
     );
 }
 
-pub fn on_load(vm: *mut c_void, main: fn()) -> jint {
+pub fn on_load(vm: *mut c_void, natives_class: &str, main: fn()) -> jint {
     let Ok(vm) = (unsafe { JavaVM::from_raw(vm.cast()) }) else {
         return jni::sys::JNI_ERR;
     };
     let registered = vm
         .get_env()
-        .and_then(|mut env| env.register_native_methods("dev/zz/android/ZzNative", &natives()));
+        .and_then(|mut env| env.register_native_methods(natives_class, &natives()));
     if let Err(error) = registered {
         log::error!("registering natives failed: {error}");
         return jni::sys::JNI_ERR;
@@ -124,7 +124,7 @@ fn natives() -> Vec<NativeMethod> {
     vec![
         native(
             "onCreate",
-            "(Ldev/zz/android/ZzActivity;Ldev/zz/android/ZzView;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V",
+            "(Landroid/app/Activity;Landroid/view/View;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V",
             on_create as *mut c_void,
         ),
         native("onDestroy", "()V", on_destroy as *mut c_void),
