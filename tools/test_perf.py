@@ -75,7 +75,7 @@ class PerfTests(unittest.TestCase):
             with patch.object(perf, "metadata", return_value=current.copy()):
                 binary, info = perf.prepare(args)
             executable = "benchmark.exe" if perf.sys.platform == "win32" else "benchmark"
-            self.assertEqual(binary, str(variant / executable))
+            self.assertEqual(binary, str(variant.resolve() / executable))
             self.assertEqual(info["worktree_sha256"], "original-source")
             self.assertEqual(info["machine"], "measurement-host")
             with patch.object(perf, "metadata", return_value={**current, "binary_sha256": "changed-binary"}):
