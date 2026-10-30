@@ -523,13 +523,13 @@ impl Platform for WindowsPlatform {
             return;
         };
         let script = r#"
-            $pidToWaitFor = $env:ZED_RESTART_PID
-            $exePath = $env:ZED_RESTART_EXECUTABLE
-            $argumentList = $env:ZED_RESTART_ARGUMENTS
+            $pidToWaitFor = $env:ALA_RESTART_PID
+            $exePath = $env:ALA_RESTART_EXECUTABLE
+            $argumentList = $env:ALA_RESTART_ARGUMENTS
 
-            [Environment]::SetEnvironmentVariable("ZED_RESTART_PID", $null)
-            [Environment]::SetEnvironmentVariable("ZED_RESTART_EXECUTABLE", $null)
-            [Environment]::SetEnvironmentVariable("ZED_RESTART_ARGUMENTS", $null)
+            [Environment]::SetEnvironmentVariable("ALA_RESTART_PID", $null)
+            [Environment]::SetEnvironmentVariable("ALA_RESTART_EXECUTABLE", $null)
+            [Environment]::SetEnvironmentVariable("ALA_RESTART_ARGUMENTS", $null)
 
             while ($true) {
                 $process = Get-Process -Id $pidToWaitFor -ErrorAction SilentlyContinue
@@ -556,9 +556,9 @@ impl Platform for WindowsPlatform {
                 command
                     .arg("-command")
                     .arg(script)
-                    .env("ZED_RESTART_PID", pid.to_string())
-                    .env("ZED_RESTART_EXECUTABLE", app_path)
-                    .env("ZED_RESTART_ARGUMENTS", arguments);
+                    .env("ALA_RESTART_PID", pid.to_string())
+                    .env("ALA_RESTART_EXECUTABLE", app_path)
+                    .env("ALA_RESTART_ARGUMENTS", arguments);
                 #[allow(
                     clippy::disallowed_methods,
                     reason = "We are restarting ourselves, using std command thus is fine"

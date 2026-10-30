@@ -272,14 +272,14 @@ impl WgpuContext {
 
     #[cfg(not(target_family = "wasm"))]
     fn device_id_filter() -> Option<u32> {
-        match std::env::var("ZED_DEVICE_ID") {
+        match std::env::var("ALA_DEVICE_ID") {
             Ok(value) => parse_pci_id(&value)
-                .context("Failed to parse device ID from `ZED_DEVICE_ID` environment variable")
+                .context("Failed to parse device ID from `ALA_DEVICE_ID` environment variable")
                 .log_err(),
             Err(std::env::VarError::NotPresent) => None,
             error => {
                 error
-                    .context("Failed to read value of `ZED_DEVICE_ID` environment variable")
+                    .context("Failed to read value of `ALA_DEVICE_ID` environment variable")
                     .log_err();
                 None
             }
@@ -487,7 +487,7 @@ impl WgpuContext {
         }
 
         if let Some(device_id) = device_id_filter {
-            log::info!("ZED_DEVICE_ID filter: {:#06x}", device_id);
+            log::info!("ALA_DEVICE_ID filter: {:#06x}", device_id);
         }
 
         Self::sort_adapters(&mut adapters, device_id_filter, compositor_gpu);

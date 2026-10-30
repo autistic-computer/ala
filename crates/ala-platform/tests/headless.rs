@@ -184,7 +184,7 @@ fn bench_glyph_paint() -> anyhow::Result<()> {
         }
     };
     let window = cx.open_window(size(px(1720.), px(1100.)), |_, cx| cx.new(|_| grid()))?;
-    let frames: usize = std::env::var("ZZ_BENCH_FRAMES")
+    let frames: usize = std::env::var("ALA_BENCH_FRAMES")
         .ok()
         .and_then(|frames| frames.parse().ok())
         .unwrap_or(400);

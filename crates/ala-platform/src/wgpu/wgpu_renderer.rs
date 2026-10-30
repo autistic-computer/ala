@@ -3261,7 +3261,7 @@ fn create_context_and_surface<W>(
 where
     W: HasDisplayHandle + std::fmt::Debug + Send + Sync + Clone + 'static,
 {
-    let device_id_override = std::env::var("ZED_DEVICE_ID").ok();
+    let device_id_override = std::env::var("ALA_DEVICE_ID").ok();
     create_with_backend_fallback(
         device_id_override.as_deref(),
         reject_software,
@@ -3344,7 +3344,7 @@ impl RenderingParameters {
             .find(|&n| format_features.flags.sample_count_supported(n))
             .unwrap_or(1);
 
-        let gamma = env::var("ZED_FONTS_GAMMA")
+        let gamma = env::var("ALA_FONTS_GAMMA")
             .ok()
             .and_then(|v| v.parse().ok())
             .filter(|value: &f32| value.is_finite())
@@ -3352,14 +3352,14 @@ impl RenderingParameters {
             .clamp(1.0, 2.2);
         let gamma_ratios = get_gamma_correction_ratios(gamma);
 
-        let grayscale_enhanced_contrast = env::var("ZED_FONTS_GRAYSCALE_ENHANCED_CONTRAST")
+        let grayscale_enhanced_contrast = env::var("ALA_FONTS_GRAYSCALE_ENHANCED_CONTRAST")
             .ok()
             .and_then(|v| v.parse().ok())
             .filter(|value: &f32| value.is_finite())
             .unwrap_or(1.0_f32)
             .max(0.0);
 
-        let subpixel_enhanced_contrast = env::var("ZED_FONTS_SUBPIXEL_ENHANCED_CONTRAST")
+        let subpixel_enhanced_contrast = env::var("ALA_FONTS_SUBPIXEL_ENHANCED_CONTRAST")
             .ok()
             .and_then(|v| v.parse().ok())
             .filter(|value: &f32| value.is_finite())
@@ -3614,9 +3614,9 @@ mod tests {
                         "--nocapture",
                     ])
                     .env(CHILD, "1")
-                    .env("ZED_FONTS_GAMMA", value)
-                    .env("ZED_FONTS_GRAYSCALE_ENHANCED_CONTRAST", value)
-                    .env("ZED_FONTS_SUBPIXEL_ENHANCED_CONTRAST", value)
+                    .env("ALA_FONTS_GAMMA", value)
+                    .env("ALA_FONTS_GRAYSCALE_ENHANCED_CONTRAST", value)
+                    .env("ALA_FONTS_SUBPIXEL_ENHANCED_CONTRAST", value)
                     .output()?;
                 assert!(
                     output.status.success(),
@@ -5690,8 +5690,8 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 height: DevicePixels(1200),
             };
             let (width, height) = (1920.0 / SCALE, 1200.0 / SCALE);
-            let scenes = std::env::var("ZZ_BENCH_PATHS").unwrap_or("none,ring,corners".into());
-            let frames: u32 = std::env::var("ZZ_BENCH_FRAMES")
+            let scenes = std::env::var("ALA_BENCH_PATHS").unwrap_or("none,ring,corners".into());
+            let frames: u32 = std::env::var("ALA_BENCH_FRAMES")
                 .ok()
                 .and_then(|frames| frames.parse().ok())
                 .unwrap_or(600);
@@ -5717,9 +5717,9 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
         }
 
         #[test]
-        #[ignore = "dump: ZZ_PATH_DUMP=<dir> cargo test -p ala-platform --all-features dump_path_scenes -- --ignored"]
+        #[ignore = "dump: ALA_PATH_DUMP=<dir> cargo test -p ala-platform --all-features dump_path_scenes -- --ignored"]
         fn dump_path_scenes() -> anyhow::Result<()> {
-            let directory = std::path::PathBuf::from(std::env::var("ZZ_PATH_DUMP")?);
+            let directory = std::path::PathBuf::from(std::env::var("ALA_PATH_DUMP")?);
             std::fs::create_dir_all(&directory)?;
             let mut renderer = WgpuHeadlessRenderer::new()?;
             let target = Size {
@@ -5894,7 +5894,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
         #[test]
         #[ignore = "benchmark: cargo test -p ala-platform --all-features --release bench_atlas_upload_burst -- --ignored --nocapture"]
         fn bench_atlas_upload_burst() -> anyhow::Result<()> {
-            let glyphs: u32 = std::env::var("ZZ_BENCH_GLYPHS")
+            let glyphs: u32 = std::env::var("ALA_BENCH_GLYPHS")
                 .ok()
                 .and_then(|glyphs| glyphs.parse().ok())
                 .unwrap_or(2000);

@@ -108,7 +108,7 @@ impl ActivityGuard {
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[inline]
 pub fn guess_compositor() -> &'static str {
-    if std::env::var_os("ZED_HEADLESS").is_some() {
+    if std::env::var_os("ALA_HEADLESS").is_some() {
         return "Headless";
     }
 

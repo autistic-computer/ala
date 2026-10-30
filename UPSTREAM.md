@@ -39,6 +39,7 @@ The ios and android backends have no upstream counterpart.
 | `crates/<x>/src/` for `collections`, `http_client`, `scheduler`, `sum_tree`, `refineable` | `crates/ala/src/<x>/`, root file `<x>.rs` |
 | `crates/util/src/` (the parts ala uses) | `crates/ala/src/util.rs` |
 | `gpui::`, `gpui_<x>::`, `collections::` | `ala::`, `ala_platform::<x>::`, `ala::collections::` (`crate::` inside the crate) |
+| `ZED_*` environment variables: `HEADLESS`, `DEVICE_ID`, `FONTS_GAMMA`, `FONTS_GRAYSCALE_ENHANCED_CONTRAST`, `FONTS_SUBPIXEL_ENHANCED_CONTRAST`, `MEASUREMENTS`, `RESTART_*` | `ALA_*` with the same suffix |
 | `tooling/perf`, screen capture (`scap`, ScreenCaptureKit), tracy, `zlog`, `ztracing`, `util_macros` | removed: skip upstream patches that only touch them |
 
 ## Pulling a fix from upstream
