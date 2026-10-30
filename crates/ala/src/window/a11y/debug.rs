@@ -349,7 +349,7 @@ mod tests {
     fn node_json_includes_bounds_and_automation_properties() {
         let mut node = Node::new(Role::Link);
         node.set_author_id("settings.docs");
-        node.set_url("https://zzmux.sh");
+        node.set_url("https://example.com");
         node.set_disabled();
         node.set_hidden();
         let bounds = Bounds::new(point(px(12.), px(34.)), size(px(56.), px(78.)));
@@ -366,7 +366,7 @@ mod tests {
             serde_json::json!({"x": 12., "y": 34., "width": 56., "height": 78.})
         );
         assert_eq!(json["aria"]["author_id"], "settings.docs");
-        assert_eq!(json["aria"]["url"], "https://zzmux.sh");
+        assert_eq!(json["aria"]["url"], "https://example.com");
         assert_eq!(json["aria"]["disabled"], true);
         assert_eq!(json["aria"]["hidden"], true);
     }
