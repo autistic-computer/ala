@@ -1,0 +1,26 @@
+Original source: ab1bc309a8bd85c02b2ab978fda90bc1875eba41
+Final diagnostic/timing source: c34cd002d05e3153cdb1ad34c29c8645d20cf0b7
+Worktree: /home/demfabris/dev/ala-worktrees/segmented-shaping
+Build environment: CARGO_TARGET_DIR=/home/demfabris/dev/ala-native-target CARGO_BUILD_JOBS=4
+
+Original native correctness, before timing or source changes:
+python3 experiments/segmented-shaping/run.py --build --verify-only --output experiments/segmented-shaping/xps/verify-original-xps.json
+
+Expanded verifier:
+cargo fmt --all
+python3 experiments/segmented-shaping/run.py --build --verify-only --output experiments/segmented-shaping/xps/verify-xps.json
+cargo clippy --release --locked -p ala-platform --no-default-features --features bench-support --bench segmented_shaping -- -D warnings
+cargo fmt --all -- --check
+python3 experiments/segmented-shaping/run.py --binary /home/demfabris/dev/ala-native-target/release/deps/segmented_shaping-6561ccc396247396 --cpu 2 --repetitions 5 --samples 120 --output experiments/segmented-shaping/xps/xps-segmented-shaping.json
+
+The expanded verifier was first run at d24749f, where an added check incorrectly assumed raw add_fonts advances the native generation. It failed with exit101; native stderr is in verify-instrumentation-native.log.gz, with empty stdout preserved separately. The actual contract was inspected and the invalid test replaced by an ASCII probe at471841d. That successful intermediate verification is preserved. c34cd00 then included the ASCII result in the overall equivalence flag and checked the glyph budget in allocation passes too. Final verification and all timings use c34cd00.
+
+Direct diagnostic invocation for the failed intermediate assertion:
+/home/demfabris/dev/ala-native-target/release/deps/segmented_shaping-6561ccc396247396 --verify
+
+Native verification completed with correctness_blocked=true; timings are diagnostic only.
+Each JSON saves exact source/compiler/binary hashes and child commands.
+Machine audit commands and results are in machine.json.
+Raw log files are preserved locally and published as unchanged gzip copies.
+No concurrent builds or other benchmark workloads ran.
+git diff --check

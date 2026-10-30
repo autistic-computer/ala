@@ -1,0 +1,654 @@
+{
+  "metadata": {
+    "experimental": true,
+    "utc": "2026-10-30T02:01:27.826782+00:00",
+    "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "text_backend": "CoreText",
+    "cpuinfo": null,
+    "cpu_affinity": null,
+    "source_commit": "a665851306cd5e882fcc7163de633f2544246b2c",
+    "baseline_commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "build_command": [
+      "cargo",
+      "bench",
+      "--locked",
+      "-p",
+      "ala-platform",
+      "--no-default-features",
+      "--features",
+      "bench-support",
+      "--bench",
+      "segmented_shaping",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "f36d52df8febc7f384046c1d90290981468832f67ff85ecbf82cad127bcb63a4",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "measurements": "Main-thread text edit + layout + draw + arena clear; no GPU submission. Separate allocation passes.",
+    "allocation_note": "Separate instrumented processes count allocation requests, not retained memory or RSS. Counting disabled in timing runs.",
+    "shaping_scope": "Benchmark-only decorator around the native platform text system; semantic differences block merging",
+    "donor_commits": {
+      "segment_helpers": "mesa-hills-research/gpui@30d883237d5f913f2d11cfcb938bd7697da88aa6"
+    },
+    "source_sha256": {
+      "crates/ala-platform/benches/segmented_shaping.rs": "dc73d96ccbd7e5f5537fa017f08aa04f62eaca706d8e80b30f869a990cc256ca",
+      "crates/ala-platform/benches/segmented_shaping/segments.rs": "ce8d156c7dd573ef04001afbd91451bb3f0abbd66c1620eca20e5559a9932eab",
+      "crates/ala-platform/benches/segmented_shaping/text.rs": "3c5a5de425bfa5cf6e09778fbdb99d637ccec1f8fecd9aa24066c63bcc88f95d",
+      "Cargo.lock": "347067dbf6987e80711aa345c8838a8baca28532a2af1e0eacb01d590272f483",
+      "experiments/segmented-shaping/run.py": "493835d5e91ae3573ef75dab6c12a77a63c57770c8cbbe62bf289cdd6a97d25a"
+    },
+    "relevant_environment": {}
+  },
+  "verification": {
+    "case": "verification",
+    "text": {
+      "paragraphs": 80,
+      "wrap_comparisons": 400,
+      "wrap_differences": 0,
+      "max_glyph_x_drift_px": 1.25,
+      "max_glyph_y_drift_px": 0.0,
+      "exact_line_layouts_equivalent": false,
+      "fallback_cases": 10,
+      "verified_fallback_cases": 10,
+      "font_invalidation": true,
+      "external_font_generation_tested": false,
+      "glyph_identity_equivalent": true,
+      "ascii_probe": {
+        "text_unit": "hello ",
+        "repetitions": 700,
+        "text_bytes": 4200,
+        "segment_cuts": [
+          2052,
+          4104
+        ],
+        "max_glyph_x_drift_px": 1.10546875,
+        "baseline_width_px": 40320.2890625,
+        "segmented_width_px": 40319.1796875,
+        "layout_equivalent": false,
+        "warm_cache_raw_calls": 0
+      },
+      "first_layout_difference": {
+        "seed": 1,
+        "generator_seed": 2,
+        "text": "up brown and is another keeps Hello, x=1; why brown which brown na\u00efve na\u00efve and na\u00efve na\u00efve one a another (really) x=1; jumps na\u00efve over a https://example.com/a/b brown which matters. x=1; arrive one a keeps while the jumps and jumps another r\u00e9sum\u00e9 caf\u00e9 which up r\u00e9sum\u00e9 and another streaming layout, matters. why a up the the caching tokens tokens streaming brown a brown world! world! the fox arrive the \u2014 matters. jumps na\u00efve with streaming is a after 123,456 and na\u00efve quick after renderer which a renderer one It's x=1; with \u2014 https://example.com/a/b caf\u00e9 world! x=1; na\u00efve na\u00efve \u2014 dog 123,456 caf\u00e9 brown 123,456 up is a matters. lazy dog x=1; a r\u00e9sum\u00e9 fox layout, which caching matters. (really) caf\u00e9 It's while na\u00efve a fox matters. na\u00efve It's streaming after one renderer caf\u00e9 one why after na\u00efve https://example.com/a/b another a the another \u2014 layout, is over which and 123,456 na\u00efve na\u00efve a na\u00efve jumps the matters. x=1; which \u2014 brown https://example.com/a/b brown lazy matters. matters. which streaming why x=1; another fox x=1; one the Hello, It's It's lazy the \u2014 and one which while fine another r\u00e9sum\u00e9 (really) streaming x=1; arrive is r\u00e9sum\u00e9 brown after tokens na\u00efve caf\u00e9 x=1; is another (really) quick why r\u00e9sum\u00e9 world! while layout, world! layout, It's the 123,456 quick jumps the the brown streaming fine matters. quick why renderer caching is renderer r\u00e9sum\u00e9 one up one (really) keeps caching why lazy quick is over na\u00efve Hello, x=1; dog arrive the It's up and the is brown fine a https://example.com/a/b why is arrive r\u00e9sum\u00e9 after layout, 123,456 why renderer jumps x=1; world! 123,456 streaming matters. the world! jumps r\u00e9sum\u00e9 streaming another 123,456 caf\u00e9 r\u00e9sum\u00e9 up caching why lazy after tokens renderer x=1; It's is dog lazy over matters. and streaming the matters. It's fox matters. while up dog is \u2014 quick fox and with fine world! na\u00efve fine with It's tokens https://example.com/a/b quick arrive which jumps layout, keeps brown a dog 123,456 fine \u2014 t",
+        "text_bytes": 2037,
+        "font": "IBM Plex Sans",
+        "font_size_px": 16,
+        "baseline_width_px": 18969.220703125,
+        "segmented_width_px": 18969.626953125,
+        "first_position_difference": {
+          "glyph_ordinal": 216,
+          "baseline_byte_index": 221,
+          "segmented_byte_index": 221,
+          "baseline_font_id": "FontId(0)",
+          "segmented_font_id": "FontId(0)",
+          "baseline_glyph_id": "GlyphId(1)",
+          "segmented_glyph_id": "GlyphId(1)",
+          "baseline_x_px": 2073.5966796875,
+          "segmented_x_px": 2073.596435546875,
+          "baseline_x_bits": 1157732748,
+          "segmented_x_bits": 1157732747,
+          "baseline_y_px": 0.0,
+          "segmented_y_px": 0.0
+        },
+        "segment_cuts": [
+          {
+            "cut_byte": 219,
+            "native_prefix_width_px": 2054.396484375,
+            "summed_segment_width_px": 2054.396484375,
+            "baseline_next_glyph_x_px": 2054.396484375,
+            "segmented_next_glyph_x_px": 2054.396484375
+          },
+          {
+            "cut_byte": 428,
+            "native_prefix_width_px": 3993.6162109375,
+            "summed_segment_width_px": 3993.59326171875,
+            "baseline_next_glyph_x_px": 3993.6162109375,
+            "segmented_next_glyph_x_px": 3993.59326171875
+          },
+          {
+            "cut_byte": 625,
+            "native_prefix_width_px": 5788.83447265625,
+            "summed_segment_width_px": 5788.7900390625,
+            "baseline_next_glyph_x_px": 5788.83447265625,
+            "segmented_next_glyph_x_px": 5788.7900390625
+          },
+          {
+            "cut_byte": 882,
+            "native_prefix_width_px": 8169.65869140625,
+            "summed_segment_width_px": 8169.58984375,
+            "baseline_next_glyph_x_px": 8169.65869140625,
+            "segmented_next_glyph_x_px": 8169.58984375
+          },
+          {
+            "cut_byte": 1099,
+            "native_prefix_width_px": 10204.77734375,
+            "summed_segment_width_px": 10204.7861328125,
+            "baseline_next_glyph_x_px": 10204.77734375,
+            "segmented_next_glyph_x_px": 10204.7861328125
+          },
+          {
+            "cut_byte": 1732,
+            "native_prefix_width_px": 16108.537109375,
+            "summed_segment_width_px": 16108.822265625,
+            "baseline_next_glyph_x_px": 16108.537109375,
+            "segmented_next_glyph_x_px": 16108.822265625
+          }
+        ]
+      },
+      "first_wrap_difference": null,
+      "max_drift_case": {
+        "seed": 79,
+        "generator_seed": 80,
+        "text_bytes": 4923,
+        "glyph_ordinal": 4803,
+        "byte_index": 4922,
+        "baseline_x_px": 46110.03125,
+        "segmented_x_px": 46108.78125
+      },
+      "layout_equivalent": false,
+      "pixel_equivalence": "not established for segmented text"
+    },
+    "wall_seconds": 0.17124350000085542,
+    "command": [
+      "/Users/demfabris/dev/ala/target/release/deps/segmented_shaping-33926e7158798766",
+      "--verify"
+    ]
+  },
+  "correctness_blocked": true,
+  "summary": [
+    {
+      "name": "text/2000/append",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.0761045,
+          "p95_ms": 0.082833,
+          "run_medians_ms": [
+            0.0761045,
+            0.0760625,
+            0.076729,
+            0.0769585,
+            0.0760625
+          ],
+          "thread_cpu_median_ms": 0.076271,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 281742.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.077479,
+          "p95_ms": 0.082167,
+          "run_medians_ms": [
+            0.077479,
+            0.0768335,
+            0.078146,
+            0.0768755,
+            0.0789165
+          ],
+          "thread_cpu_median_ms": 0.0776875,
+          "paired_speedup_range": [
+            0.9638351928937547,
+            1.0010796677745186
+          ],
+          "median_allocated_bytes": 157721.0,
+          "speedup_vs_baseline": 0.9822597090824611
+        }
+      }
+    },
+    {
+      "name": "text/2000/middle",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.0684375,
+          "p95_ms": 0.074084,
+          "run_medians_ms": [
+            0.068375,
+            0.068333,
+            0.068958,
+            0.068875,
+            0.0684375
+          ],
+          "thread_cpu_median_ms": 0.068625,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 166383.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.071125,
+          "p95_ms": 0.076875,
+          "run_medians_ms": [
+            0.0711455,
+            0.0711045,
+            0.070708,
+            0.071125,
+            0.071125
+          ],
+          "thread_cpu_median_ms": 0.071292,
+          "paired_speedup_range": [
+            0.9610221575287078,
+            0.9752503252814392
+          ],
+          "median_allocated_bytes": 140875.0,
+          "speedup_vs_baseline": 0.9622144112478032
+        }
+      }
+    },
+    {
+      "name": "text/2000/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.069917,
+          "p95_ms": 0.072959,
+          "run_medians_ms": [
+            0.069875,
+            0.069917,
+            0.070083,
+            0.069708,
+            0.069958
+          ],
+          "thread_cpu_median_ms": 0.0700835,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 166180.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.0806455,
+          "p95_ms": 0.087416,
+          "run_medians_ms": [
+            0.0806455,
+            0.0802295,
+            0.0809375,
+            0.0805835,
+            0.0809375
+          ],
+          "thread_cpu_median_ms": 0.080875,
+          "paired_speedup_range": [
+            0.8643459459459459,
+            0.8714624919761434
+          ],
+          "median_allocated_bytes": 254960.0,
+          "speedup_vs_baseline": 0.8669671587379333
+        }
+      }
+    },
+    {
+      "name": "text/2000/unchanged",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.0535,
+          "p95_ms": 0.054625,
+          "run_medians_ms": [
+            0.053583,
+            0.0535,
+            0.0550625,
+            0.0535,
+            0.0534165
+          ],
+          "thread_cpu_median_ms": 0.053708,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 17476.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.053625,
+          "p95_ms": 0.05575,
+          "run_medians_ms": [
+            0.053583,
+            0.053625,
+            0.054125,
+            0.053791,
+            0.0535
+          ],
+          "thread_cpu_median_ms": 0.053833,
+          "paired_speedup_range": [
+            0.9945901730772806,
+            1.0173210161662818
+          ],
+          "median_allocated_bytes": 17476.0,
+          "speedup_vs_baseline": 0.9976689976689976
+        }
+      }
+    },
+    {
+      "name": "text/20000/append",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.2549375,
+          "p95_ms": 0.268334,
+          "run_medians_ms": [
+            0.254813,
+            0.258437,
+            0.2536665,
+            0.2574795,
+            0.2549375
+          ],
+          "thread_cpu_median_ms": 0.2551665,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 1607052.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.2666455,
+          "p95_ms": 0.277959,
+          "run_medians_ms": [
+            0.2669795,
+            0.27,
+            0.265042,
+            0.2666455,
+            0.2659375
+          ],
+          "thread_cpu_median_ms": 0.266833,
+          "paired_speedup_range": [
+            0.9544290853792146,
+            0.9656247714662352
+          ],
+          "median_allocated_bytes": 527732.5,
+          "speedup_vs_baseline": 0.9560915147639844
+        }
+      }
+    },
+    {
+      "name": "text/20000/middle",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.250958,
+          "p95_ms": 0.262875,
+          "run_medians_ms": [
+            0.253542,
+            0.2513955,
+            0.2505835,
+            0.250958,
+            0.248771
+          ],
+          "thread_cpu_median_ms": 0.251167,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 1607052.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.2614165,
+          "p95_ms": 0.272625,
+          "run_medians_ms": [
+            0.2614375,
+            0.2614165,
+            0.2607085,
+            0.26325,
+            0.260521
+          ],
+          "thread_cpu_median_ms": 0.261625,
+          "paired_speedup_range": [
+            0.953306742640076,
+            0.969799665311977
+          ],
+          "median_allocated_bytes": 554957.0,
+          "speedup_vs_baseline": 0.9599929614236286
+        }
+      }
+    },
+    {
+      "name": "text/20000/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.2566875,
+          "p95_ms": 0.269916,
+          "run_medians_ms": [
+            0.2566875,
+            0.257104,
+            0.259521,
+            0.2550625,
+            0.2560205
+          ],
+          "thread_cpu_median_ms": 0.256875,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 1607052.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.3324585,
+          "p95_ms": 0.381625,
+          "run_medians_ms": [
+            0.3324585,
+            0.329583,
+            0.3429165,
+            0.3449165,
+            0.329021
+          ],
+          "thread_cpu_median_ms": 0.332729,
+          "paired_speedup_range": [
+            0.739490572355918,
+            0.7800887788508509
+          ],
+          "median_allocated_bytes": 1910936.0,
+          "speedup_vs_baseline": 0.7720888471794224
+        }
+      }
+    },
+    {
+      "name": "text/20000/unchanged",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.1284795,
+          "p95_ms": 0.137,
+          "run_medians_ms": [
+            0.1284795,
+            0.128792,
+            0.12875,
+            0.12825,
+            0.1271455
+          ],
+          "thread_cpu_median_ms": 0.128667,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 17476.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.128459,
+          "p95_ms": 0.136041,
+          "run_medians_ms": [
+            0.13025,
+            0.128334,
+            0.12875,
+            0.128459,
+            0.1277705
+          ],
+          "thread_cpu_median_ms": 0.128666,
+          "paired_speedup_range": [
+            0.9864069097888676,
+            1.0035688126295448
+          ],
+          "median_allocated_bytes": 17476.0,
+          "speedup_vs_baseline": 1.0001595839917794
+        }
+      }
+    },
+    {
+      "name": "text/100000/append",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.0981875,
+          "p95_ms": 1.128083,
+          "run_medians_ms": [
+            1.0990415,
+            1.0971665,
+            1.0981875,
+            1.100354,
+            1.090542
+          ],
+          "thread_cpu_median_ms": 1.0985415,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 6374796.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 1.1540835,
+          "p95_ms": 1.199042,
+          "run_medians_ms": [
+            1.156542,
+            1.15325,
+            1.1505835,
+            1.1540835,
+            1.1594375
+          ],
+          "thread_cpu_median_ms": 1.1543335,
+          "paired_speedup_range": [
+            0.9405785132876934,
+            0.954461366776075
+          ],
+          "median_allocated_bytes": 2462996.5,
+          "speedup_vs_baseline": 0.9515667627169091
+        }
+      }
+    },
+    {
+      "name": "text/100000/middle",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.0939585,
+          "p95_ms": 1.126625,
+          "run_medians_ms": [
+            1.094,
+            1.0972085,
+            1.0931245,
+            1.0939585,
+            1.093542
+          ],
+          "thread_cpu_median_ms": 1.094125,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 6374796.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 1.153625,
+          "p95_ms": 1.203625,
+          "run_medians_ms": [
+            1.1445415,
+            1.153625,
+            1.1502085,
+            1.1640835,
+            1.1543955
+          ],
+          "thread_cpu_median_ms": 1.1539795,
+          "paired_speedup_range": [
+            0.9397594760169695,
+            0.9558412691894527
+          ],
+          "median_allocated_bytes": 2465468.0,
+          "speedup_vs_baseline": 0.9482791201646983
+        }
+      }
+    },
+    {
+      "name": "text/100000/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.100229,
+          "p95_ms": 1.139625,
+          "run_medians_ms": [
+            1.100229,
+            1.098208,
+            1.1002495,
+            1.097396,
+            1.103479
+          ],
+          "thread_cpu_median_ms": 1.1008125,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 6374796.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 1.5049375,
+          "p95_ms": 1.579958,
+          "run_medians_ms": [
+            1.503625,
+            1.5023545,
+            1.506188,
+            1.5150625,
+            1.5049375
+          ],
+          "thread_cpu_median_ms": 1.505104,
+          "paired_speedup_range": [
+            0.7243239140299492,
+            0.7332390880019934
+          ],
+          "median_allocated_bytes": 9492068.0,
+          "speedup_vs_baseline": 0.731079529880809
+        }
+      }
+    },
+    {
+      "name": "text/100000/unchanged",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.4519165,
+          "p95_ms": 0.4725,
+          "run_medians_ms": [
+            0.452313,
+            0.454021,
+            0.4518335,
+            0.4519165,
+            0.450583
+          ],
+          "thread_cpu_median_ms": 0.4521045,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 17476.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "segmented": {
+          "median_ms": 0.452292,
+          "p95_ms": 0.4685,
+          "run_medians_ms": [
+            0.452292,
+            0.452375,
+            0.450542,
+            0.450875,
+            0.452542
+          ],
+          "thread_cpu_median_ms": 0.4524585,
+          "paired_speedup_range": [
+            0.9956711200286382,
+            1.0036385741917657
+          ],
+          "median_allocated_bytes": 17476.0,
+          "speedup_vs_baseline": 0.999169784121762
+        }
+      }
+    }
+  ]
+}
