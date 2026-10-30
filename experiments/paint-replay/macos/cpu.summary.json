@@ -1,0 +1,184 @@
+{
+  "metadata": {
+    "experimental": true,
+    "utc": "2026-10-30T02:02:03.443978+00:00",
+    "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "text_backend": "CoreText",
+    "cpuinfo": null,
+    "cpu_affinity": null,
+    "source_commit": "de64d16db673390499e34eaef4699e15bcdf0915",
+    "baseline_commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "build_command": [
+      "cargo",
+      "bench",
+      "--locked",
+      "-p",
+      "ala-platform",
+      "--no-default-features",
+      "--features",
+      "bench-support,perf-experiments",
+      "--bench",
+      "paint_replay",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "b8614162fed57e86b0976dc30e3f67a51331f871fb0384890c574dcc511388fc",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "measurements": "Main-thread elapsed update + draw + arena clear, without GPU submission; thread CPU time also recorded. Allocation passes are separate.",
+    "allocation_note": "Separate instrumented processes count allocation requests, not retained memory or RSS. Counting disabled in timing runs.",
+    "paint_scope": "Manually driven opacity replay, not the donor animation scheduler or a production animation API",
+    "donor_commits": {
+      "paint_records": "mesa-hills-research/gpui@eb63578acb9637ba72146dfafc07e4e1cb03d16b"
+    },
+    "source_sha256": {
+      "crates/ala-platform/benches/paint_replay.rs": "9b9f58910602782fcbcab74c26241289b3bb696c460c2fb389b2550aa4882a70",
+      "crates/ala/src/scene.rs": "ed2485014c7d4d5c5b285575b3480c45c81b260d310f338a4834af4d399d92db",
+      "crates/ala/src/window.rs": "dcdb1a369cf3e9b301abb9057f72278d3544806a05d82f2168f0b014074a4df7",
+      "crates/ala/src/window/perf_experiments.rs": "d2d4330cca85d4e719353aff5565a61d15688a60a1e07fdd7027533be8598ce9",
+      "Cargo.lock": "347067dbf6987e80711aa345c8838a8baca28532a2af1e0eacb01d590272f483",
+      "experiments/paint-replay/run.py": "c8d6210050f1d306b97cb7feef64a085861dcb30fe025c074dbf5fa966fdc8f1"
+    },
+    "relevant_environment": {}
+  },
+  "verification": {
+    "case": "verification",
+    "animation_frames": 24,
+    "equal_pixels": 46080000,
+    "distinct_animation_images": 17,
+    "scene_comparisons": 24,
+    "distinct_scenes": 17,
+    "pixel_checks_available": true,
+    "cached_input_checks": 2,
+    "wall_seconds": 0.20281795799382962,
+    "command": [
+      "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+      "--verify"
+    ]
+  },
+  "summary": [
+    {
+      "name": "animation/30",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.1156045,
+          "p95_ms": 0.123084,
+          "run_medians_ms": [
+            0.114792,
+            0.1159375,
+            0.114834,
+            0.115792,
+            0.1156045
+          ],
+          "thread_cpu_median_ms": 0.115875,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 244076.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "replay": {
+          "median_ms": 0.0202295,
+          "p95_ms": 0.021,
+          "run_medians_ms": [
+            0.020084,
+            0.0205,
+            0.020208,
+            0.0202295,
+            0.020458
+          ],
+          "thread_cpu_median_ms": 0.020417,
+          "paired_speedup_range": [
+            5.650821194642683,
+            5.7239180404854295
+          ],
+          "median_allocated_bytes": 23472.0,
+          "speedup_vs_baseline": 5.714649398156158
+        }
+      }
+    },
+    {
+      "name": "animation/120",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.3154585,
+          "p95_ms": 0.334375,
+          "run_medians_ms": [
+            0.3154585,
+            0.315437,
+            0.3159165,
+            0.3144795,
+            0.316917
+          ],
+          "thread_cpu_median_ms": 0.3157295,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 832340.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "replay": {
+          "median_ms": 0.0317085,
+          "p95_ms": 0.033584,
+          "run_medians_ms": [
+            0.031708,
+            0.0317085,
+            0.031708,
+            0.031833,
+            0.03175
+          ],
+          "thread_cpu_median_ms": 0.0318955,
+          "paired_speedup_range": [
+            9.87904061822637,
+            9.98163779527559
+          ],
+          "median_allocated_bytes": 23472.0,
+          "speedup_vs_baseline": 9.948704606020467
+        }
+      }
+    },
+    {
+      "name": "animation/480",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.134667,
+          "p95_ms": 1.207791,
+          "run_medians_ms": [
+            1.111667,
+            1.123,
+            1.134667,
+            1.144354,
+            1.144771
+          ],
+          "thread_cpu_median_ms": 1.135083,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 3185396.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "replay": {
+          "median_ms": 0.0783545,
+          "p95_ms": 0.0825,
+          "run_medians_ms": [
+            0.0773125,
+            0.07725,
+            0.0785205,
+            0.078542,
+            0.0783545
+          ],
+          "thread_cpu_median_ms": 0.078542,
+          "paired_speedup_range": [
+            14.37887793047696,
+            14.61015002329158
+          ],
+          "median_allocated_bytes": 23472.0,
+          "speedup_vs_baseline": 14.481197633830858
+        }
+      }
+    }
+  ]
+}

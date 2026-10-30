@@ -1,0 +1,46 @@
+[
+  {
+    "source_commit": "de64d16db673390499e34eaef4699e15bcdf0915",
+    "label": "metal-final-baseline",
+    "target_pid": 33222,
+    "target_name": "paint_replay-c96368a968ce7e90",
+    "target_arguments": "--live --mode baseline --seconds 10 --rows 480",
+    "recording_duration_seconds": 11.082741,
+    "recording_end_reason": "Target app exited",
+    "target_termination_reason": "exit(0)",
+    "gpu_devices": [
+      "M4 Max"
+    ],
+    "target_gpu_intervals_including_startup": 461,
+    "excluded_startup_seconds": 1,
+    "command_buffers": 207,
+    "gpu_encoder_envelope_ms": {
+      "median": 0.114708,
+      "p95": 0.122833
+    },
+    "note": "Target PID only. Envelope is the earliest GPU channel start to latest channel end for each application command buffer, not queue latency, display presentation, summed overlapping stage time, energy or power. Short captures under automatic GPU clocks are diagnostic, not evidence for general GPU speedups.",
+    "source_xml_sha256": "5b83b7ddd896c304114d2ded3283c4bee522c1e43e2f32958a6653b9193a8805"
+  },
+  {
+    "source_commit": "de64d16db673390499e34eaef4699e15bcdf0915",
+    "label": "metal-final-replay",
+    "target_pid": 33391,
+    "target_name": "paint_replay-c96368a968ce7e90",
+    "target_arguments": "--live --mode replay --seconds 10 --rows 480",
+    "recording_duration_seconds": 10.840434,
+    "recording_end_reason": "Target app exited",
+    "target_termination_reason": "exit(0)",
+    "gpu_devices": [
+      "M4 Max"
+    ],
+    "target_gpu_intervals_including_startup": 474,
+    "excluded_startup_seconds": 1,
+    "command_buffers": 213,
+    "gpu_encoder_envelope_ms": {
+      "median": 0.114917,
+      "p95": 0.122792
+    },
+    "note": "Target PID only. Envelope is the earliest GPU channel start to latest channel end for each application command buffer, not queue latency, display presentation, summed overlapping stage time, energy or power. Short captures under automatic GPU clocks are diagnostic, not evidence for general GPU speedups.",
+    "source_xml_sha256": "0613d3501828b41685cc34b8faf29744ef0a3bce68b644666ecc0a0df0036572"
+  }
+]

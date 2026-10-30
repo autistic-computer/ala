@@ -1,0 +1,182 @@
+{
+  "source_commit": "de64d16db673390499e34eaef4699e15bcdf0915",
+  "binary_sha256": "b8614162fed57e86b0976dc30e3f67a51331f871fb0384890c574dcc511388fc",
+  "runs": [
+    {
+      "pair": 1,
+      "mode": "baseline",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "baseline",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793325744.7547588,
+      "ended_unix": 1793325805.006283
+    },
+    {
+      "pair": 1,
+      "mode": "replay",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "replay",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793325805.007236,
+      "ended_unix": 1793325865.172571
+    },
+    {
+      "pair": 2,
+      "mode": "replay",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "replay",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793325865.173486,
+      "ended_unix": 1793325925.354558
+    },
+    {
+      "pair": 2,
+      "mode": "baseline",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "baseline",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793325925.355556,
+      "ended_unix": 1793325985.546005
+    },
+    {
+      "pair": 3,
+      "mode": "baseline",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "baseline",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793325985.5470238,
+      "ended_unix": 1793326045.712416
+    },
+    {
+      "pair": 3,
+      "mode": "replay",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "replay",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326045.713435,
+      "ended_unix": 1793326105.8904698
+    },
+    {
+      "pair": 4,
+      "mode": "replay",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "replay",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326105.891499,
+      "ended_unix": 1793326166.060208
+    },
+    {
+      "pair": 4,
+      "mode": "baseline",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "baseline",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326166.061261,
+      "ended_unix": 1793326226.2179918
+    },
+    {
+      "pair": 5,
+      "mode": "baseline",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "baseline",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326226.21854,
+      "ended_unix": 1793326286.412512
+    },
+    {
+      "pair": 5,
+      "mode": "replay",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "replay",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326286.4134111,
+      "ended_unix": 1793326346.5731819
+    },
+    {
+      "pair": null,
+      "mode": "static",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "static",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326346.574152,
+      "ended_unix": 1793326408.229912
+    }
+  ]
+}

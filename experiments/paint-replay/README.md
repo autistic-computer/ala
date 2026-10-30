@@ -64,3 +64,5 @@ Capture actual GPU work separately with Instruments Metal System Trace (Mac), PI
 ## Cloud evidence
 
 `cloud.json` contains raw process/sample results; `cloud.summary.json` contains the summary and verification. These are Linux VM measurements against the in-process baseline from commit `b9b22210d37bd7157161a238f602136a65095723`, not physical GPU benchmarks. See the PR for measured results and validation status.
+
+[Apple Silicon validation](macos/README.md) covers native CoreText/Metal correctness, CPU fixture/live pairs, static idle behavior and target-process GPU diagnostics. Representative application and physical display/input/power gates remain open.
