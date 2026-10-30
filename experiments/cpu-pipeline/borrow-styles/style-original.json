@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "commit": "b9b22210d37bd7157161a238f602136a65095723",
+  "worktree_sha256": "0e4e999f6df4981170320e8553b0c5ad076195fc57bf4b3281b31cc4f2f4e906",
+  "dirty": true,
+  "machine": {
+    "system": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "host": "fd56cdf262a0",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "logical_cpus": 5,
+    "affinity": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "cpu_quota": "400000 100000",
+    "governor": null
+  },
+  "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "features": "bench-support,font-kit,wayland,x11",
+  "rustflags": "-C force-frame-pointers=yes",
+  "bench": "ui_cpu",
+  "filter": "",
+  "binary": "/workspace/ala/target/perf-results/style-original/benchmark",
+  "binary_sha256": "e6271cc3bcf6380bd8449b866d3ab23189e851a541f1b8dbf6c679c58d2dd829",
+  "renderer": "none (CPU UI pipeline only)",
+  "runtime": {
+    "VK_DRIVER_FILES": "/workspace/.ala-perf/sysroot/usr/share/vulkan/icd.d/lvp_icd.json",
+    "VK_ICD_FILENAMES": null,
+    "LP_NUM_THREADS": "4",
+    "ALA_PERF_SYSROOT": "/workspace/.ala-perf/sysroot"
+  }
+}

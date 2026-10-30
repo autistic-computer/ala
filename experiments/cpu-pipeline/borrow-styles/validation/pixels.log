@@ -1,0 +1,9 @@
+   Compiling ala-platform v0.1.0 (/workspace/ala/crates/ala-platform)
+    Finished `perf` profile [optimized + debuginfo] target(s) in 22.70s
+     Running tests/headless.rs (target/perf/deps/headless-190c731208ccff9a)
+
+running 2 tests
+test bench_glyph_paint ... ignored, benchmark: cargo test -p ala-platform --all-features --release --test headless bench_glyph_paint -- --ignored --nocapture
+test window_screenshot_shows_the_laid_out_scene ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.11s

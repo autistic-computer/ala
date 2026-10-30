@@ -1,0 +1,185 @@
+Gnuplot not found, using plotters backend
+Benchmarking ui_cpu/grid/100
+Benchmarking ui_cpu/grid/100: Warming up for 1.0000 s
+Benchmarking ui_cpu/grid/100: Collecting 30 samples in estimated 3.0081 s (19k iterations)
+Benchmarking ui_cpu/grid/100: Analyzing
+ui_cpu/grid/100         time:   [163.15 µs 163.77 µs 164.57 µs]
+Found 2 outliers among 30 measurements (6.67%)
+  1 (3.33%) high mild
+  1 (3.33%) high severe
+ala bench report (all observed iterations): ui_cpu/grid
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 26791
+    mean: 0.158ms
+    p50: 0.154ms
+    p90: 0.170ms
+    p95: 0.173ms
+    p99: 0.192ms
+    max: 4.239ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  window draw:
+    samples: 26791
+    mean: 0.157ms
+    p50: 0.153ms
+    p90: 0.170ms
+    p95: 0.172ms
+    p99: 0.191ms
+    max: 4.235ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/grid/1000
+Benchmarking ui_cpu/grid/1000: Warming up for 1.0000 s
+Benchmarking ui_cpu/grid/1000: Collecting 30 samples in estimated 3.2001 s (1860 iterations)
+Benchmarking ui_cpu/grid/1000: Analyzing
+ui_cpu/grid/1000        time:   [1.7066 ms 1.7444 ms 1.7896 ms]
+Found 3 outliers among 30 measurements (10.00%)
+  3 (10.00%) high severe
+ala bench report (all observed iterations): ui_cpu/grid
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 2883
+    mean: 1.685ms
+    p50: 1.641ms
+    p90: 1.770ms
+    p95: 1.890ms
+    p99: 2.390ms
+    max: 5.059ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  window draw:
+    samples: 2883
+    mean: 1.684ms
+    p50: 1.640ms
+    p90: 1.769ms
+    p95: 1.888ms
+    p99: 2.388ms
+    max: 5.059ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/grid/10000
+Benchmarking ui_cpu/grid/10000: Warming up for 1.0000 s
+Benchmarking ui_cpu/grid/10000: Collecting 30 samples in estimated 3.5018 s (150 iterations)
+Benchmarking ui_cpu/grid/10000: Analyzing
+ui_cpu/grid/10000       time:   [23.886 ms 24.031 ms 24.189 ms]
+Found 2 outliers among 30 measurements (6.67%)
+  2 (6.67%) high mild
+ala bench report (all observed iterations): ui_cpu/grid
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 213
+    mean: 23.159ms
+    p50: 22.397ms
+    p90: 26.788ms
+    p95: 27.181ms
+    p99: 28.230ms
+    max: 29.606ms
+    frame budget overruns total: 463
+    frame budget overruns max: 3
+  window draw:
+    samples: 213
+    mean: 23.152ms
+    p50: 22.397ms
+    p90: 26.771ms
+    p95: 27.165ms
+    p99: 28.230ms
+    max: 29.606ms
+    frame budget overruns total: 463
+    frame budget overruns max: 3
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/text_warm/50
+Benchmarking ui_cpu/text_warm/50: Warming up for 1.0000 s
+Benchmarking ui_cpu/text_warm/50: Collecting 30 samples in estimated 3.1325 s (6045 iterations)
+Benchmarking ui_cpu/text_warm/50: Analyzing
+ui_cpu/text_warm/50     time:   [513.82 µs 514.87 µs 516.18 µs]
+Found 1 outliers among 30 measurements (3.33%)
+  1 (3.33%) high mild
+ala bench report (all observed iterations): ui_cpu/text
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 8092
+    mean: 0.511ms
+    p50: 0.508ms
+    p90: 0.526ms
+    p95: 0.540ms
+    p99: 0.638ms
+    max: 1.723ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  window draw:
+    samples: 8092
+    mean: 0.511ms
+    p50: 0.508ms
+    p90: 0.525ms
+    p95: 0.539ms
+    p99: 0.637ms
+    max: 1.721ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/text_warm/500
+Benchmarking ui_cpu/text_warm/500: Warming up for 1.0000 s
+Benchmarking ui_cpu/text_warm/500: Collecting 30 samples in estimated 3.2268 s (1395 iterations)
+Benchmarking ui_cpu/text_warm/500: Analyzing
+ui_cpu/text_warm/500    time:   [2.3330 ms 2.3551 ms 2.3826 ms]
+ala bench report (all observed iterations): ui_cpu/text
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 1906
+    mean: 2.315ms
+    p50: 2.271ms
+    p90: 2.376ms
+    p95: 2.486ms
+    p99: 3.052ms
+    max: 5.202ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  window draw:
+    samples: 1906
+    mean: 2.313ms
+    p50: 2.271ms
+    p90: 2.374ms
+    p95: 2.484ms
+    p99: 3.049ms
+    max: 5.198ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/text_churn/50
+Benchmarking ui_cpu/text_churn/50: Warming up for 1.0000 s
+Benchmarking ui_cpu/text_churn/50: Collecting 30 samples in estimated 3.1333 s (1860 iterations)
+Benchmarking ui_cpu/text_churn/50: Analyzing
+ui_cpu/text_churn/50    time:   [1.6544 ms 1.6698 ms 1.6919 ms]
+ala bench report (all observed iterations): ui_cpu/text
+  note: includes Criterion warmup/calibration
+  window dirty-to-draw:
+    samples: 2883
+    mean: 1.674ms
+    p50: 1.623ms
+    p90: 1.798ms
+    p95: 1.979ms
+    p99: 2.265ms
+    max: 5.132ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  window draw:
+    samples: 2883
+    mean: 1.673ms
+    p50: 1.622ms
+    p90: 1.796ms
+    p95: 1.976ms
+    p99: 2.263ms
+    max: 5.132ms
+    frame budget overruns total: 0
+    frame budget overruns max: 0
+  invalidations per frame: mean 1.00, max 1
+Benchmarking ui_cpu/idle_no_redraw
+Benchmarking ui_cpu/idle_no_redraw: Warming up for 1.0000 s
+Benchmarking ui_cpu/idle_no_redraw: Collecting 30 samples in estimated 3.0000 s (33M iterations)
+Benchmarking ui_cpu/idle_no_redraw: Analyzing
+ui_cpu/idle_no_redraw   time:   [93.442 ns 94.018 ns 94.587 ns]
+Found 1 outliers among 30 measurements (3.33%)
+  1 (3.33%) high mild

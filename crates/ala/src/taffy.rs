@@ -60,7 +60,7 @@ impl TaffyLayoutEngine {
 
     pub fn request_layout(
         &mut self,
-        style: Style,
+        style: &Style,
         rem_size: Pixels,
         scale_factor: f32,
         children: &[LayoutId],
@@ -82,7 +82,7 @@ impl TaffyLayoutEngine {
 
     pub fn request_measured_layout(
         &mut self,
-        style: Style,
+        style: &Style,
         rem_size: Pixels,
         scale_factor: f32,
         measure: impl FnMut(

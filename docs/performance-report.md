@@ -5,6 +5,8 @@ a runner for saved baselines, comparisons, phase statistics, and Linux sampling.
 The usage guide is [performance.md](performance.md). This report establishes the
 initial baseline; [committed evidence](../experiments/cpu-pipeline/README.md)
 contains the raw Criterion samples, metadata, profiles, and validation logs.
+The follow-up [style-borrowing experiment](performance-experiment.md) records
+the first retained optimization and its three paired comparisons.
 
 ## Host and available measurements
 

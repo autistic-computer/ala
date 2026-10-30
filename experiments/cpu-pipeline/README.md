@@ -30,3 +30,8 @@ that session, not prerequisites for a native-machine reproduction.
 
 Use [native validation](../../docs/performance-validation.md) for current,
 portable reproduction commands and the Linux/macOS/Windows validation gates.
+
+`borrow-styles/` contains the follow-up optimization's six confirmation runs,
+paired summaries, original/candidate build metadata, rejected inlining screens,
+profile/work-count evidence, and validation logs. The
+[experiment report](../../docs/performance-experiment.md) interprets those results.
