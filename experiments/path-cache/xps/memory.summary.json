@@ -1,0 +1,262 @@
+{
+  "source_commit": "5e0a214dbb12cda890f62be68d4e3a852547acc2",
+  "binary_sha256": "f9bc8dd61f9538cb40e1827d70f8f98687ab5ff60ce4cd285940bebc80228fbb",
+  "cpu_affinity": [
+    2
+  ],
+  "runs": [
+    {
+      "name": "curves-baseline-120",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/curves-baseline-120.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "curves",
+        "--mode",
+        "baseline",
+        "--paths",
+        "128",
+        "--samples",
+        "120"
+      ],
+      "utc": "2026-10-29T23:32:18.171443+00:00",
+      "peak_rss_kib": 7032,
+      "hits": 0,
+      "misses": 0,
+      "retained_payload_bytes": 0
+    },
+    {
+      "name": "curves-cached-120",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/curves-cached-120.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "curves",
+        "--mode",
+        "cached",
+        "--paths",
+        "128",
+        "--samples",
+        "120"
+      ],
+      "utc": "2026-10-29T23:32:18.233123+00:00",
+      "peak_rss_kib": 10792,
+      "hits": 15360,
+      "misses": 0,
+      "retained_payload_bytes": 3886964
+    },
+    {
+      "name": "dashed-baseline-120",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/dashed-baseline-120.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "dashed",
+        "--mode",
+        "baseline",
+        "--paths",
+        "128",
+        "--samples",
+        "120"
+      ],
+      "utc": "2026-10-29T23:32:18.720930+00:00",
+      "peak_rss_kib": 6856,
+      "hits": 0,
+      "misses": 0,
+      "retained_payload_bytes": 0
+    },
+    {
+      "name": "dashed-cached-120",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/dashed-cached-120.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "dashed",
+        "--mode",
+        "cached",
+        "--paths",
+        "128",
+        "--samples",
+        "120"
+      ],
+      "utc": "2026-10-29T23:32:18.793311+00:00",
+      "peak_rss_kib": 10052,
+      "hits": 15360,
+      "misses": 0,
+      "retained_payload_bytes": 2781764
+    },
+    {
+      "name": "triangle-baseline-120",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/triangle-baseline-120.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "triangle",
+        "--mode",
+        "baseline",
+        "--paths",
+        "128",
+        "--samples",
+        "120"
+      ],
+      "utc": "2026-10-29T23:32:18.822828+00:00",
+      "peak_rss_kib": 6568,
+      "hits": 0,
+      "misses": 0,
+      "retained_payload_bytes": 0
+    },
+    {
+      "name": "triangle-cached-120",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/triangle-cached-120.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "triangle",
+        "--mode",
+        "cached",
+        "--paths",
+        "128",
+        "--samples",
+        "120"
+      ],
+      "utc": "2026-10-29T23:32:18.854113+00:00",
+      "peak_rss_kib": 7152,
+      "hits": 15360,
+      "misses": 0,
+      "retained_payload_bytes": 134788
+    },
+    {
+      "name": "changing-baseline-120",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/changing-baseline-120.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "changing",
+        "--mode",
+        "baseline",
+        "--paths",
+        "128",
+        "--samples",
+        "120"
+      ],
+      "utc": "2026-10-29T23:32:19.570917+00:00",
+      "peak_rss_kib": 7204,
+      "hits": 0,
+      "misses": 0,
+      "retained_payload_bytes": 0
+    },
+    {
+      "name": "changing-cached-120",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/changing-cached-120.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "changing",
+        "--mode",
+        "cached",
+        "--paths",
+        "128",
+        "--samples",
+        "120"
+      ],
+      "utc": "2026-10-29T23:32:20.295303+00:00",
+      "peak_rss_kib": 15960,
+      "hits": 0,
+      "misses": 15360,
+      "retained_payload_bytes": 1872216
+    },
+    {
+      "name": "cold-baseline-120",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/cold-baseline-120.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "cold",
+        "--mode",
+        "baseline",
+        "--paths",
+        "128",
+        "--samples",
+        "120"
+      ],
+      "utc": "2026-10-29T23:32:20.931458+00:00",
+      "peak_rss_kib": 6948,
+      "hits": 0,
+      "misses": 0,
+      "retained_payload_bytes": 0
+    },
+    {
+      "name": "cold-cached-120",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/cold-cached-120.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "cold",
+        "--mode",
+        "cached",
+        "--paths",
+        "128",
+        "--samples",
+        "120"
+      ],
+      "utc": "2026-10-29T23:32:21.729230+00:00",
+      "peak_rss_kib": 11128,
+      "hits": 0,
+      "misses": 15360,
+      "retained_payload_bytes": 3886964
+    },
+    {
+      "name": "changing-cached-1200",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/path-cache/experiments/path-cache/xps/memory/changing-cached-1200.time.txt",
+        "/home/demfabris/dev/ala-native-target/release/deps/path_cache-84cc2772f6ea8aa9",
+        "--workload",
+        "changing",
+        "--mode",
+        "cached",
+        "--paths",
+        "128",
+        "--samples",
+        "1200"
+      ],
+      "utc": "2026-10-29T23:32:27.958890+00:00",
+      "peak_rss_kib": 17384,
+      "hits": 0,
+      "misses": 153600,
+      "retained_payload_bytes": 6825588
+    }
+  ]
+}

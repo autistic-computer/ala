@@ -1,0 +1,18 @@
+{
+  "linux": {
+    "cache_unit_tests": {
+      "passed": 3,
+      "command": "cargo test --locked -p ala --no-default-features --lib path_builder::cache::tests"
+    },
+    "clippy_benchmark": "passed with -D warnings",
+    "clippy_core_tests": "passed with -D warnings",
+    "format_and_diff_checks": "passed"
+  },
+  "windows": {
+    "command": "cargo check --locked -p ala-platform --no-default-features --features bench-support --bench path_cache --target x86_64-pc-windows-gnu",
+    "host": "Linux, Rust 1.99 / MinGW GCC 14.2",
+    "result": "passed",
+    "scope": "Cross-check only; native MSVC execution pending"
+  },
+  "pending": "Native hardware measurements on Apple Silicon, Windows GPU and Linux GPU; macOS pixel verification"
+}

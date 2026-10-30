@@ -1,0 +1,254 @@
+{
+  "metadata": {
+    "experimental": true,
+    "utc": "2026-10-29T22:20:52.877353+00:00",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "text_backend": "not used (path-only)",
+    "cpuinfo": "AMD EPYC 9V45 96-Core Processor",
+    "cpu_affinity": [
+      2
+    ],
+    "source_commit": "03491a9fccba9e0f32af39188841724806192b34",
+    "baseline_commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "build_command": null,
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "c9279b6c2add27997238527fc8e9bdb024e4ba9756b97af88da2d07ae494c253",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "measurements": "Path building, keying, tessellation/cache hit, and mesh drop; no GPU submission. Allocation passes are separate.",
+    "allocation_note": "Separate instrumented processes count allocation requests, not retained memory or RSS. Counting disabled in timing runs.",
+    "path_scope": "Path construction + exact key + tessellation or mesh clone + drop; no ALA reconciliation or GPU submission",
+    "source_sha256": {
+      "crates/ala-platform/benches/path_cache.rs": "46c7457e44c9d5c711301b650ca85d8244813f283c9e9bfed80ea926febefc93",
+      "crates/ala/src/path_builder.rs": "e8b9e79a41e470777948e296d15c3e7ccd5d26f5af50b8b62fa3d6ae9fd83caf",
+      "crates/ala/src/path_builder/cache.rs": "736cf175977b854a7ff5117750102c0cfa2b79854bf1df75fcb6343e1ec05012",
+      "Cargo.lock": "347067dbf6987e80711aa345c8838a8baca28532a2af1e0eacb01d590272f483",
+      "experiments/path-cache/run.py": "2a44f6b8c58e283d918ac01ef3811f66f2cd9a335024244e9364df3d3baa9a0a"
+    },
+    "relevant_environment": {
+      "VK_DRIVER_FILES": "/tmp/ala-sysroot/usr/share/vulkan/icd.d/lvp_icd.json",
+      "LP_NUM_THREADS": "2"
+    },
+    "donor": "longbridge/gpui-fast@07b42ebf1f43088b8b74a7d4fca6b95e44e04265"
+  },
+  "verification": {
+    "case": "verification",
+    "exact_mesh_comparisons": 1536,
+    "cache_hits": 768,
+    "retained_payload_bytes": 5239092,
+    "pixel_checks_available": true,
+    "equal_pixels": 5760000,
+    "distinct_scenes": 3,
+    "wall_seconds": 2.259542492000037,
+    "command": [
+      "/workspace/ala-perf-target/release/deps/path_cache-84cc2772f6ea8aa9",
+      "--verify"
+    ]
+  },
+  "summary": [
+    {
+      "name": "paths/curves",
+      "modes": {
+        "baseline": {
+          "median_ms": 3.0324075,
+          "p95_ms": 3.183154,
+          "run_medians_ms": [
+            3.0402585,
+            3.028757,
+            3.0324075,
+            3.024575,
+            3.0449355
+          ],
+          "thread_cpu_median_ms": 3.032568,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 15710744.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "cached": {
+          "median_ms": 0.204833,
+          "p95_ms": 0.234403,
+          "run_medians_ms": [
+            0.204833,
+            0.204398,
+            0.205044,
+            0.20585,
+            0.204774
+          ],
+          "thread_cpu_median_ms": 0.205006,
+          "paired_speedup_range": [
+            14.693101773135778,
+            14.869736880658678
+          ],
+          "median_allocated_bytes": 4334232.0,
+          "speedup_vs_baseline": 14.80429178892073
+        }
+      }
+    },
+    {
+      "name": "paths/dashed",
+      "modes": {
+        "baseline": {
+          "median_ms": 2.102031,
+          "p95_ms": 2.215327,
+          "run_medians_ms": [
+            2.112011,
+            2.104399,
+            2.102031,
+            2.1011945,
+            2.0965375
+          ],
+          "thread_cpu_median_ms": 2.102181,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 14458865.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "cached": {
+          "median_ms": 0.198584,
+          "p95_ms": 0.221093,
+          "run_medians_ms": [
+            0.1982135,
+            0.200322,
+            0.200121,
+            0.198584,
+            0.1985425
+          ],
+          "thread_cpu_median_ms": 0.1987415,
+          "paired_speedup_range": [
+            10.503800200878468,
+            10.655232867589746
+          ],
+          "median_allocated_bytes": 3354488.0,
+          "speedup_vs_baseline": 10.585097490230835
+        }
+      }
+    },
+    {
+      "name": "paths/triangle",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.062453,
+          "p95_ms": 0.074702,
+          "run_medians_ms": [
+            0.0624535,
+            0.062453,
+            0.062198,
+            0.062724,
+            0.0623935
+          ],
+          "thread_cpu_median_ms": 0.062558,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 984072.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "cached": {
+          "median_ms": 0.056084,
+          "p95_ms": 0.066599,
+          "run_medians_ms": [
+            0.056084,
+            0.055954,
+            0.056289,
+            0.056465,
+            0.0557185
+          ],
+          "thread_cpu_median_ms": 0.056184,
+          "paired_speedup_range": [
+            1.104976105455773,
+            1.119798630616402
+          ],
+          "median_allocated_bytes": 285332.0,
+          "speedup_vs_baseline": 1.1135618001569074
+        }
+      }
+    },
+    {
+      "name": "paths/changing",
+      "modes": {
+        "baseline": {
+          "median_ms": 3.026105,
+          "p95_ms": 3.161929,
+          "run_medians_ms": [
+            3.0224645,
+            3.0333755,
+            3.0225995,
+            3.030136,
+            3.026105
+          ],
+          "thread_cpu_median_ms": 3.0263885,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 15710343.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "cached": {
+          "median_ms": 3.338608,
+          "p95_ms": 3.490594,
+          "run_medians_ms": [
+            3.3607855,
+            3.357096,
+            3.338608,
+            3.335756,
+            3.332732
+          ],
+          "thread_cpu_median_ms": 3.3370725,
+          "paired_speedup_range": [
+            0.899332760153839,
+            0.9083805889879236
+          ],
+          "median_allocated_bytes": 20088225.0,
+          "speedup_vs_baseline": 0.90639721704375
+        }
+      }
+    },
+    {
+      "name": "paths/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 3.031804,
+          "p95_ms": 3.091343,
+          "run_medians_ms": [
+            3.0336915,
+            3.0213325,
+            3.0247485,
+            3.031804,
+            3.0343125
+          ],
+          "thread_cpu_median_ms": 3.032022,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 15710744.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "cached": {
+          "median_ms": 3.3765505,
+          "p95_ms": 3.48308,
+          "run_medians_ms": [
+            3.3568185,
+            3.3958415,
+            3.3765505,
+            3.4128645,
+            3.369339
+          ],
+          "thread_cpu_median_ms": 3.376772,
+          "paired_speedup_range": [
+            0.8883458455499772,
+            0.9037401039108907
+          ],
+          "median_allocated_bytes": 20082456.0,
+          "speedup_vs_baseline": 0.8978997944796028
+        }
+      }
+    }
+  ]
+}

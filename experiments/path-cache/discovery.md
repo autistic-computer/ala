@@ -1,0 +1,14 @@
+# Second discovery / verification cycle
+
+Sources inspected on 2026-10-29:
+
+- [GPUI Fast path cache, pinned source](https://github.com/longbridge/gpui-fast/blob/07b42ebf1f43088b8b74a7d4fca6b95e44e04265/crates/gpui/src/fast/path_cache.rs): retains Lyon meshes by normalized path events and style; two generations, 2,048-shape bound. ALA currently tessellates each `PathBuilder::build()` and has no equivalent cache there.
+- [Gpux revert](https://github.com/rayx-ui/Gpux/commit/20bdd1a7c3db6044c9490782e59ef11f08631ef4) and [standalone measurements](https://github.com/rayx-ui/Gpux/blob/5191a069a69a857220c4c669398f400bd76ba95c/docs/fast-mode.md): the cache was reverted because none of that suite's scenarios drew paths, so it saved no measured work. That observation motivates measuring actual repeated curves and cheap/unique/cold controls here; it neither proves nor disproves a path-heavy benefit.
+- [Flightdeck retained chart geometry](https://github.com/joaofnds/flightdeck/commit/b42a0269d78b9ece58d35bc2f103e2ac0769cfff): reports repeated chart tessellation in a live app, while explicitly documenting that moved fills can triangulate differently due to floating-point ties. Its reported machine timings are donor claims, not reproduced ALA results.
+- [Zorite whiteboard glyph tessellation](https://github.com/packetThrower/zorite/commit/c963c3cdbbdf097f33f5aa46f8496f4333ac0fe9): caches glyph-outline meshes across panning/zoom bands. It is another application-level example; ALA's normal glyph atlas is a different path, so this is not a general text-rendering optimization for ALA.
+
+The adaptation keeps absolute coordinates and uses caller-owned payload bounds to test a narrower exact-geometry claim. This limits scroll/pan reuse but gives an unchanged baseline for geometry/pixel comparison. No donor timing is included as ALA evidence. Promote this API only for demonstrated repeated path workloads; a broad automatic cache and translation-normalized variant remain separate proposals.
+
+Further candidate: Sonora's post-burst GPU buffer trimming. ALA's wgpu instance buffer grows to its peak and has no shrink path. Resource lifetime and trim scheduling can be inspected in software, but hardware allocation/power and trim-induced stalls need native GPU traces. This draft does not implement or claim a measured benefit for that candidate.
+
+The Sonora policy observes frame peaks in five-second windows, shrinks only after low usage falls below a quarter of capacity, and keeps about twice the peak with a 2 MiB floor. It runs when drawing: a window that becomes completely idle needs a separately designed trim opportunity. Reusing this policy in ALA also requires rebuilding the instance bind group after replacement and keeping in-flight resources alive. These are concrete next verification gates, not completed memory measurements.

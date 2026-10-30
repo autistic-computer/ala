@@ -13,6 +13,9 @@ pub use lyon::tessellation::{FillOptions, FillRule, StrokeOptions};
 
 use crate::{Path, Pixels, Point, point, px};
 
+mod cache;
+pub use cache::PathCache;
+
 pub enum PathStyle {
     Stroke(StrokeOptions),
     Fill(FillOptions),
