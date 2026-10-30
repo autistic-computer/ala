@@ -1,0 +1,15 @@
+   Compiling wayland-backend v0.3.17
+   Compiling rustybuzz v0.20.1
+   Compiling ala-platform v0.1.0 (/home/demfabris/dev/ala-worktrees/paint-replay/crates/ala-platform)
+   Compiling wayland-client v0.31.15
+   Compiling usvg v0.46.0
+   Compiling wayland-protocols v0.32.13
+   Compiling resvg v0.46.0
+   Compiling ashpd v0.13.13
+   Compiling oo7 v0.6.0
+   Compiling wayland-protocols-wlr v0.3.12
+   Compiling wayland-protocols-plasma v0.3.12
+   Compiling ala v0.1.0 (/home/demfabris/dev/ala-worktrees/paint-replay/crates/ala)
+   Compiling calloop-wayland-source v0.4.1
+   Compiling wayland-cursor v0.31.14
+    Finished `bench` profile [optimized] target(s) in 1m 32s

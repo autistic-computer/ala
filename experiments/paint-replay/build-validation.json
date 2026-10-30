@@ -1,0 +1,20 @@
+{
+  "tested_source": "636ae23ec2484f232b1ba060f4899cfbd42b290b",
+  "linux": {
+    "command": "cargo test --locked -p ala --no-default-features --features perf-experiments --lib",
+    "passed": 543
+  },
+  "windows": {
+    "command": "cargo check --locked -p ala-platform --no-default-features --features bench-support,perf-experiments --bench paint_replay --target x86_64-pc-windows-gnu",
+    "host": "Linux, MinGW GCC 14.2",
+    "result": "passed",
+    "scope": "Cross-check only, not MSVC/native execution"
+  },
+  "repository_ci": {
+    "url": "https://github.com/autistic-computer/ala/actions/runs/40963795055",
+    "macos_all_targets_all_features_clippy": "passed",
+    "macos_workspace_tests_excluding_platform": "passed",
+    "linux_job": "passed"
+  },
+  "pending": "Native MSVC run, native CoreText/DirectWrite correctness and physical GPU timing on all three machines"
+}

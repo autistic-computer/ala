@@ -1,0 +1,52 @@
+{
+  "scope": "Execution smoke test only; Xvfb X11, Mesa 25.0.7 llvmpipe LLVM 19.1.7 software Vulkan, 4 seconds per mode. These are not physical GPU timings.",
+  "binary": "paint_replay-7caf1fc348762e8b",
+  "features": "bench-support,perf-experiments,wayland,x11",
+  "modes": {
+    "baseline": {
+      "frames": 71,
+      "first_five_views_rendered": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "first_five_layout_nodes": [
+        967,
+        967,
+        967,
+        967,
+        967
+      ]
+    },
+    "replay": {
+      "frames": 84,
+      "first_five_views_rendered": [
+        2,
+        2,
+        1,
+        1,
+        1
+      ],
+      "first_five_layout_nodes": [
+        967,
+        967,
+        4,
+        4,
+        4
+      ]
+    },
+    "static": {
+      "frames": 2,
+      "first_five_views_rendered": [
+        2,
+        2
+      ],
+      "first_five_layout_nodes": [
+        967,
+        967
+      ]
+    }
+  }
+}

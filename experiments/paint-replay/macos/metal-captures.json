@@ -1,0 +1,58 @@
+[
+  {
+    "mode": "baseline",
+    "command": [
+      "xcrun",
+      "xctrace",
+      "record",
+      "--template",
+      "Metal System Trace",
+      "--time-limit",
+      "15s",
+      "--output",
+      "/Users/demfabris/dev/ala/target/macos-validation/metal-final-baseline.trace",
+      "--target-stdout",
+      "/Users/demfabris/dev/ala/target/macos-validation/metal-final-baseline-app.log",
+      "--no-prompt",
+      "--launch",
+      "--",
+      "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+      "--live",
+      "--mode",
+      "baseline",
+      "--seconds",
+      "10",
+      "--rows",
+      "480"
+    ],
+    "returncode": 0
+  },
+  {
+    "mode": "replay",
+    "command": [
+      "xcrun",
+      "xctrace",
+      "record",
+      "--template",
+      "Metal System Trace",
+      "--time-limit",
+      "15s",
+      "--output",
+      "/Users/demfabris/dev/ala/target/macos-validation/metal-final-replay.trace",
+      "--target-stdout",
+      "/Users/demfabris/dev/ala/target/macos-validation/metal-final-replay-app.log",
+      "--no-prompt",
+      "--launch",
+      "--",
+      "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+      "--live",
+      "--mode",
+      "replay",
+      "--seconds",
+      "10",
+      "--rows",
+      "480"
+    ],
+    "returncode": 0
+  }
+]

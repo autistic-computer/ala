@@ -1,0 +1,155 @@
+{
+  "baseline": {
+    "runs": 5,
+    "total_frames": [
+      3590,
+      3588,
+      3595,
+      3589,
+      3588
+    ],
+    "steady_frames": [
+      3531,
+      3530,
+      3537,
+      3530,
+      3529
+    ],
+    "startup_draw_wall_ms": {
+      "median": 23.610734,
+      "p95": 24.479426,
+      "max": 24.479426
+    },
+    "process_cpu_seconds": {
+      "median": 19.34,
+      "p95": 19.61,
+      "max": 19.61
+    },
+    "peak_rss_kib": {
+      "median": 116544.0,
+      "p95": 116824.0,
+      "max": 116824.0
+    },
+    "draw_hz": {
+      "median": 59.81858492265533,
+      "p95": 59.932172975776425,
+      "max": 59.932172975776425
+    },
+    "draw_wall_ms": {
+      "median": 4.272767,
+      "p95": 4.75855
+    },
+    "request_layout_wall_ms": {
+      "median": 1.8782735000000002,
+      "p95": 2.113257
+    },
+    "prepaint_wall_ms": {
+      "median": 0.744721,
+      "p95": 1.112255
+    },
+    "paint_wall_ms": {
+      "median": 1.169759,
+      "p95": 1.568043
+    },
+    "scene_finish_wall_ms": {
+      "median": 0.01162,
+      "p95": 0.041243
+    },
+    "present_submit_wall_ms": {
+      "median": 0.7028465,
+      "p95": 1.042612
+    }
+  },
+  "replay": {
+    "runs": 5,
+    "total_frames": [
+      3597,
+      3591,
+      3588,
+      3589,
+      3590
+    ],
+    "steady_frames": [
+      3538,
+      3532,
+      3529,
+      3531,
+      3531
+    ],
+    "startup_draw_wall_ms": {
+      "median": 21.834765,
+      "p95": 25.082683,
+      "max": 25.082683
+    },
+    "process_cpu_seconds": {
+      "median": 6.71,
+      "p95": 6.79,
+      "max": 6.79
+    },
+    "peak_rss_kib": {
+      "median": 115956.0,
+      "p95": 116252.0,
+      "max": 116252.0
+    },
+    "draw_hz": {
+      "median": 59.83702692657995,
+      "p95": 59.95400196551715,
+      "max": 59.95400196551715
+    },
+    "draw_wall_ms": {
+      "median": 0.845939,
+      "p95": 1.02592
+    },
+    "request_layout_wall_ms": {
+      "median": 0.058843,
+      "p95": 0.173793
+    },
+    "prepaint_wall_ms": {
+      "median": 0.294076,
+      "p95": 0.37688
+    },
+    "paint_wall_ms": {
+      "median": 0.33268450000000005,
+      "p95": 0.421737
+    },
+    "scene_finish_wall_ms": {
+      "median": 0.010713,
+      "p95": 0.035645
+    },
+    "present_submit_wall_ms": {
+      "median": 0.627275,
+      "p95": 0.906122
+    }
+  },
+  "static": {
+    "runs": 1,
+    "total_frames": [
+      5
+    ],
+    "steady_frames": [
+      0
+    ],
+    "startup_draw_wall_ms": {
+      "median": 20.241711,
+      "p95": 20.241711,
+      "max": 20.241711
+    },
+    "process_cpu_seconds": {
+      "median": 0.29,
+      "p95": 0.29,
+      "max": 0.29
+    },
+    "peak_rss_kib": {
+      "median": 116128.0,
+      "p95": 116128.0,
+      "max": 116128.0
+    },
+    "draw_hz": null,
+    "draw_wall_ms": null,
+    "request_layout_wall_ms": null,
+    "prepaint_wall_ms": null,
+    "paint_wall_ms": null,
+    "scene_finish_wall_ms": null,
+    "present_submit_wall_ms": null
+  }
+}

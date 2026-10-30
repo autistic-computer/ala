@@ -1,0 +1,6 @@
+/opt/homebrew/bin/python3.14 experiments/paint-replay/run.py --build --repetitions 5 --samples 120 --output target/macos-validation/pr1.json
+cargo test --locked --release -p ala --no-default-features --features bench-support,perf-experiments --lib
+cargo fmt --all -- --check
+# Native: five alternating baseline/replay pairs, each --seconds 60 --rows 480, with ALA_FRAME_STATS set to a separate filename. Then --mode static --seconds 60.
+# The exact native and Metal commands are retained in live-runs.json and metal-captures.json.
+# To reproduce target-only GPU extraction, copy extract_metal.py into target/macos-validation after generating pr1.json there; export the TOC and the metal-gpu-intervals, metal-gpu-info and metal-application-command-buffer-submissions tables as <label>-toc.xml and <label>-tables.xml, then run extract_metal.py <label>.

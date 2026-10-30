@@ -1,0 +1,81 @@
+{
+  "source_commit": "bbb6a3ff8d1afbf4a1bf1cc7b2998eecf464ea48",
+  "binary_sha256": "1e0f48dceb989715339b6baec63c4482715c437c5c26dcaaad331230bb4bfc1c",
+  "gpu_timing_documentation": "https://docs.mesa3d.org/u_trace.html",
+  "runs": [
+    {
+      "name": "01-replay",
+      "utc": "2026-10-29T23:21:59.939758+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu-reverse/01-replay.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "replay",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu-reverse/01-replay.ndjson",
+        "MESA_GPU_TRACES": "print_json",
+        "MESA_GPU_TRACEFILE": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu-reverse/01-replay-gpu.json"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 40050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 42000,
+        "/sys/class/thermal/thermal_zone5/temp": 32050,
+        "/sys/class/thermal/thermal_zone3/temp": 43050,
+        "/sys/class/thermal/thermal_zone1/temp": 50050,
+        "/sys/class/thermal/thermal_zone8/temp": 56000,
+        "/sys/class/thermal/thermal_zone6/temp": 41050,
+        "/sys/class/thermal/thermal_zone4/temp": 40050
+      },
+      "returncode": 0,
+      "frequency_sample_interval_seconds": 0.047
+    },
+    {
+      "name": "02-baseline",
+      "utc": "2026-10-29T23:23:01.174728+00:00",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu-reverse/02-baseline.time.txt",
+        "python3",
+        "experiments/paint-replay/run.py",
+        "--binary",
+        "/home/demfabris/dev/ala-native-target/release/deps/paint_replay-7caf1fc348762e8b",
+        "--live",
+        "baseline",
+        "--seconds",
+        "60"
+      ],
+      "environment": {
+        "ALA_FRAME_STATS": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu-reverse/02-baseline.ndjson",
+        "MESA_GPU_TRACES": "print_json",
+        "MESA_GPU_TRACEFILE": "/home/demfabris/dev/ala-worktrees/paint-replay/experiments/paint-replay/xps/gpu-reverse/02-baseline-gpu.json"
+      },
+      "power_mode": "performance",
+      "thermal_millicelsius": {
+        "/sys/class/thermal/thermal_zone2/temp": 41050,
+        "/sys/class/thermal/thermal_zone0/temp": 20000,
+        "/sys/class/thermal/thermal_zone7/temp": 40000,
+        "/sys/class/thermal/thermal_zone5/temp": 32050,
+        "/sys/class/thermal/thermal_zone3/temp": 47050,
+        "/sys/class/thermal/thermal_zone1/temp": 65050,
+        "/sys/class/thermal/thermal_zone8/temp": 63000,
+        "/sys/class/thermal/thermal_zone6/temp": 42050,
+        "/sys/class/thermal/thermal_zone4/temp": 41050
+      },
+      "returncode": 0,
+      "frequency_sample_interval_seconds": 0.047
+    }
+  ]
+}

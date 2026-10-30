@@ -27,6 +27,7 @@ large_enum_variant = "allow"
 nonminimal_bool = "allow"
 
 [features]
+perf-experiments = []
 default = ["font-kit", "wayland", "x11", "windows-manifest"]
 test-support = [
     "leak-detection",

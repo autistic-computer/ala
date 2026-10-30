@@ -1,0 +1,599 @@
+{
+  "source_commit": "de64d16db673390499e34eaef4699e15bcdf0915",
+  "binary_sha256": "b8614162fed57e86b0976dc30e3f67a51331f871fb0384890c574dcc511388fc",
+  "note": "First second excluded from animated draw statistics. Draw events and CPU submission timestamps do not establish compositor scanout, GPU completion, physical display pacing, input latency or power.",
+  "runs": [
+    {
+      "pair": 1,
+      "mode": "baseline",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "baseline",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793325744.7547588,
+      "ended_unix": 1793325805.006283,
+      "frames_including_startup": 1400,
+      "last_frame_seconds": 60.018375,
+      "process_seconds": 60.251524209976196,
+      "steady_frames": 1376,
+      "scale_factors": [
+        1.0
+      ],
+      "draw_wall_ms": {
+        "median": 6.023562999999999,
+        "p95": 7.343125
+      },
+      "draw_thread_cpu_ms": {
+        "median": 5.880021,
+        "p95": 7.083583
+      },
+      "draw_event_rate_hz": 23.29849956307265,
+      "draw_interval_ms": {
+        "median": 49.474,
+        "p95": 50.056
+      },
+      "steady_counter_values": {
+        "views_rendered": [
+          2
+        ],
+        "elements": [
+          968
+        ],
+        "layout_nodes": [
+          967
+        ],
+        "quads": [
+          98
+        ],
+        "hitboxes": [
+          480
+        ]
+      }
+    },
+    {
+      "pair": 1,
+      "mode": "replay",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "replay",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793325805.007236,
+      "ended_unix": 1793325865.172571,
+      "frames_including_startup": 1392,
+      "last_frame_seconds": 60.011019,
+      "process_seconds": 60.165334939956665,
+      "steady_frames": 1368,
+      "scale_factors": [
+        1.0
+      ],
+      "draw_wall_ms": {
+        "median": 0.7514795,
+        "p95": 0.96125
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.7223539999999999,
+        "p95": 0.889459
+      },
+      "draw_event_rate_hz": 23.18260462820775,
+      "draw_interval_ms": {
+        "median": 49.612,
+        "p95": 50.049
+      },
+      "steady_counter_values": {
+        "views_rendered": [
+          1
+        ],
+        "elements": [
+          5
+        ],
+        "layout_nodes": [
+          4
+        ],
+        "quads": [
+          98
+        ],
+        "hitboxes": [
+          480
+        ]
+      }
+    },
+    {
+      "pair": 2,
+      "mode": "replay",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "replay",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793325865.173486,
+      "ended_unix": 1793325925.354558,
+      "frames_including_startup": 1388,
+      "last_frame_seconds": 60.028027,
+      "process_seconds": 60.18107199668884,
+      "steady_frames": 1363,
+      "scale_factors": [
+        1.0
+      ],
+      "draw_wall_ms": {
+        "median": 0.687125,
+        "p95": 0.905
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.661625,
+        "p95": 0.8755
+      },
+      "draw_event_rate_hz": 23.090740353728783,
+      "draw_interval_ms": {
+        "median": 49.787,
+        "p95": 50.05
+      },
+      "steady_counter_values": {
+        "views_rendered": [
+          1
+        ],
+        "elements": [
+          5
+        ],
+        "layout_nodes": [
+          4
+        ],
+        "quads": [
+          98
+        ],
+        "hitboxes": [
+          480
+        ]
+      }
+    },
+    {
+      "pair": 2,
+      "mode": "baseline",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "baseline",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793325925.355556,
+      "ended_unix": 1793325985.546005,
+      "frames_including_startup": 1405,
+      "last_frame_seconds": 60.024749,
+      "process_seconds": 60.19044899940491,
+      "steady_frames": 1381,
+      "scale_factors": [
+        1.0
+      ],
+      "draw_wall_ms": {
+        "median": 6.123958,
+        "p95": 7.380792
+      },
+      "draw_thread_cpu_ms": {
+        "median": 5.997458,
+        "p95": 7.11975
+      },
+      "draw_event_rate_hz": 23.39631882319636,
+      "draw_interval_ms": {
+        "median": 49.462,
+        "p95": 50.047
+      },
+      "steady_counter_values": {
+        "views_rendered": [
+          2
+        ],
+        "elements": [
+          968
+        ],
+        "layout_nodes": [
+          967
+        ],
+        "quads": [
+          98
+        ],
+        "hitboxes": [
+          480
+        ]
+      }
+    },
+    {
+      "pair": 3,
+      "mode": "baseline",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "baseline",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793325985.5470238,
+      "ended_unix": 1793326045.712416,
+      "frames_including_startup": 1392,
+      "last_frame_seconds": 60.010342,
+      "process_seconds": 60.16539216041565,
+      "steady_frames": 1367,
+      "scale_factors": [
+        1.0
+      ],
+      "draw_wall_ms": {
+        "median": 5.927084,
+        "p95": 7.305042
+      },
+      "draw_thread_cpu_ms": {
+        "median": 5.820375,
+        "p95": 7.032458
+      },
+      "draw_event_rate_hz": 23.15905988186913,
+      "draw_interval_ms": {
+        "median": 49.661,
+        "p95": 50.052
+      },
+      "steady_counter_values": {
+        "views_rendered": [
+          2
+        ],
+        "elements": [
+          968
+        ],
+        "layout_nodes": [
+          967
+        ],
+        "quads": [
+          98
+        ],
+        "hitboxes": [
+          480
+        ]
+      }
+    },
+    {
+      "pair": 3,
+      "mode": "replay",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "replay",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326045.713435,
+      "ended_unix": 1793326105.8904698,
+      "frames_including_startup": 1397,
+      "last_frame_seconds": 60.024156,
+      "process_seconds": 60.177034854888916,
+      "steady_frames": 1373,
+      "scale_factors": [
+        1.0
+      ],
+      "draw_wall_ms": {
+        "median": 0.711834,
+        "p95": 0.926041
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.695417,
+        "p95": 0.868542
+      },
+      "draw_event_rate_hz": 23.24724932259769,
+      "draw_interval_ms": {
+        "median": 49.035,
+        "p95": 50.047
+      },
+      "steady_counter_values": {
+        "views_rendered": [
+          1
+        ],
+        "elements": [
+          5
+        ],
+        "layout_nodes": [
+          4
+        ],
+        "quads": [
+          98
+        ],
+        "hitboxes": [
+          480
+        ]
+      }
+    },
+    {
+      "pair": 4,
+      "mode": "replay",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "replay",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326105.891499,
+      "ended_unix": 1793326166.060208,
+      "frames_including_startup": 1389,
+      "last_frame_seconds": 60.012531,
+      "process_seconds": 60.16870903968811,
+      "steady_frames": 1365,
+      "scale_factors": [
+        1.0
+      ],
+      "draw_wall_ms": {
+        "median": 0.733042,
+        "p95": 0.928958
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.71875,
+        "p95": 0.868834
+      },
+      "draw_event_rate_hz": 23.125227702537618,
+      "draw_interval_ms": {
+        "median": 48.7695,
+        "p95": 50.088
+      },
+      "steady_counter_values": {
+        "views_rendered": [
+          1
+        ],
+        "elements": [
+          5
+        ],
+        "layout_nodes": [
+          4
+        ],
+        "quads": [
+          98
+        ],
+        "hitboxes": [
+          480
+        ]
+      }
+    },
+    {
+      "pair": 4,
+      "mode": "baseline",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "baseline",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326166.061261,
+      "ended_unix": 1793326226.2179918,
+      "frames_including_startup": 1397,
+      "last_frame_seconds": 60.007943,
+      "process_seconds": 60.15673089027405,
+      "steady_frames": 1373,
+      "scale_factors": [
+        1.0
+      ],
+      "draw_wall_ms": {
+        "median": 5.709583,
+        "p95": 7.116375
+      },
+      "draw_thread_cpu_ms": {
+        "median": 5.586667,
+        "p95": 6.903834
+      },
+      "draw_event_rate_hz": 23.260835480383047,
+      "draw_interval_ms": {
+        "median": 48.736,
+        "p95": 50.072
+      },
+      "steady_counter_values": {
+        "views_rendered": [
+          2
+        ],
+        "elements": [
+          968
+        ],
+        "layout_nodes": [
+          967
+        ],
+        "quads": [
+          98
+        ],
+        "hitboxes": [
+          480
+        ]
+      }
+    },
+    {
+      "pair": 5,
+      "mode": "baseline",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "baseline",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326226.21854,
+      "ended_unix": 1793326286.412512,
+      "frames_including_startup": 1395,
+      "last_frame_seconds": 60.042956,
+      "process_seconds": 60.19397211074829,
+      "steady_frames": 1371,
+      "scale_factors": [
+        1.0
+      ],
+      "draw_wall_ms": {
+        "median": 5.987125,
+        "p95": 7.334083
+      },
+      "draw_thread_cpu_ms": {
+        "median": 5.861834,
+        "p95": 7.085542
+      },
+      "draw_event_rate_hz": 23.207487148684592,
+      "draw_interval_ms": {
+        "median": 48.68,
+        "p95": 50.087
+      },
+      "steady_counter_values": {
+        "views_rendered": [
+          2
+        ],
+        "elements": [
+          968
+        ],
+        "layout_nodes": [
+          967
+        ],
+        "quads": [
+          98
+        ],
+        "hitboxes": [
+          480
+        ]
+      }
+    },
+    {
+      "pair": 5,
+      "mode": "replay",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "replay",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326286.4134111,
+      "ended_unix": 1793326346.5731819,
+      "frames_including_startup": 1406,
+      "last_frame_seconds": 60.011218,
+      "process_seconds": 60.15977072715759,
+      "steady_frames": 1381,
+      "scale_factors": [
+        1.0
+      ],
+      "draw_wall_ms": {
+        "median": 0.725791,
+        "p95": 0.909875
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.708333,
+        "p95": 0.871584
+      },
+      "draw_event_rate_hz": 23.389816236722297,
+      "draw_interval_ms": {
+        "median": 48.448,
+        "p95": 50.08
+      },
+      "steady_counter_values": {
+        "views_rendered": [
+          1
+        ],
+        "elements": [
+          5
+        ],
+        "layout_nodes": [
+          4
+        ],
+        "quads": [
+          98
+        ],
+        "hitboxes": [
+          480
+        ]
+      }
+    },
+    {
+      "pair": null,
+      "mode": "static",
+      "command": [
+        "/Users/demfabris/dev/ala/target/release/deps/paint_replay-c96368a968ce7e90",
+        "--live",
+        "--mode",
+        "static",
+        "--seconds",
+        "60",
+        "--rows",
+        "480"
+      ],
+      "started_unix": 1793326346.574152,
+      "ended_unix": 1793326408.229912,
+      "frames_including_startup": 1,
+      "last_frame_seconds": 0.0,
+      "process_seconds": 61.655760049819946,
+      "steady_frames": 0,
+      "scale_factors": [
+        1.0
+      ]
+    }
+  ],
+  "mode_medians": {
+    "baseline": {
+      "draw_wall_ms": {
+        "median": 5.987125,
+        "p95": 7.334083
+      },
+      "draw_thread_cpu_ms": {
+        "median": 5.861834,
+        "p95": 7.083583
+      },
+      "draw_interval_ms": {
+        "median": 49.462,
+        "p95": 50.056
+      },
+      "draw_event_rate_hz": 23.260835480383047
+    },
+    "replay": {
+      "draw_wall_ms": {
+        "median": 0.725791,
+        "p95": 0.926041
+      },
+      "draw_thread_cpu_ms": {
+        "median": 0.708333,
+        "p95": 0.871584
+      },
+      "draw_interval_ms": {
+        "median": 49.035,
+        "p95": 50.05
+      },
+      "draw_event_rate_hz": 23.18260462820775
+    }
+  },
+  "paired_cpu_draw_ratios": [
+    8.015605216110352,
+    8.91243660178279,
+    8.326497469915738,
+    7.78888931329992,
+    8.249103392023324
+  ]
+}

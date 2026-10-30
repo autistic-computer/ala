@@ -74,6 +74,8 @@ pub(crate) mod a11y;
 mod glyph_cache;
 #[cfg(test)]
 mod invalidation_tests;
+#[cfg(feature = "perf-experiments")]
+mod perf_experiments;
 mod prompts;
 
 pub use a11y::A11ySubtreeBuilder;
@@ -888,6 +890,8 @@ impl InputRead {
 }
 
 pub(crate) struct Frame {
+    #[cfg(feature = "perf-experiments")]
+    experimental_effects: Vec<perf_experiments::OpacityRecord>,
     pub(crate) focus: Option<FocusId>,
     pub(crate) window_active: bool,
     pub(crate) drag_active: bool,
@@ -930,6 +934,8 @@ pub(crate) struct PrepaintStateIndex {
 
 #[derive(Clone, Default)]
 pub(crate) struct PaintIndex {
+    #[cfg(feature = "perf-experiments")]
+    experimental_effects_index: usize,
     scene_index: usize,
     #[cfg(any(test, feature = "test-support"))]
     debug_bounds_index: usize,
@@ -951,6 +957,8 @@ impl Frame {
 
     pub(crate) fn new(dispatch_tree: DispatchTree) -> Self {
         Frame {
+            #[cfg(feature = "perf-experiments")]
+            experimental_effects: Vec::new(),
             focus: None,
             window_active: false,
             drag_active: false,
@@ -984,6 +992,8 @@ impl Frame {
     }
 
     pub(crate) fn clear(&mut self) {
+        #[cfg(feature = "perf-experiments")]
+        self.experimental_effects.clear();
         self.element_states.clear();
         self.accessed_element_states.clear();
         self.mouse_listeners.clear();
@@ -3749,6 +3759,8 @@ impl Window {
 
     pub(crate) fn paint_index(&self) -> PaintIndex {
         PaintIndex {
+            #[cfg(feature = "perf-experiments")]
+            experimental_effects_index: self.next_frame.experimental_effects.len(),
             scene_index: self.next_frame.scene.len(),
             #[cfg(any(test, feature = "test-support"))]
             debug_bounds_index: self.next_frame.debug_bounds_records.len(),
@@ -3763,6 +3775,8 @@ impl Window {
     }
 
     pub(crate) fn reuse_paint(&mut self, range: Range<PaintIndex>) {
+        #[cfg(feature = "perf-experiments")]
+        self.reuse_experimental_scene(&range);
         #[cfg(any(test, feature = "test-support"))]
         for (selector, bounds) in &self.rendered_frame.debug_bounds_records
             [range.start.debug_bounds_index..range.end.debug_bounds_index]
@@ -3802,6 +3816,7 @@ impl Window {
 
         self.text_system
             .reuse_layouts(range.start.line_layout_index..range.end.line_layout_index);
+        #[cfg(not(feature = "perf-experiments"))]
         self.next_frame.scene.replay(
             range.start.scene_index..range.end.scene_index,
             &self.rendered_frame.scene,

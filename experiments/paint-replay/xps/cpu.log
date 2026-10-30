@@ -1,0 +1,5 @@
+Verifying this experiment...
+animation/30: baseline=0.4556ms (p95 0.5158, 1.00x), replay=0.1231ms (p95 0.1477, 3.70x)
+animation/120: baseline=0.9210ms (p95 1.0598, 1.00x), replay=0.1477ms (p95 0.1777, 6.24x)
+animation/480: baseline=2.8753ms (p95 3.1471, 1.00x), replay=0.2442ms (p95 0.2669, 11.78x)
+Saved 36 runs to experiments/paint-replay/xps/xps-paint-replay.json
