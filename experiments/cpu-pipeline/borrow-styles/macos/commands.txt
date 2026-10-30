@@ -1,0 +1,11 @@
+python3 tools/perf.py snapshot --label mac-borrowed
+cargo test --locked --release --workspace --all-features --exclude ala-platform
+cargo test --locked --release -p ala-platform --all-features --lib --test ios
+python3 -m unittest discover -s tools -p test_*.py
+cargo fmt --all -- --check
+python3 tools/perf.py run --variant target/perf-results/mac-original --label mac-a1 --warmup 2 --measurement 10 --samples 50
+python3 tools/perf.py run --variant target/perf-results/mac-borrowed --label mac-b1 --warmup 2 --measurement 10 --samples 50
+python3 tools/perf.py run --variant target/perf-results/mac-borrowed --label mac-b2 --warmup 2 --measurement 10 --samples 50
+python3 tools/perf.py run --variant target/perf-results/mac-original --label mac-a2 --warmup 2 --measurement 10 --samples 50
+python3 tools/perf.py run --variant target/perf-results/mac-original --label mac-a3 --warmup 2 --measurement 10 --samples 50
+python3 tools/perf.py run --variant target/perf-results/mac-borrowed --label mac-b3 --warmup 2 --measurement 10 --samples 50

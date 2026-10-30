@@ -1,0 +1,102 @@
+{
+  "frames": 101,
+  "skipped_frames": 30,
+  "note": "Diagnostic timings in ms, including setup and Criterion warmup/calibration. Submission is not GPU completion or scanout.",
+  "timings_ms": {
+    "draw.wall_ns": {
+      "samples": 101,
+      "mean": 10.096764801980198,
+      "p50": 9.711541,
+      "p95": 11.455125,
+      "p99": 11.560375
+    },
+    "draw.thread_cpu_ns": {
+      "samples": 101,
+      "mean": 10.091326316831683,
+      "p50": 9.711458,
+      "p95": 11.455125,
+      "p99": 11.560292
+    },
+    "request_layout.wall_ns": {
+      "samples": 101,
+      "mean": 6.029024297029704,
+      "p50": 5.921041,
+      "p95": 6.794042,
+      "p99": 6.894833
+    },
+    "request_layout.thread_cpu_ns": {
+      "samples": 101,
+      "mean": 6.027822227722772,
+      "p50": 5.920667,
+      "p95": 6.794666,
+      "p99": 6.895125
+    },
+    "prepaint.wall_ns": {
+      "samples": 101,
+      "mean": 1.2263949108910892,
+      "p50": 1.200416,
+      "p95": 1.374875,
+      "p99": 1.455208
+    },
+    "prepaint.thread_cpu_ns": {
+      "samples": 101,
+      "mean": 1.2247103366336634,
+      "p50": 1.199581,
+      "p95": 1.374541,
+      "p99": 1.438083
+    },
+    "paint.wall_ns": {
+      "samples": 101,
+      "mean": 2.5283671188118815,
+      "p50": 2.308833,
+      "p95": 3.211,
+      "p99": 3.315041
+    },
+    "paint.thread_cpu_ns": {
+      "samples": 101,
+      "mean": 2.526489693069307,
+      "p50": 2.308791,
+      "p95": 3.210958,
+      "p99": 3.314959
+    },
+    "scene_finish.wall_ns": {
+      "samples": 101,
+      "mean": 0.014619198019801981,
+      "p50": 0.013333,
+      "p95": 0.020875,
+      "p99": 0.024625
+    },
+    "scene_finish.thread_cpu_ns": {
+      "samples": 101,
+      "mean": 0.01459730693069307,
+      "p50": 0.013333,
+      "p95": 0.020833,
+      "p99": 0.024625
+    },
+    "present_submit.wall_ns": {
+      "samples": 101,
+      "mean": 0.00023715841584158416,
+      "p50": 0.000209,
+      "p95": 0.000333,
+      "p99": 0.000416
+    },
+    "present_submit.thread_cpu_ns": {
+      "samples": 101,
+      "mean": 0.00021034653465346533,
+      "p50": 0.000208,
+      "p95": 0.000333,
+      "p99": 0.000334
+    }
+  },
+  "mean_counts_per_frame": {
+    "views_rendered": 1.0,
+    "elements": 10102.0,
+    "layout_nodes": 10101.0,
+    "sprites": 0.0,
+    "quads": 10000.0,
+    "paths": 0.0,
+    "glyphs_shaped": 0.0,
+    "shape_calls": 0.0,
+    "hitboxes": 0.0
+  }
+}
