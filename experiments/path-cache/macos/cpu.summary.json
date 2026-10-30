@@ -1,0 +1,262 @@
+{
+  "metadata": {
+    "experimental": true,
+    "utc": "2026-10-30T02:00:36.739539+00:00",
+    "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "text_backend": "not used (path-only)",
+    "cpuinfo": null,
+    "cpu_affinity": null,
+    "source_commit": "b083be572dcd2495dc0856ca00d31399d2746ef0",
+    "baseline_commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "build_command": [
+      "cargo",
+      "bench",
+      "--locked",
+      "-p",
+      "ala-platform",
+      "--no-default-features",
+      "--features",
+      "bench-support",
+      "--bench",
+      "path_cache",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "f78104eca15dfc06a923d101b9b86abfed33d2cbbd1f50cbef873687458b8c04",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "measurements": "Path building, keying, tessellation/cache hit, and mesh drop; no GPU submission. Allocation passes are separate.",
+    "allocation_note": "Separate instrumented processes count allocation requests, not retained memory or RSS. Counting disabled in timing runs.",
+    "path_scope": "Path construction + exact key + tessellation or mesh clone + drop; no ALA reconciliation or GPU submission",
+    "source_sha256": {
+      "crates/ala-platform/benches/path_cache.rs": "46c7457e44c9d5c711301b650ca85d8244813f283c9e9bfed80ea926febefc93",
+      "crates/ala/src/path_builder.rs": "e8b9e79a41e470777948e296d15c3e7ccd5d26f5af50b8b62fa3d6ae9fd83caf",
+      "crates/ala/src/path_builder/cache.rs": "736cf175977b854a7ff5117750102c0cfa2b79854bf1df75fcb6343e1ec05012",
+      "Cargo.lock": "347067dbf6987e80711aa345c8838a8baca28532a2af1e0eacb01d590272f483",
+      "experiments/path-cache/run.py": "2a44f6b8c58e283d918ac01ef3811f66f2cd9a335024244e9364df3d3baa9a0a"
+    },
+    "relevant_environment": {},
+    "donor": "longbridge/gpui-fast@07b42ebf1f43088b8b74a7d4fca6b95e44e04265"
+  },
+  "verification": {
+    "case": "verification",
+    "exact_mesh_comparisons": 1536,
+    "cache_hits": 768,
+    "retained_payload_bytes": 5239092,
+    "pixel_checks_available": true,
+    "equal_pixels": 5760000,
+    "distinct_scenes": 3,
+    "wall_seconds": 0.7843600830019568,
+    "command": [
+      "/Users/demfabris/dev/ala/target/release/deps/path_cache-5fce312643713671",
+      "--verify"
+    ]
+  },
+  "summary": [
+    {
+      "name": "paths/curves",
+      "modes": {
+        "baseline": {
+          "median_ms": 2.498271,
+          "p95_ms": 2.6885,
+          "run_medians_ms": [
+            2.5077085,
+            2.469146,
+            2.505396,
+            2.4914795,
+            2.498271
+          ],
+          "thread_cpu_median_ms": 2.5000625,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 15710744.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "cached": {
+          "median_ms": 0.214167,
+          "p95_ms": 0.228167,
+          "run_medians_ms": [
+            0.215833,
+            0.2141455,
+            0.213917,
+            0.214167,
+            0.215896
+          ],
+          "thread_cpu_median_ms": 0.214292,
+          "paired_speedup_range": [
+            11.530225944509692,
+            11.712000448772187
+          ],
+          "median_allocated_bytes": 4334232.0,
+          "speedup_vs_baseline": 11.665060443485691
+        }
+      }
+    },
+    {
+      "name": "paths/dashed",
+      "modes": {
+        "baseline": {
+          "median_ms": 1.880271,
+          "p95_ms": 1.94375,
+          "run_medians_ms": [
+            1.8461035,
+            1.919875,
+            1.8508755,
+            1.880271,
+            1.9333125
+          ],
+          "thread_cpu_median_ms": 1.8795625,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 14458865.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "cached": {
+          "median_ms": 0.2084795,
+          "p95_ms": 0.219875,
+          "run_medians_ms": [
+            0.2084795,
+            0.210583,
+            0.20725,
+            0.210479,
+            0.20825
+          ],
+          "thread_cpu_median_ms": 0.208604,
+          "paired_speedup_range": [
+            8.855084073014373,
+            9.283613445378151
+          ],
+          "median_allocated_bytes": 3354488.0,
+          "speedup_vs_baseline": 9.018973088481122
+        }
+      }
+    },
+    {
+      "name": "paths/triangle",
+      "modes": {
+        "baseline": {
+          "median_ms": 0.0713545,
+          "p95_ms": 0.073584,
+          "run_medians_ms": [
+            0.069459,
+            0.0716875,
+            0.0728955,
+            0.067833,
+            0.0713545
+          ],
+          "thread_cpu_median_ms": 0.0714795,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 984072.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "cached": {
+          "median_ms": 0.06975,
+          "p95_ms": 0.071959,
+          "run_medians_ms": [
+            0.073,
+            0.06975,
+            0.0685835,
+            0.071166,
+            0.06825
+          ],
+          "thread_cpu_median_ms": 0.0698955,
+          "paired_speedup_range": [
+            0.9514931506849315,
+            1.0628722651949813
+          ],
+          "median_allocated_bytes": 285332.0,
+          "speedup_vs_baseline": 1.0230035842293907
+        }
+      }
+    },
+    {
+      "name": "paths/changing",
+      "modes": {
+        "baseline": {
+          "median_ms": 2.487729,
+          "p95_ms": 2.692584,
+          "run_medians_ms": [
+            2.500813,
+            2.4873125,
+            2.487729,
+            2.4865835,
+            2.5092915
+          ],
+          "thread_cpu_median_ms": 2.4874795,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 15710343.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "cached": {
+          "median_ms": 2.6975415,
+          "p95_ms": 2.890334,
+          "run_medians_ms": [
+            2.7094585,
+            2.6975415,
+            2.6668755,
+            2.7014795,
+            2.6848125
+          ],
+          "thread_cpu_median_ms": 2.697708,
+          "paired_speedup_range": [
+            0.9204524779847487,
+            0.9346244849500663
+          ],
+          "median_allocated_bytes": 20088217.0,
+          "speedup_vs_baseline": 0.922220844424451
+        }
+      }
+    },
+    {
+      "name": "paths/cold",
+      "modes": {
+        "baseline": {
+          "median_ms": 2.500167,
+          "p95_ms": 2.63825,
+          "run_medians_ms": [
+            2.500167,
+            2.4922505,
+            2.4826665,
+            2.5073125,
+            2.5212915
+          ],
+          "thread_cpu_median_ms": 2.5006875,
+          "paired_speedup_range": [
+            1.0,
+            1.0
+          ],
+          "median_allocated_bytes": 15710744.0,
+          "speedup_vs_baseline": 1.0
+        },
+        "cached": {
+          "median_ms": 2.6895205,
+          "p95_ms": 2.831375,
+          "run_medians_ms": [
+            2.709979,
+            2.710771,
+            2.6711665,
+            2.670375,
+            2.6895205
+          ],
+          "thread_cpu_median_ms": 2.6906665,
+          "paired_speedup_range": [
+            0.9193880633959859,
+            0.9389364789589477
+          ],
+          "median_allocated_bytes": 20082400.0,
+          "speedup_vs_baseline": 0.9295958145699206
+        }
+      }
+    }
+  ]
+}

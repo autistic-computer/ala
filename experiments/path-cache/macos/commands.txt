@@ -1,0 +1,2 @@
+/opt/homebrew/bin/python3.14 experiments/path-cache/run.py --build --repetitions 5 --samples 120 --output target/macos-validation/pr6.json
+cargo test --release --locked -p ala --no-default-features --lib path_builder::cache::tests

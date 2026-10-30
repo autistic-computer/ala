@@ -72,6 +72,6 @@ Linux VM medians per batch of 128 paths (5 alternating repetitions × 120 sample
 
 Changing/cold cases take 10–11% longer with the cache. Warm-curve allocation requests fall from 15,710,744 to 4,334,232 bytes/batch; they still include path/key construction and returned mesh copies. Verification passes 1,536 exact mesh comparisons and 5,760,000 pixels over twelve rendered images.
 
-`cloud.json` holds raw measurements, `cloud.summary.json` the summary/verification. These are Linux VM CPU measurements with software Vulkan used only for pixel verification. [XPS/Linux native results](xps/README.md) include all workload controls, exactness tests and process-memory measurements. Apple and Windows native runs remain outstanding.
+`cloud.json` holds raw measurements, `cloud.summary.json` the summary/verification. These are Linux VM CPU measurements with software Vulkan used only for pixel verification. [XPS/Linux native results](xps/README.md) include all workload controls, exactness tests and process-memory measurements. [Apple Silicon results](macos/README.md) also pass exactness and Metal pixels. Native Windows execution remains outstanding.
 
 See [discovery.md](discovery.md) for source findings and why this experiment includes paths and negative controls.
