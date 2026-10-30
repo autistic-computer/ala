@@ -1,0 +1,54 @@
+{
+  "utc": "2026-10-29T23:34:23.743888+00:00",
+  "full_hardware_audit": "https://github.com/autistic-computer/ala/blob/de64d16/experiments/paint-replay/xps/machine.json",
+  "commands": [
+    {
+      "command": "uname -a",
+      "returncode": 0,
+      "stdout": "Linux xps 7.0.0-42-generic #42-Ubuntu SMP PREEMPT_DYNAMIC Thu Oct 15 08:06:44 UTC 2026 x86_64 GNU/Linux\n",
+      "stderr": ""
+    },
+    {
+      "command": "lscpu",
+      "returncode": 0,
+      "stdout": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           39 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  8\nOn-line CPU(s) list:                     0-7\nVendor ID:                               GenuineIntel\nModel name:                              Intel(R) Core(TM) i7-1065G7 CPU @ 1.30GHz\nCPU family:                              6\nModel:                                   126\nThread(s) per core:                      2\nCore(s) per socket:                      4\nSocket(s):                               1\nStepping:                                5\nCPU(s) scaling MHz:                      63%\nCPU max MHz:                             3900.0000\nCPU min MHz:                             400.0000\nBogoMIPS:                                2995.20\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust sgx bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt intel_pt avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves split_lock_detect dtherm ida arat pln pts hwp hwp_act_window hwp_epp hwp_pkg_req vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid sgx_lc fsrm md_clear flush_l1d arch_capabilities\nVirtualization:                          VT-x\nL1d cache:                               192 KiB (4 instances)\nL1i cache:                               128 KiB (4 instances)\nL2 cache:                                2 MiB (4 instances)\nL3 cache:                                8 MiB (1 instance)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-7\nVulnerability Gather data sampling:      Vulnerable\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Mitigation; Aligned branch/return thunks\nVulnerability Itlb multihit:             KVM: Mitigation: Split huge pages\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Mitigation; Clear CPU buffers; SMT vulnerable\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Mitigation; Enhanced IBRS\nVulnerability Spec rstack overflow:      Not affected\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI SW loop, KVM SW loop\nVulnerability Srbds:                     Mitigation; Microcode\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+      "stderr": ""
+    },
+    {
+      "command": "free -b",
+      "returncode": 0,
+      "stdout": "               total        used        free      shared  buff/cache   available\nMem:     15787745280  5443022848  1905209344   854138880  9777238016 10344722432\nSwap:     4294963200    10039296  4284923904\n",
+      "stderr": ""
+    },
+    {
+      "command": "powerprofilesctl get",
+      "returncode": 0,
+      "stdout": "performance\n",
+      "stderr": ""
+    },
+    {
+      "command": "cat /sys/class/power_supply/AC*/online",
+      "returncode": 0,
+      "stdout": "1\n",
+      "stderr": ""
+    },
+    {
+      "command": "gdbus call --session --dest org.gnome.Mutter.DisplayConfig --object-path /org/gnome/Mutter/DisplayConfig --method org.gnome.Mutter.DisplayConfig.GetCurrentState",
+      "returncode": 0,
+      "stdout": "(uint32 1, [(('eDP-1', 'SHP', '0x14cb', '0x00000000'), [('1920x1200@59.950', 1920, 1200, 59.950172424316406, 1.25, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {'is-current': <true>, 'is-preferred': <true>}), ('1920x1200@47.960', 1920, 1200, 47.960136413574219, 1.25, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@59.934', 1920, 1080, 59.933879852294922, 1.25, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1680x1050@59.954', 1680, 1050, 59.954250335693359, 1.0, [1.0, 1.25, 1.5, 1.6666666269302368, 1.75, 2.0], {}), ('1680x1050@59.883', 1680, 1050, 59.883251190185547, 1.0, [1.0, 1.25, 1.5, 1.6666666269302368, 1.75, 2.0], {}), ('1600x1200@59.924', 1600, 1200, 59.923629760742188, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368, 2.0], {}), ('1600x900@59.946', 1600, 900, 59.946022033691406, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368], {}), ('1600x900@59.825', 1600, 900, 59.824760437011719, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368], {}), ('1440x1080@59.989', 1440, 1080, 59.988838195800781, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1440x1080@59.912', 1440, 1080, 59.912242889404297, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1440x900@59.901', 1440, 900, 59.901458740234375, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368], {}), ('1440x900@59.887', 1440, 900, 59.887443542480469, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368], {}), ('1400x1050@59.978', 1400, 1050, 59.978443145751953, 1.0, [1.0, 1.25, 1.6666666269302368, 1.75], {}), ('1400x1050@59.948', 1400, 1050, 59.947769165039062, 1.0, [1.0, 1.25, 1.6666666269302368, 1.75], {}), ('1368x768@59.882', 1368, 768, 59.882049560546875, 1.0, [1.0, 1.3333333730697632, 1.5], {}), ('1368x768@59.853', 1368, 768, 59.853202819824219, 1.0, [1.0, 1.3333333730697632, 1.5], {}), ('1280x960@59.939', 1280, 960, 59.939048767089844, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368], {}), ('1280x960@59.920', 1280, 960, 59.920433044433594, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368], {}), ('1280x800@59.910', 1280, 800, 59.9095458984375, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x800@59.810', 1280, 800, 59.810325622558594, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@59.855', 1280, 720, 59.855125427246094, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@59.745', 1280, 720, 59.744712829589844, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1152x864@59.959', 1152, 864, 59.958633422851562, 1.0, [1.0, 1.3333333730697632, 1.5], {}), ('1152x864@59.801', 1152, 864, 59.801021575927734, 1.0, [1.0, 1.3333333730697632, 1.5], {}), ('1024x768@59.920', 1024, 768, 59.920131683349609, 1.0, [1.0, 1.3333333730697632], {}), ('1024x768@59.870', 1024, 768, 59.8699951171875, 1.0, [1.0, 1.3333333730697632], {}), ('800x600@59.861', 800, 600, 59.861404418945312, 1.0, [1.0], {}), ('800x600@59.837', 800, 600, 59.836837768554688, 1.0, [1.0], {})], {'is-builtin': <true>, 'display-name': <'Built-in display'>, 'is-for-lease': <false>, 'color-mode': <uint32 0>, 'supported-color-modes': <[uint32 0, 2]>, 'rgb-range': <uint32 1>})], [(0, 0, 1.25, uint32 0, true, [('eDP-1', 'SHP', '0x14cb', '0x00000000')], @a{sv} {})], {'layout-mode': <uint32 1>, 'supports-changing-layout-mode': <true>})\n",
+      "stderr": ""
+    },
+    {
+      "command": "git status --short --branch",
+      "returncode": 0,
+      "stdout": "## codex/retained-layout...origin/codex/retained-layout\n",
+      "stderr": ""
+    },
+    {
+      "command": "git rev-parse HEAD",
+      "returncode": 0,
+      "stdout": "ccd4ea0bc09eaa13f3b4b24fe7969f9bd716cf6f\n",
+      "stderr": ""
+    }
+  ]
+}

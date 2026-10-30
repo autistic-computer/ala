@@ -1,0 +1,18 @@
+{
+  "machine": "MacBook Pro Mac16,5",
+  "soc": "Apple M4 Max",
+  "cpu_cores": 16,
+  "performance_cores": 12,
+  "efficiency_cores": 4,
+  "gpu_cores": 40,
+  "memory_gib": 48,
+  "os": "macOS 27.2 (26B123)",
+  "display": "1920 x 1080 @ 60 Hz, virtual display",
+  "power": "AC adapter connected, automatic mode; LowPowerMode and HighPowerMode off",
+  "thermal_start": "no thermal/performance warning recorded",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "python": "Python 3.14.10",
+  "xcode": "27.0 (27A266a)",
+  "affinity": "not pinned; macOS runner has no hard CPU affinity",
+  "conditions": "Shared workstation; background services remain active. No task-owned build/profile overlaps timing."
+}

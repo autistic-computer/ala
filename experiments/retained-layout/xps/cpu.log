@@ -1,0 +1,6 @@
+Verifying this experiment...
+layout/0: rebuild=2.4663ms (p95 2.9424, 1.00x), retained=0.1251ms (p95 0.1536, 19.72x), write-all=2.1768ms (p95 2.5570, 1.13x)
+layout/1: rebuild=2.5084ms (p95 2.9869, 1.00x), retained=0.2126ms (p95 0.2604, 11.80x), write-all=2.2047ms (p95 2.6259, 1.14x)
+layout/64: rebuild=2.5199ms (p95 2.7885, 1.00x), retained=0.2255ms (p95 0.2753, 11.18x), write-all=2.2256ms (p95 2.4843, 1.13x)
+layout/3840: rebuild=2.5566ms (p95 2.9037, 1.00x), retained=2.2695ms (p95 2.5921, 1.13x), write-all=2.2760ms (p95 2.6614, 1.12x)
+Saved 72 runs to experiments/retained-layout/xps/xps-retained-layout.json

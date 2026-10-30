@@ -1,0 +1,63 @@
+{
+  "metadata": {
+    "experimental": true,
+    "utc": "2026-10-29T23:35:10.646962+00:00",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43",
+    "text_backend": "not used (Taffy-only)",
+    "cpuinfo": "Intel(R) Core(TM) i7-1065G7 CPU @ 1.30GHz",
+    "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "source_commit": "ccd4ea0bc09eaa13f3b4b24fe7969f9bd716cf6f",
+    "baseline_commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "build_command": [
+      "cargo",
+      "bench",
+      "--locked",
+      "-p",
+      "ala-platform",
+      "--no-default-features",
+      "--features",
+      "bench-support",
+      "--bench",
+      "retained_layout",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_sha256": "2ec954820db0e80059a5b12adf6c37f1e191baaebc13de6070e5f1ec240b71eb",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "measurements": "Taffy kernel style update + compute + layout reads; no ALA reconciliation, text or GPU work. Separate allocation passes.",
+    "allocation_note": "Separate instrumented processes count allocation requests, not retained memory or RSS. Counting disabled in timing runs.",
+    "layout_scope": "Taffy kernel only; stable fixture identities, no ALA reconciliation or view work",
+    "source_sha256": {
+      "crates/ala-platform/benches/retained_layout.rs": "b39edc428b8ba217f33c0779d3392ce0db09c1ac4b1ecb91ca85348164fa8ea9",
+      "crates/ala-platform/benches/retained_layout/kernel.rs": "e81cfc3eb43885292a6f411e509012ea86f34d19d5815976f24a75e9088ff121",
+      "Cargo.lock": "22bcce4174fb32338080580e032826d4b503493e5e5691704f4026d0918ec550",
+      "experiments/retained-layout/run.py": "6983de32cf1c233ed036fd2b5e106dd4d33de46fe1adf24dba82ea6bcd212e52"
+    },
+    "relevant_environment": {}
+  },
+  "verification": {
+    "case": "verification",
+    "layout": {
+      "frames": 128,
+      "exact_node_geometry_comparisons": 499328,
+      "scope": "Taffy kernel with fixture-provided stable identities"
+    },
+    "wall_seconds": 0.6192730650000158,
+    "command": [
+      "/home/demfabris/dev/ala-native-target/release/deps/retained_layout-74a6da6bc1299138",
+      "--verify"
+    ]
+  },
+  "runs": [],
+  "summary": []
+}

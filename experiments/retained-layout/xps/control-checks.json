@@ -1,0 +1,53 @@
+{
+  "note": "Final aggregate checksums across all modes; weaker than exact rectangle verification and outside timing.",
+  "cases": {
+    "0": {
+      "runs": 18,
+      "modes": [
+        "rebuild",
+        "retained",
+        "write-all"
+      ],
+      "final_geometry_checksums": [
+        2998240.0
+      ],
+      "equal": true
+    },
+    "1": {
+      "runs": 18,
+      "modes": [
+        "rebuild",
+        "retained",
+        "write-all"
+      ],
+      "final_geometry_checksums": [
+        2998365.0
+      ],
+      "equal": true
+    },
+    "64": {
+      "runs": 18,
+      "modes": [
+        "rebuild",
+        "retained",
+        "write-all"
+      ],
+      "final_geometry_checksums": [
+        3004224.0
+      ],
+      "equal": true
+    },
+    "3840": {
+      "runs": 18,
+      "modes": [
+        "rebuild",
+        "retained",
+        "write-all"
+      ],
+      "final_geometry_checksums": [
+        3144800.0
+      ],
+      "equal": true
+    }
+  }
+}
