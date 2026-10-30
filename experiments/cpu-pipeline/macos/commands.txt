@@ -1,0 +1,6 @@
+python3 tools/perf.py doctor
+python3 tools/perf.py snapshot --label mac-original
+python3 -m unittest discover -s tools -p test_*.py
+python3 tools/perf.py run --variant target/perf-results/mac-original --label mac-a1 --warmup 2 --measurement 10 --samples 50
+python3 tools/perf.py run --variant target/perf-results/mac-original --label mac-a2 --warmup 2 --measurement 10 --samples 50
+python3 tools/perf.py run --variant target/perf-results/mac-original --label mac-a3 --warmup 2 --measurement 10 --samples 50

@@ -1,0 +1,25 @@
+{
+  "machine": {
+    "system": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "host": "macbook",
+    "cpu": "arm",
+    "logical_cpus": 16,
+    "affinity": null,
+    "cpu_quota": null,
+    "governor": null
+  },
+  "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "tools": {
+    "perf": null,
+    "valgrind": null,
+    "vulkaninfo": null,
+    "c++filt": "/usr/bin/c++filt",
+    "inferno-collapse-perf": null,
+    "inferno-flamegraph": null
+  },
+  "perf_user_cpu_clock": "probe unsupported on this platform",
+  "perf_user_cycles": "probe unsupported on this platform",
+  "gpu_devices": [],
+  "display": null,
+  "perf_event_paranoid": null
+}

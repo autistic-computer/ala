@@ -1,0 +1,1749 @@
+{
+  "metadata": {
+    "schema_version": 1,
+    "commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "worktree_sha256": "afa137d49b7153afc36af878aac32e304e31f58852c893219212944607c4383a",
+    "dirty": true,
+    "machine": {
+      "system": "Linux-6.18.55-x86_64-with-glibc2.41",
+      "host": "fd56cdf262a0",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "logical_cpus": 5,
+      "affinity": [
+        0
+      ],
+      "cpu_quota": "400000 100000",
+      "governor": null
+    },
+    "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "features": "bench-support,font-kit,wayland,x11",
+    "rustflags": "-C force-frame-pointers=yes",
+    "bench": "ui_cpu",
+    "filter": "^ui_cpu/text_churn/50$",
+    "binary": "/workspace/ala/target/perf/deps/ui_cpu-bfcc3592a6dd1551",
+    "binary_sha256": "e6271cc3bcf6380bd8449b866d3ab23189e851a541f1b8dbf6c679c58d2dd829",
+    "renderer": "none (CPU UI pipeline only)",
+    "runtime": {
+      "VK_DRIVER_FILES": "/workspace/.ala-perf/sysroot/usr/share/vulkan/icd.d/lvp_icd.json",
+      "VK_ICD_FILENAMES": null,
+      "LP_NUM_THREADS": "4",
+      "ALA_PERF_SYSROOT": "/workspace/.ala-perf/sysroot"
+    },
+    "command": [
+      "perf",
+      "record",
+      "-e",
+      "cpu-clock:u",
+      "-F",
+      "499",
+      "--call-graph",
+      "dwarf,16384",
+      "-o",
+      "/workspace/ala/target/perf-results/text-profile/perf.data",
+      "--",
+      "/workspace/ala/target/perf/deps/ui_cpu-bfcc3592a6dd1551",
+      "--bench",
+      "--profile-time",
+      "10",
+      "^ui_cpu/text_churn/50$"
+    ],
+    "seconds": 10,
+    "event": "cpu-clock:u",
+    "perf": "perf version 6.12.107"
+  },
+  "recorded_samples": 5359,
+  "lost_samples": 0,
+  "total_cpu_clock_sample_weight": 10739478872,
+  "leaf_functions": [
+    {
+      "symbol": "__memmove_avx512_unaligned_erms",
+      "sample_weight": 897795584,
+      "percent": 8.359768613547304
+    },
+    {
+      "symbol": "unicode_bidi[1440357e349e96e6]::char_data::bsearch_range_value_table",
+      "sample_weight": 511022040,
+      "percent": 4.758350438514649
+    },
+    {
+      "symbol": "<char as unicode_script[d243b1c3f143db37]::UnicodeScript>::script",
+      "sample_weight": 408817632,
+      "percent": 3.8066803508117184
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::slice::sort::stable::quicksort::quicksort::<ala[19492d470db44ba3]::scene::MonochromeSprite, <[ala[19492d470db44ba3]::scene::MonochromeSprite]>::sort_by_key<(u32, u32), <ala[19492d470db44ba3]::scene::Scene>::finish::{closure#4}>::{closure#0}>",
+      "sample_weight": 358717432,
+      "percent": 3.340175405859302
+    },
+    {
+      "symbol": "cosmic_text[f909cb9773b6a48f]::shape::shape_fallback",
+      "sample_weight": 324649296,
+      "percent": 3.022952043291659
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::attrs::AttrsList>::get_span",
+      "sample_weight": 292585168,
+      "percent": 2.724388878522112
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::glyph_cache::GlyphLookupCache>::lookup",
+      "sample_weight": 278557112,
+      "percent": 2.593767493935436
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::paint_glyph_with_options",
+      "sample_weight": 272545088,
+      "percent": 2.5377869005411458
+    },
+    {
+      "symbol": "_int_malloc",
+      "sample_weight": 270541080,
+      "percent": 2.519126702743049
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot_shape::shape_internal",
+      "sample_weight": 250501000,
+      "percent": 2.3325247247620826
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::scene::Scene>::place_primitive",
+      "sample_weight": 244488976,
+      "percent": 2.2765441313677925
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot_layout::apply_layout_table::<harfrust[4be6d866ffb55c48]::hb::ot::GsubTable>",
+      "sample_weight": 194388776,
+      "percent": 1.810039186415376
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::scene::Scene>::insert_primitive::<ala[19492d470db44ba3]::scene::MonochromeSprite>",
+      "sample_weight": 164328656,
+      "percent": 1.530136219443926
+    },
+    {
+      "symbol": "malloc",
+      "sample_weight": 154308616,
+      "percent": 1.4368352304534429
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::shape::ShapeWord>::build",
+      "sample_weight": 136272544,
+      "percent": 1.2688934502705729
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot_layout::apply_forward",
+      "sample_weight": 130260520,
+      "percent": 1.2129128568762828
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::shape::ShapeLine>::build",
+      "sample_weight": 126252504,
+      "percent": 1.1755924612800897
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::bounds_tree::Grid<ala[19492d470db44ba3]::geometry::ScaledPixels>>::add",
+      "sample_weight": 124248496,
+      "percent": 1.156932263481993
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot_layout::apply_layout_table::<harfrust[4be6d866ffb55c48]::hb::ot::GposTable>",
+      "sample_weight": 124248496,
+      "percent": 1.156932263481993
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::font::fallback::FontFallbackIter as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::next",
+      "sample_weight": 116232464,
+      "percent": 1.0822914722896062
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::shape::ShapeLine>::layout_to_buffer::{closure#8}",
+      "sample_weight": 116232464,
+      "percent": 1.0822914722896062
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot::lookup::pair_pos2_cached",
+      "sample_weight": 114228456,
+      "percent": 1.0636312744915095
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::slice::sort::shared::smallsort::small_sort_general_with_scratch::<ala[19492d470db44ba3]::scene::MonochromeSprite, <[ala[19492d470db44ba3]::scene::MonochromeSprite]>::sort_by_key<(u32, u32), <ala[19492d470db44ba3]::scene::Scene>::finish::{closure#4}>::{closure#0}>",
+      "sample_weight": 108216432,
+      "percent": 1.0076506810972197
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gsub::LigatureSubstFormat1Marker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply_with_external_cache",
+      "sample_weight": 104208416,
+      "percent": 0.9703302855010263
+    },
+    {
+      "symbol": "cfree@GLIBC_2.2.5",
+      "sample_weight": 98196392,
+      "percent": 0.9143496921067363
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::buffer::hb_buffer_t>::guess_segment_properties",
+      "sample_weight": 98196392,
+      "percent": 0.9143496921067363
+    },
+    {
+      "symbol": "unlink_chunk.isra.0",
+      "sample_weight": 92184368,
+      "percent": 0.8583690987124464
+    },
+    {
+      "symbol": "<ala_platform[57f95dceee8650c0]::wgpu::cosmic_text_system::CosmicTextSystemState>::layout_line_no_separators",
+      "sample_weight": 90180360,
+      "percent": 0.8397089009143497
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::layout::ChainedSequenceContextFormat3Marker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply",
+      "sample_weight": 90180360,
+      "percent": 0.8397089009143497
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::paint_cached_monochrome_glyph",
+      "sample_weight": 84168336,
+      "percent": 0.7837283075200597
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::block::compute_inner::<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>",
+      "sample_weight": 84168336,
+      "percent": 0.7837283075200597
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::iter::adapters::chain::Chain<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::str::iter::CharIndices, unicode_linebreak[7d291d8fe8993af4]::linebreaks::{closure#0}>, core[a9090a07a7fa7517]::iter::sources::once::Once<(usize, u8)>> as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::try_fold::<(), <core[a9090a07a7fa7517]::iter::adapters::scan::Scan<_, _, _> as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::try_fold::scan<(usize, u8), (u8, bool), (usize, bool, bool), (), core[a9090a07a7fa7517]::ops::control_flow::ControlFlow<(usize, unicode_linebreak[7d291d8fe8993af4]::BreakOpportunity)>, unicode_linebreak[7d291d8fe8993af4]::linebreaks::{closure#1}, core[a9090a07a7fa7517]::iter::traits::iterator::Iterator::find_map::check<(usize, bool, bool), (usize, unicode_linebreak[7d291d8fe8993af4]::BreakOpportunity), &mut unicode_linebreak[7d291d8fe8993af4]::linebreaks::{closure#2}>::{closure#0}>::{closure#0}, core[a9090a07a7fa7517]::ops::control_flow::ControlFlow<core[a9090a07a7fa7517]::ops::control_flow::ControlFlow<(usize, unicode_linebreak[7d291d8fe8993af4]::BreakOpportunity)>>>",
+      "sample_weight": 82164328,
+      "percent": 0.765068109721963
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gsub::LigatureSetMarker> as harfrust[4be6d866ffb55c48]::hb::ot::gsub::ligature::ApplyLigatureSet>::apply",
+      "sample_weight": 82164328,
+      "percent": 0.765068109721963
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot::lookup::pair_pos1_cached",
+      "sample_weight": 82164328,
+      "percent": 0.765068109721963
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line_layout::LineLayoutCache>::layout_wrapped_line::<&ala[19492d470db44ba3]::shared_string::SharedString>",
+      "sample_weight": 78156312,
+      "percent": 0.7277477141257698
+    },
+    {
+      "symbol": "<rangemap[7974cf74291d4309]::map::RangeMap<usize, cosmic_text[f909cb9773b6a48f]::attrs::AttrsOwned>>::get_key_value",
+      "sample_weight": 72144288,
+      "percent": 0.6717671207314797
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::match_lookahead::<<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::layout::ChainedSequenceContextFormat3Marker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply::{closure#1}>",
+      "sample_weight": 72144288,
+      "percent": 0.6717671207314797
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot::lookup::ligature_subst1",
+      "sample_weight": 72144288,
+      "percent": 0.6717671207314797
+    },
+    {
+      "symbol": "ceilf",
+      "sample_weight": 68136272,
+      "percent": 0.6344467251352864
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::shape::Shaping>::run",
+      "sample_weight": 68136272,
+      "percent": 0.6344467251352864
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::flexbox::compute_flexbox_layout::<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>",
+      "sample_weight": 68136272,
+      "percent": 0.6344467251352864
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::glyph_tile",
+      "sample_weight": 66132264,
+      "percent": 0.6157865273371897
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::paint_layer::<core[a9090a07a7fa7517]::result::Result<(), anyhow[a13589b50018769c]::Error>, ala[19492d470db44ba3]::text_system::line::paint_line::{closure#0}>",
+      "sample_weight": 66132264,
+      "percent": 0.6157865273371897
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::ot::lookup::LookupInfo>::apply",
+      "sample_weight": 66132264,
+      "percent": 0.6157865273371897
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::font::system::FontSystem>::get_font_matches",
+      "sample_weight": 58116232,
+      "percent": 0.5411457361448031
+    },
+    {
+      "symbol": "roundf",
+      "sample_weight": 58116232,
+      "percent": 0.5411457361448031
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::buffer::GlyphInfo>::init_unicode_props",
+      "sample_weight": 58116232,
+      "percent": 0.5411457361448031
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::collections::btree::node::NodeRef<alloc[12ca63220423dfc2]::collections::btree::node::marker::Immut, rangemap[7974cf74291d4309]::range_wrapper::RangeStartWrapper<usize>, cosmic_text[f909cb9773b6a48f]::attrs::AttrsOwned, alloc[12ca63220423dfc2]::collections::btree::node::marker::LeafOrInternal>>::find_leaf_edges_spanning_range::<rangemap[7974cf74291d4309]::range_wrapper::RangeStartWrapper<usize>, (core[a9090a07a7fa7517]::ops::range::Bound<rangemap[7974cf74291d4309]::range_wrapper::RangeStartWrapper<usize>>, core[a9090a07a7fa7517]::ops::range::Bound<rangemap[7974cf74291d4309]::range_wrapper::RangeStartWrapper<usize>>)>",
+      "sample_weight": 56112224,
+      "percent": 0.5224855383467065
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::buffer::hb_buffer_t>::push_str",
+      "sample_weight": 56112224,
+      "percent": 0.5224855383467065
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::map::HashMap<cosmic_text[f909cb9773b6a48f]::attrs::FontMatchAttrs, alloc[12ca63220423dfc2]::sync::Arc<alloc[12ca63220423dfc2]::vec::Vec<cosmic_text[f909cb9773b6a48f]::font::system::FontMatchKey>>, core[a9090a07a7fa7517]::hash::BuildHasherDefault<rustc_hash[4524cdd11449678d]::FxHasher>>>::rustc_entry",
+      "sample_weight": 54108216,
+      "percent": 0.5038253405486098
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::shape::ShapeSpan>::build",
+      "sample_weight": 52104208,
+      "percent": 0.48516514275051315
+    },
+    {
+      "symbol": "__memcmp_evex_movbe",
+      "sample_weight": 48096192,
+      "percent": 0.4478447471543198
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::text::TextLayout>::layout::{closure#0}",
+      "sample_weight": 48096192,
+      "percent": 0.4478447471543198
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gpos::PairPosFormat2Marker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply_with_external_cache",
+      "sample_weight": 48096192,
+      "percent": 0.4478447471543198
+    },
+    {
+      "symbol": "<smol_str[95aa57f6f5de867d]::Repr>::new",
+      "sample_weight": 46092184,
+      "percent": 0.4291845493562232
+    },
+    {
+      "symbol": "_int_free_chunk",
+      "sample_weight": 44088176,
+      "percent": 0.4105243515581265
+    },
+    {
+      "symbol": "malloc_consolidate",
+      "sample_weight": 44088176,
+      "percent": 0.4105243515581265
+    },
+    {
+      "symbol": "<unicode_bidi[1440357e349e96e6]::BidiInfo>::new_with_data_source::<unicode_bidi[1440357e349e96e6]::char_data::HardcodedBidiData>",
+      "sample_weight": 42084168,
+      "percent": 0.39186415376002987
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line_wrapper::LineWrapper>::is_word_char",
+      "sample_weight": 42084168,
+      "percent": 0.39186415376002987
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::ot_shape_plan::ShapePlanKey>::instance",
+      "sample_weight": 38076152,
+      "percent": 0.35454375816383654
+    },
+    {
+      "symbol": "_int_realloc",
+      "sample_weight": 36072144,
+      "percent": 0.33588356036573985
+    },
+    {
+      "symbol": "truncf",
+      "sample_weight": 36072144,
+      "percent": 0.33588356036573985
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot::coverage_index_cached::<<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gpos::PairPosFormat1Marker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply_with_external_cache::{closure#0}>",
+      "sample_weight": 36072144,
+      "percent": 0.33588356036573985
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::buffer::hb_buffer_t>::next_glyphs",
+      "sample_weight": 36072144,
+      "percent": 0.33588356036573985
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::ot::OtTables>::glyph_props",
+      "sample_weight": 36072144,
+      "percent": 0.33588356036573985
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::shape::ShapeLine>::layout_spans",
+      "sample_weight": 34068136,
+      "percent": 0.3172233625676432
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::compute_child_layout::{closure#0}",
+      "sample_weight": 34068136,
+      "percent": 0.3172233625676432
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::font::system::FontSystem>::get_font",
+      "sample_weight": 32064128,
+      "percent": 0.29856316476954653
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gpos::PairPosFormat1Marker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply_with_external_cache",
+      "sample_weight": 32064128,
+      "percent": 0.29856316476954653
+    },
+    {
+      "symbol": "__rustc[9d087a5ab36ea756]::__rust_no_alloc_shim_is_unstable_v2",
+      "sample_weight": 30060120,
+      "percent": 0.2799029669714499
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::enumerate::Enumerate<core[a9090a07a7fa7517]::iter::adapters::filter::Filter<core[a9090a07a7fa7517]::iter::adapters::map::Map<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyTreeChildIter, taffy[c1f23ef5926276af]::compute::block::generate_item_list<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#0}>, taffy[c1f23ef5926276af]::compute::block::generate_item_list<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#1}>>, taffy[c1f23ef5926276af]::compute::block::generate_item_list<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#2}> as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::next",
+      "sample_weight": 30060120,
+      "percent": 0.2799029669714499
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::scene::Primitive>",
+      "sample_weight": 30060120,
+      "percent": 0.2799029669714499
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot::coverage_index_cached::<<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gpos::PairPosFormat2Marker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply_with_external_cache::{closure#0}>",
+      "sample_weight": 30060120,
+      "percent": 0.2799029669714499
+    },
+    {
+      "symbol": "_int_free_create_chunk",
+      "sample_weight": 28056112,
+      "percent": 0.26124276917335326
+    },
+    {
+      "symbol": "<smol_str[95aa57f6f5de867d]::SmolStr as core[a9090a07a7fa7517]::hash::Hash>::hash::<rustc_hash[4524cdd11449678d]::FxHasher>",
+      "sample_weight": 28056112,
+      "percent": 0.26124276917335326
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line_layout::LineLayoutCache>::shape_line",
+      "sample_weight": 28056112,
+      "percent": 0.26124276917335326
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::leaf::compute_leaf_layout::<<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}::{closure#1}, taffy[c1f23ef5926276af]::style::Style, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}::{closure#0}>",
+      "sample_weight": 28056112,
+      "percent": 0.26124276917335326
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gpos::PairPosFormat2Marker> as read_fonts[fbeccfa1e7fc88b5]::read::FontRead>::read",
+      "sample_weight": 28056112,
+      "percent": 0.26124276917335326
+    },
+    {
+      "symbol": "realloc",
+      "sample_weight": 26052104,
+      "percent": 0.24258257137525657
+    },
+    {
+      "symbol": "_int_free_merge_chunk",
+      "sample_weight": 26052104,
+      "percent": 0.24258257137525657
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::scene::PaintOperation>",
+      "sample_weight": 26052104,
+      "percent": 0.24258257137525657
+    },
+    {
+      "symbol": "__memset_avx512_unaligned_erms",
+      "sample_weight": 26052104,
+      "percent": 0.24258257137525657
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::block::compute_block_layout::<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>",
+      "sample_weight": 26052104,
+      "percent": 0.24258257137525657
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gpos::PairPosFormat1Marker> as read_fonts[fbeccfa1e7fc88b5]::read::FontRead>::read",
+      "sample_weight": 26052104,
+      "percent": 0.24258257137525657
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot::gpos::apply_value",
+      "sample_weight": 26052104,
+      "percent": 0.24258257137525657
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot::lookup::chained_context3",
+      "sample_weight": 26052104,
+      "percent": 0.24258257137525657
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::str::count::char_count_general_case",
+      "sample_weight": 24048096,
+      "percent": 0.2239223735771599
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::match_input::<<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gsub::LigatureMarker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply::{closure#0}>",
+      "sample_weight": 24048096,
+      "percent": 0.2239223735771599
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::ot_shape_plan::ShapePlanKey>::matches",
+      "sample_weight": 24048096,
+      "percent": 0.2239223735771599
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::raw_vec::RawVecInner>::finish_grow",
+      "sample_weight": 22044088,
+      "percent": 0.20526217577906325
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::Vec<ala[19492d470db44ba3]::text_system::line_layout::ShapedRun> as core[a9090a07a7fa7517]::clone::Clone>::clone",
+      "sample_weight": 22044088,
+      "percent": 0.20526217577906325
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::layout::ChainedSequenceContextFormat1Marker> as read_fonts[fbeccfa1e7fc88b5]::read::FontRead>::read",
+      "sample_weight": 22044088,
+      "percent": 0.20526217577906325
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::WindowTextSystem>::shape_text",
+      "sample_weight": 22044088,
+      "percent": 0.20526217577906325
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::shape::ShapeLine>::layout_to_buffer",
+      "sample_weight": 20040080,
+      "percent": 0.1866019779809666
+    },
+    {
+      "symbol": "fmaf",
+      "sample_weight": 20040080,
+      "percent": 0.1866019779809666
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line_layout::LineLayoutCache>::layout_line::<&ala[19492d470db44ba3]::shared_string::SharedString>",
+      "sample_weight": 20040080,
+      "percent": 0.1866019779809666
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line_layout::CacheKeyRef as core[a9090a07a7fa7517]::hash::Hash>::hash::<rustc_hash[4524cdd11449678d]::FxHasher>",
+      "sample_weight": 20040080,
+      "percent": 0.1866019779809666
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot::coverage_index_cached::<<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gsub::LigatureSubstFormat1Marker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply_with_external_cache::{closure#0}>",
+      "sample_weight": 20040080,
+      "percent": 0.1866019779809666
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::face::hb_font_t>::shape_with_plan",
+      "sample_weight": 20040080,
+      "percent": 0.1866019779809666
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::glyph_metrics::GlyphMetrics>::populate_advance_widths",
+      "sample_weight": 20040080,
+      "percent": 0.1866019779809666
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::TextSystem>::sync_font_generation",
+      "sample_weight": 18036072,
+      "percent": 0.16794178018286993
+    },
+    {
+      "symbol": "<ala_platform[57f95dceee8650c0]::wgpu::cosmic_text_system::CosmicTextSystem as ala[19492d470db44ba3]::platform::PlatformTextSystem>::font_generation",
+      "sample_weight": 18036072,
+      "percent": 0.16794178018286993
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::Style as ala[19492d470db44ba3]::refineable::Refineable>::refine",
+      "sample_weight": 18036072,
+      "percent": 0.16794178018286993
+    },
+    {
+      "symbol": "__rustc[9d087a5ab36ea756]::__rust_alloc",
+      "sample_weight": 18036072,
+      "percent": 0.16794178018286993
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::attrs::AttrsOwned>::as_attrs",
+      "sample_weight": 18036072,
+      "percent": 0.16794178018286993
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::TextStyleRefinement as ala[19492d470db44ba3]::refineable::Refineable>::refine",
+      "sample_weight": 16032064,
+      "percent": 0.14928158238477326
+    },
+    {
+      "symbol": "<unicode_segmentation[6a68ecb1189651a4]::grapheme::GraphemeCursor>::grapheme_category",
+      "sample_weight": 16032064,
+      "percent": 0.14928158238477326
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::layout_bounds",
+      "sample_weight": 16032064,
+      "percent": 0.14928158238477326
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::tree::cache::Cache>::store",
+      "sample_weight": 16032064,
+      "percent": 0.14928158238477326
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gsub::LigatureMarker> as read_fonts[fbeccfa1e7fc88b5]::read::FontRead>::read",
+      "sample_weight": 16032064,
+      "percent": 0.14928158238477326
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gsub::LigatureMarker>>::component_glyph_ids",
+      "sample_weight": 16032064,
+      "percent": 0.14928158238477326
+    },
+    {
+      "symbol": "<skrifa[b9af980c07a74399]::outline::glyf::hint::engine::Engine>::run",
+      "sample_weight": 14028056,
+      "percent": 0.13062138458667663
+    },
+    {
+      "symbol": "<std[c29fa2d9dbea2b0e]::hash::random::RandomState as core[a9090a07a7fa7517]::hash::BuildHasher>::hash_one::<&u32>",
+      "sample_weight": 14028056,
+      "percent": 0.13062138458667663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::request_layout",
+      "sample_weight": 14028056,
+      "percent": 0.13062138458667663
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::map::HashMap<alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::CacheKey>, alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::LineLayout>, rustc_hash[4524cdd11449678d]::FxBuildHasher>>::insert",
+      "sample_weight": 14028056,
+      "percent": 0.13062138458667663
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}> as taffy[c1f23ef5926276af]::tree::traits::CacheTree>::cache_get",
+      "sample_weight": 14028056,
+      "percent": 0.13062138458667663
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::flexbox::calculate_flex_item::<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>",
+      "sample_weight": 14028056,
+      "percent": 0.13062138458667663
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gsub::LigatureMarker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply",
+      "sample_weight": 14028056,
+      "percent": 0.13062138458667663
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot_layout_gpos_table::GPOS::position_finish_offsets",
+      "sample_weight": 14028056,
+      "percent": 0.13062138458667663
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::iter::adapters::cloned::Cloned<core[a9090a07a7fa7517]::iter::adapters::filter::Filter<core[a9090a07a7fa7517]::slice::iter::Iter<ala[19492d470db44ba3]::text_system::TextRun>, <ala[19492d470db44ba3]::text_system::WindowTextSystem>::shape_text::{closure#0}>> as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::next",
+      "sample_weight": 14028056,
+      "percent": 0.13062138458667663
+    },
+    {
+      "symbol": "<ala_platform[57f95dceee8650c0]::wgpu::cosmic_text_system::CosmicTextSystemState>::font_match_properties",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<fontdb[522db155ebbe510a]::Database>::face",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::bounds_tree::BoundsTree<ala[19492d470db44ba3]::geometry::ScaledPixels>>::insert",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::platform::test::window::TestWindow as ala[19492d470db44ba3]::platform::PlatformWindow>::background_appearance",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "floorf",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::Vec<taffy[c1f23ef5926276af]::style::grid::GridTemplateComponent<alloc[12ca63220423dfc2]::string::String>> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::font::fallback::FontFallbackIter>::new",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<slotmap[20049c4fb81311b9]::basic::SlotMap<slotmap[20049c4fb81311b9]::DefaultKey, taffy[c1f23ef5926276af]::tree::taffy_tree::NodeData>>::try_insert_with_key::<<slotmap[20049c4fb81311b9]::basic::SlotMap<slotmap[20049c4fb81311b9]::DefaultKey, taffy[c1f23ef5926276af]::tree::taffy_tree::NodeData>>::insert::{closure#0}, slotmap[20049c4fb81311b9]::util::Never>",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[12ca63220423dfc2]::alloc::Global>",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::TextSystem>::bounding_box",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<smol_str[95aa57f6f5de867d]::SmolStr as core[a9090a07a7fa7517]::cmp::PartialEq>::eq",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<unicode_bidi[1440357e349e96e6]::char_data::HardcodedBidiData as unicode_bidi[1440357e349e96e6]::data_source::BidiDataSource>::bidi_class",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::compute_style_internal",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::Style as core[a9090a07a7fa7517]::default::Default>::default",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<slotmap[20049c4fb81311b9]::basic::SlotMap<slotmap[20049c4fb81311b9]::DefaultKey, alloc[12ca63220423dfc2]::vec::Vec<taffy[c1f23ef5926276af]::tree::node::NodeId>>>::try_insert_with_key::<<slotmap[20049c4fb81311b9]::basic::SlotMap<slotmap[20049c4fb81311b9]::DefaultKey, alloc[12ca63220423dfc2]::vec::Vec<taffy[c1f23ef5926276af]::tree::node::NodeId>>>::insert::{closure#0}, slotmap[20049c4fb81311b9]::util::Never>",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::Vec<taffy[c1f23ef5926276af]::compute::block::BlockItem> as alloc[12ca63220423dfc2]::vec::spec_from_iter::SpecFromIter<taffy[c1f23ef5926276af]::compute::block::BlockItem, core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::enumerate::Enumerate<core[a9090a07a7fa7517]::iter::adapters::filter::Filter<core[a9090a07a7fa7517]::iter::adapters::map::Map<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyTreeChildIter, taffy[c1f23ef5926276af]::compute::block::generate_item_list<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#0}>, taffy[c1f23ef5926276af]::compute::block::generate_item_list<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#1}>>, taffy[c1f23ef5926276af]::compute::block::generate_item_list<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#2}>>>::from_iter",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::tables::layout::CoverageTable as read_fonts[fbeccfa1e7fc88b5]::read::FontRead>::read",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gsub::LigatureSetMarker>>::ligatures",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::layout::ChainedClassSequenceRuleSetMarker> as read_fonts[fbeccfa1e7fc88b5]::read::FontRead>::read",
+      "sample_weight": 12024048,
+      "percent": 0.11196118678857996
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::Style as ala[19492d470db44ba3]::taffy::ToTaffy<taffy[c1f23ef5926276af]::style::Style>>::to_taffy",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::iter::adapters::map::Map<alloc[12ca63220423dfc2]::vec::drain::Drain<cosmic_text[f909cb9773b6a48f]::shape::VisualLine>, <cosmic_text[f909cb9773b6a48f]::shape::ShapeLine>::layout_to_buffer::{closure#0}> as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::fold::<(), core[a9090a07a7fa7517]::iter::traits::iterator::Iterator::for_each::call<cosmic_text[f909cb9773b6a48f]::shape::VisualLine, <alloc[12ca63220423dfc2]::vec::Vec<cosmic_text[f909cb9773b6a48f]::shape::VisualLine>>::extend_trusted<core[a9090a07a7fa7517]::iter::adapters::map::Map<alloc[12ca63220423dfc2]::vec::drain::Drain<cosmic_text[f909cb9773b6a48f]::shape::VisualLine>, <cosmic_text[f909cb9773b6a48f]::shape::ShapeLine>::layout_to_buffer::{closure#0}>>::{closure#0}>::{closure#0}>",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "__rustc[9d087a5ab36ea756]::__rust_realloc",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyTree<ala[19492d470db44ba3]::taffy::NodeContext>>::new_leaf_with_context",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::Style>::paint::<<ala[19492d470db44ba3]::elements::div::Interactivity>::paint<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}::{closure#1}::{closure#0}>",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<ala_platform[57f95dceee8650c0]::wgpu::cosmic_text_system::CosmicTextSystem as ala[19492d470db44ba3]::platform::PlatformTextSystem>::layout_line",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div> as ala[19492d470db44ba3]::element::ElementObject>::paint",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::app::App>::record_entities_accessed",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::filter::Filter<core[a9090a07a7fa7517]::iter::adapters::filter::Filter<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::enumerate::Enumerate<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyTreeChildIter>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#0}>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#1}>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#2}>, taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#3}> as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::next",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::Fill as core[a9090a07a7fa7517]::convert::From<ala[19492d470db44ba3]::color::Rgba>>::from",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::slice::sort::stable::drift::sort::<ala[19492d470db44ba3]::scene::MonochromeSprite, <[ala[19492d470db44ba3]::scene::MonochromeSprite]>::sort_by_key<(u32, u32), <ala[19492d470db44ba3]::scene::Scene>::finish::{closure#4}>::{closure#0}>",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::CacheKey>>::drop_slow",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::map::HashMap<alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::CacheKey>, alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::WrappedLineLayout>, rustc_hash[4524cdd11449678d]::FxBuildHasher>>::insert",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::buffer::hb_buffer_t>::sync",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gpos::PairPosFormat2Marker>>::value_format1",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::layout::ChainedSequenceContextFormat3Marker> as read_fonts[fbeccfa1e7fc88b5]::read::FontRead>::read",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::TextSystem>::resolve_font",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::WindowTextSystem>::shape_text::{closure#1}",
+      "sample_weight": 10020040,
+      "percent": 0.0933009889904833
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::raw_vec::RawVec<(std[c29fa2d9dbea2b0e]::path::PathBuf, futures_channel[ab0a16ba4d265fcf]::oneshot::Sender<core[a9090a07a7fa7517]::result::Result<core[a9090a07a7fa7517]::option::Option<std[c29fa2d9dbea2b0e]::path::PathBuf>, anyhow[a13589b50018769c]::Error>>)>>::grow_one",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::attrs::AttrsOwned>::new",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala_platform[57f95dceee8650c0]::wgpu::cosmic_text_system::CosmicTextSystem as ala[19492d470db44ba3]::platform::PlatformTextSystem>::glyph_dilation_for_color",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::bounds_tree::Grid<ala[19492d470db44ba3]::geometry::ScaledPixels>>::spans",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::request_layout::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout::{closure#1}::{closure#0}>::{closure#0}",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "__memset_avx512_unaligned",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::key_dispatch::DispatchTree>::pop_node",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<smol_str[95aa57f6f5de867d]::SmolStr as core[a9090a07a7fa7517]::clone::Clone>::clone::cold_clone",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::text_system::Font>",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::raw::RawTable<(u64, smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::text_system::recent_shapes::RecentShape: 1: usize]>)>>::reserve_rehash::<hashbrown[ec5eb3d1610e94b1]::map::make_hasher<u64, smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::text_system::recent_shapes::RecentShape: 1: usize]>, rustc_hash[4524cdd11449678d]::FxBuildHasher>::{closure#0}>",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::paint_inset_shadows_with_smoothing",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::recent_shapes::RecentShapes>::push",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "unicode_bidi[1440357e349e96e6]::char_data::bidi_class",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::arena::Arena>::alloc::drop::<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::shared_string::SharedString>>",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::tree::cache::CacheKey as core[a9090a07a7fa7517]::convert::From<&taffy[c1f23ef5926276af]::tree::layout::LayoutInput>>::from",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::paint::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}::{closure#1}::{closure#0}::{closure#0}::{closure#0}::{closure#0}",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::string::String as core[a9090a07a7fa7517]::fmt::Write>::write_char",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::key_dispatch::DispatchNode>",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::slice::sort::shared::pivot::median3_rec::<ala[19492d470db44ba3]::scene::SubpixelSprite, <[ala[19492d470db44ba3]::scene::SubpixelSprite]>::sort_by_key<(u32, u32), <ala[19492d470db44ba3]::scene::Scene>::finish::{closure#5}>::{closure#0}>",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::clear",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::LineLayout>>::drop_slow",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div>>::paint",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot_shape::zero_mark_widths_by_gdef",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": " bool>>::match_at_[i]",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::layout::ChainedSequenceContextFormat3Marker>>::lookahead_coverages",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[u32: 8: usize]>>::from_elem",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_image_cache::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout::{closure#1}, ala[19492d470db44ba3]::taffy::LayoutId>",
+      "sample_weight": 8016032,
+      "percent": 0.07464079119238663
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::platform::test::window::TestWindow as ala[19492d470db44ba3]::platform::PlatformWindow>::is_hovered",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::geometry::Edges<ala[19492d470db44ba3]::geometry::Length> as ala[19492d470db44ba3]::taffy::ToTaffy<taffy[c1f23ef5926276af]::geometry::Rect<taffy[c1f23ef5926276af]::style::dimension::LengthPercentageAuto>>>::to_taffy",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::collections::btree::map::BTreeMap<cosmic_text[f909cb9773b6a48f]::font::fallback::MonospaceFallbackInfo, alloc[12ca63220423dfc2]::collections::btree::set_val::SetValZST>>::pop_first",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::attrs::AttrsList>::defaults",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::font::fallback::FontFallbackIter>::check_missing",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}::{closure#0}::{closure#0}",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::should_insert_hitbox",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::prepaint::<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::window::Hitbox>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}>::{closure#0}",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<<ala[19492d470db44ba3]::elements::text::TextLayout>::layout::{closure#0}>",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::text_system::line::WrappedLine>",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::shared_string::SharedString> as ala[19492d470db44ba3]::element::ElementObject>::paint",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::text::TextLayout>::paint::{closure#4}",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::paint_drop_shadows_with_smoothing",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::paint_quad",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::raw::RawTable<(alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::CacheKey>, alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::WrappedLineLayout>)>>::remove_entry::<hashbrown[ec5eb3d1610e94b1]::map::equivalent_key<dyn ala[19492d470db44ba3]::text_system::line_layout::AsCacheKeyRef, alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::CacheKey>, alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::WrappedLineLayout>>::{closure#0}>",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::text_system::recent_shapes::RecentShape>",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::map::HashMap<ala[19492d470db44ba3]::app::entity_map::HandleId, core[a9090a07a7fa7517]::option::Option<backtrace[c754a3dcbd962bbd]::capture::Backtrace>, rustc_hash[4524cdd11449678d]::FxBuildHasher>>::insert",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::arena::Arena>::alloc::drop::<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div>>",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}> as taffy[c1f23ef5926276af]::tree::traits::CacheTree>::cache_store",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::geometry::Rect<taffy[c1f23ef5926276af]::style::dimension::LengthPercentage> as taffy[c1f23ef5926276af]::util::resolve::ResolveOrZero<taffy[c1f23ef5926276af]::geometry::Size<core[a9090a07a7fa7517]::option::Option<f32>>, taffy[c1f23ef5926276af]::geometry::Rect<f32>>>::resolve_or_zero::<taffy[c1f23ef5926276af]::compute::flexbox::determine_used_cross_size<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#1}>",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::raw::RawTable<(alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::CacheKey>, alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::LineLayout>)>>::erase",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::raw::RawTable<(alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::CacheKey>, alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::WrappedLineLayout>)>>::erase",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::text::TextLayout>::layout",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<harfrust[4be6d866ffb55c48]::hb::buffer::hb_buffer_t>::_set_glyph_flags",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::layout::ChainedSequenceContextFormat3Marker>>::input_coverages",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gsub::LigatureSubstFormat1Marker>>::ligature_sets",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::TextSystem>::line_wrapper",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::Font as hashbrown[ec5eb3d1610e94b1]::Equivalent<ala[19492d470db44ba3]::text_system::Font>>::equivalent",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::text_system::LineWrapperHandle>",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_image_cache::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}, ()>",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::paint::<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}",
+      "sample_weight": 6012024,
+      "percent": 0.05598059339428998
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::string::String as core[a9090a07a7fa7517]::clone::Clone>::clone",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::scene::Scene>::push_layer",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line::WrappedLine>::paint_background",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::collections::btree::map::BTreeMap<cosmic_text[f909cb9773b6a48f]::font::fallback::MonospaceFallbackInfo, alloc[12ca63220423dfc2]::collections::btree::set_val::SetValZST> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<rangemap[7974cf74291d4309]::map::RangeMap<usize, cosmic_text[f909cb9773b6a48f]::attrs::AttrsOwned>>::insert",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::collections::btree::map::entry::VacantEntry<rangemap[7974cf74291d4309]::range_wrapper::RangeStartWrapper<usize>, cosmic_text[f909cb9773b6a48f]::attrs::AttrsOwned>>::insert_entry",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::Vec<cosmic_text[f909cb9773b6a48f]::shape::VisualLine>>::extend_trusted::<core[a9090a07a7fa7517]::iter::adapters::map::Map<alloc[12ca63220423dfc2]::vec::drain::Drain<cosmic_text[f909cb9773b6a48f]::shape::VisualLine>, <cosmic_text[f909cb9773b6a48f]::shape::ShapeLine>::layout_to_buffer::{closure#0}>>",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::iter::adapters::rev::Rev<alloc[12ca63220423dfc2]::vec::drain::Drain<cosmic_text[f909cb9773b6a48f]::layout::LayoutLine>> as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::fold::<(), core[a9090a07a7fa7517]::iter::adapters::map::map_fold<cosmic_text[f909cb9773b6a48f]::layout::LayoutLine, alloc[12ca63220423dfc2]::vec::Vec<cosmic_text[f909cb9773b6a48f]::layout::LayoutGlyph>, (), <cosmic_text[f909cb9773b6a48f]::shape::ShapeLine>::layout_to_buffer::{closure#1}, core[a9090a07a7fa7517]::iter::traits::iterator::Iterator::for_each::call<alloc[12ca63220423dfc2]::vec::Vec<cosmic_text[f909cb9773b6a48f]::layout::LayoutGlyph>, <alloc[12ca63220423dfc2]::vec::Vec<alloc[12ca63220423dfc2]::vec::Vec<cosmic_text[f909cb9773b6a48f]::layout::LayoutGlyph>>>::extend_trusted<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::rev::Rev<alloc[12ca63220423dfc2]::vec::drain::Drain<cosmic_text[f909cb9773b6a48f]::layout::LayoutLine>>, <cosmic_text[f909cb9773b6a48f]::shape::ShapeLine>::layout_to_buffer::{closure#1}>>::{closure#0}>::{closure#0}>::{closure#0}>",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::raw_vec::RawVec<cosmic_text[f909cb9773b6a48f]::layout::LayoutGlyph>>::grow_one",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::iter::adapters::rev::Rev<alloc[12ca63220423dfc2]::vec::drain::Drain<cosmic_text[f909cb9773b6a48f]::shape::ShapeWord>> as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::fold::<(), core[a9090a07a7fa7517]::iter::traits::iterator::Iterator::for_each::call<cosmic_text[f909cb9773b6a48f]::shape::ShapeWord, <alloc[12ca63220423dfc2]::vec::Vec<cosmic_text[f909cb9773b6a48f]::shape::ShapeWord>>::extend_trusted<core[a9090a07a7fa7517]::iter::adapters::rev::Rev<alloc[12ca63220423dfc2]::vec::drain::Drain<cosmic_text[f909cb9773b6a48f]::shape::ShapeWord>>>::{closure#0}>::{closure#0}>",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "unicode_linebreak[7d291d8fe8993af4]::linebreaks",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::prepaint::<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::window::Hitbox>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}>::{closure#0}::{closure#1}::{closure#0}",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::prepaint::<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::window::Hitbox>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::prepaint::{closure#1}>::{closure#0}::{closure#1}::{closure#0}::{closure#0}",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout::{closure#1}::{closure#0}::{closure#0}",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::shared_string::SharedString>>::request_layout",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::shared_string::SharedString as ala[19492d470db44ba3]::element::Element>::request_layout",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::hash::sip::Hasher<core[a9090a07a7fa7517]::hash::sip::Sip13Rounds> as core[a9090a07a7fa7517]::hash::Hasher>::write",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<roxmltree[cc4ba9107852f2f9]::tokenizer::Stream>::consume_qname",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::paint_keyboard_listeners",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::text::TextLayout>::paint",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::into_iter::IntoIter<(core[a9090a07a7fa7517]::any::TypeId, alloc[12ca63220423dfc2]::boxed::Box<dyn for<'a, 'b, 'c> core[a9090a07a7fa7517]::ops::function::Fn<(&'a dyn core[a9090a07a7fa7517]::any::Any, ala[19492d470db44ba3]::window::DispatchPhase, &'b mut ala[19492d470db44ba3]::window::Window, &'c mut ala[19492d470db44ba3]::app::App), Output = ()>>)> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::into_iter::IntoIter<alloc[12ca63220423dfc2]::boxed::Box<dyn for<'a, 'b, 'c, 'd> core[a9090a07a7fa7517]::ops::function::Fn<(&'a ala[19492d470db44ba3]::interactive::MousePressureEvent, ala[19492d470db44ba3]::window::DispatchPhase, &'b ala[19492d470db44ba3]::window::Hitbox, &'c mut ala[19492d470db44ba3]::window::Window, &'d mut ala[19492d470db44ba3]::app::App), Output = ()>>> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::largest_border_interior",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::LineWrapperHandle as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::text_system::line_layout::FontRun: 1: usize]> as core[a9090a07a7fa7517]::iter::traits::collect::Extend<ala[19492d470db44ba3]::text_system::line_layout::FontRun>>::extend::<core[a9090a07a7fa7517]::iter::adapters::cloned::Cloned<core[a9090a07a7fa7517]::slice::iter::Iter<ala[19492d470db44ba3]::text_system::line_layout::FontRun>>>",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::raw::RawTable<(ala[19492d470db44ba3]::app::entity_map::HandleId, core[a9090a07a7fa7517]::option::Option<backtrace[c754a3dcbd962bbd]::capture::Backtrace>)>>::remove_entry::<hashbrown[ec5eb3d1610e94b1]::map::equivalent_key<ala[19492d470db44ba3]::app::entity_map::HandleId, ala[19492d470db44ba3]::app::entity_map::HandleId, core[a9090a07a7fa7517]::option::Option<backtrace[c754a3dcbd962bbd]::capture::Backtrace>>::{closure#0}>",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::new::{closure#10}",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::app::entity_map::AnyEntity as core[a9090a07a7fa7517]::clone::Clone>::clone",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::app::App>::flush_effects",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::draw",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::geometry::Rect<taffy[c1f23ef5926276af]::style::dimension::LengthPercentage> as taffy[c1f23ef5926276af]::util::resolve::ResolveOrZero<core[a9090a07a7fa7517]::option::Option<f32>, taffy[c1f23ef5926276af]::geometry::Rect<f32>>>::resolve_or_zero::<&<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}::{closure#0}>",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::geometry::Size<taffy[c1f23ef5926276af]::style::dimension::Dimension> as taffy[c1f23ef5926276af]::util::resolve::MaybeResolve<taffy[c1f23ef5926276af]::geometry::Size<core[a9090a07a7fa7517]::option::Option<f32>>, taffy[c1f23ef5926276af]::geometry::Size<core[a9090a07a7fa7517]::option::Option<f32>>>>::maybe_resolve::<&<ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}::{closure#0}>",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::element::AnyElement: 2: usize]> as core[a9090a07a7fa7517]::iter::traits::collect::Extend<ala[19492d470db44ba3]::element::AnyElement>>::extend::<core[a9090a07a7fa7517]::iter::sources::once::Once<ala[19492d470db44ba3]::element::AnyElement>>",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::fmt::write",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::string::String as core[a9090a07a7fa7517]::fmt::Write>::write_str",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<usize as core[a9090a07a7fa7517]::fmt::Display>::fmt",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<hdrhistogram[2d3827cf64cadf90]::Histogram<u64>>::record_n_inner",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::scene::Scene>::clear",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::profiler::WindowProfiler>::record_present",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gpos::PairPosFormat1Marker>>::pair_set_offsets",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<rustc_hash[4524cdd11449678d]::FxBuildHasher as core[a9090a07a7fa7517]::hash::BuildHasher>::hash_one::<&ala[19492d470db44ba3]::text_system::Font>",
+      "sample_weight": 4008016,
+      "percent": 0.037320395596193316
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::collections::btree::map::IntoIter<rangemap[7974cf74291d4309]::range_wrapper::RangeStartWrapper<usize>, cosmic_text[f909cb9773b6a48f]::attrs::AttrsOwned>>::dying_next",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "ala[19492d470db44ba3]::text_system::line::line_paint_bounds",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<std[c29fa2d9dbea2b0e]::path::Components>::parse_next_component_back",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<cosmic_text[f909cb9773b6a48f]::shape::ShapeLine>::layout_line",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "__rustc[9d087a5ab36ea756]::__rdl_realloc",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::Vec<cosmic_text[f909cb9773b6a48f]::shape::ShapeSpan>>::extend_trusted::<core[a9090a07a7fa7517]::iter::adapters::rev::Rev<alloc[12ca63220423dfc2]::vec::drain::Drain<cosmic_text[f909cb9773b6a48f]::shape::ShapeSpan>>>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "__rustc[9d087a5ab36ea756]::__rust_dealloc",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::text::TextLayout>::prepaint",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::shared_string::SharedString as ala[19492d470db44ba3]::element::Element>::prepaint",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::request_layout::<core[a9090a07a7fa7517]::iter::adapters::copied::Copied<core[a9090a07a7fa7517]::slice::iter::Iter<ala[19492d470db44ba3]::taffy::LayoutId>>>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::taffy::LayoutId: 2: usize]> as core[a9090a07a7fa7517]::iter::traits::collect::Extend<ala[19492d470db44ba3]::taffy::LayoutId>>::extend::<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::slice::iter::IterMut<ala[19492d470db44ba3]::element::AnyElement>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout::{closure#1}::{closure#0}::{closure#0}::{closure#0}>>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::style::TextStyleRefinement>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::sync::Arc<alloc[12ca63220423dfc2]::vec::Vec<(alloc[12ca63220423dfc2]::string::String, u32)>>>::drop_slow",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<roxmltree[cc4ba9107852f2f9]::parse::Context as roxmltree[cc4ba9107852f2f9]::tokenizer::XmlEvents>::token",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "roxmltree[cc4ba9107852f2f9]::tokenizer::parse_comment",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<roxmltree[cc4ba9107852f2f9]::parse::Context>::append_node",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "roxmltree[cc4ba9107852f2f9]::tokenizer::parse_content",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::shared_string::SharedString>>::paint",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<ala[19492d470db44ba3]::element::ElementDrawPhase<ala[19492d470db44ba3]::elements::text::TextLayout, ()>>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::scene::Scene>::insert_primitive::<ala[19492d470db44ba3]::scene::Quad>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_text_style::<<ala[19492d470db44ba3]::elements::div::Interactivity>::paint<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}::{closure#1}::{closure#0}::{closure#0}, ()>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line_layout::CacheKey as ala[19492d470db44ba3]::text_system::line_layout::AsCacheKeyRef>::as_cache_key_ref",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line_layout::CacheKeyRef as ala[19492d470db44ba3]::text_system::line_layout::AsCacheKeyRef>::as_cache_key_ref",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line_layout::CacheKey as core[a9090a07a7fa7517]::hash::Hash>::hash::<rustc_hash[4524cdd11449678d]::FxHasher>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<zeno[205b040669b992b2]::raster::Rasterizer<zeno[205b040669b992b2]::raster::HeapStorage>>::line_to",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<tinytemplate[9bd196ee7151d640]::compiler::TemplateCompiler>::compile",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<criterion[7800223436db4566]::bencher::Bencher>::iter::<(), &mut <ala[19492d470db44ba3]::app::bench_context::BenchAppContext>::bench_renderer<ui_cpu[6aec32a9d909eb5]::TextRows, ui_cpu[6aec32a9d909eb5]::benchmarks::{closure#1}::{closure#1}>::{closure#1}>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::Vec<(ala[19492d470db44ba3]::app::entity_map::EntityId, alloc[12ca63220423dfc2]::boxed::Box<dyn core[a9090a07a7fa7517]::any::Any>)> as alloc[12ca63220423dfc2]::vec::spec_from_iter_nested::SpecFromIterNested<(ala[19492d470db44ba3]::app::entity_map::EntityId, alloc[12ca63220423dfc2]::boxed::Box<dyn core[a9090a07a7fa7517]::any::Any>), core[a9090a07a7fa7517]::iter::adapters::filter_map::FilterMap<alloc[12ca63220423dfc2]::vec::drain::Drain<ala[19492d470db44ba3]::app::entity_map::EntityId>, <ala[19492d470db44ba3]::app::entity_map::EntityMap>::take_dropped::{closure#0}>>>::from_iter",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::app::App>::push_effect",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::map::HashMap<ala[19492d470db44ba3]::app::entity_map::EntityId, std[c29fa2d9dbea2b0e]::collections::hash::map::HashMap<ala[19492d470db44ba3]::window::WindowId, ala[19492d470db44ba3]::window::WindowInvalidator, rustc_hash[4524cdd11449678d]::FxBuildHasher>, rustc_hash[4524cdd11449678d]::FxBuildHasher>>::insert",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<slotmap[20049c4fb81311b9]::secondary::SecondaryMap<ala[19492d470db44ba3]::app::entity_map::EntityId, alloc[12ca63220423dfc2]::boxed::Box<dyn core[a9090a07a7fa7517]::any::Any>>>::insert",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::app::App>::update_window_id::<(), <ala[19492d470db44ba3]::window::Window>::new::{closure#10}::{closure#5}::{closure#0}>::{closure#0}",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<alloc[12ca63220423dfc2]::boxed::Box<ala[19492d470db44ba3]::style::StyleRefinement>>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<taffy[c1f23ef5926276af]::geometry::Size<taffy[c1f23ef5926276af]::style::dimension::Dimension> as taffy[c1f23ef5926276af]::util::resolve::MaybeResolve<taffy[c1f23ef5926276af]::geometry::Size<core[a9090a07a7fa7517]::option::Option<f32>>, taffy[c1f23ef5926276af]::geometry::Size<core[a9090a07a7fa7517]::option::Option<f32>>>>::maybe_resolve::<taffy[c1f23ef5926276af]::compute::flexbox::generate_anonymous_flex_items<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>::{closure#3}::{closure#2}>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "taffy[c1f23ef5926276af]::compute::flexbox::calculate_layout_line::<taffy[c1f23ef5926276af]::tree::taffy_tree::TaffyView<ala[19492d470db44ba3]::taffy::NodeContext, <ala[19492d470db44ba3]::taffy::TaffyLayoutEngine>::compute_layout::{closure#1}>>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::map::HashMap<ala[19492d470db44ba3]::taffy::LayoutId, ala[19492d470db44ba3]::geometry::Point<f32>, rustc_hash[4524cdd11449678d]::FxBuildHasher>>::insert",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<smallvec[73704c7bc5bb33c2]::SmallVec<[ala[19492d470db44ba3]::element::AnyElement: 2: usize]> as core[a9090a07a7fa7517]::iter::traits::collect::Extend<ala[19492d470db44ba3]::element::AnyElement>>::extend::<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::ops::range::Range<usize>, <ui_cpu[6aec32a9d909eb5]::TextRows as ala[19492d470db44ba3]::element::Render>::render::{closure#0}>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::ParentElement>::children<ala[19492d470db44ba3]::elements::div::Div, core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::ops::range::Range<usize>, <ui_cpu[6aec32a9d909eb5]::TextRows as ala[19492d470db44ba3]::element::Render>::render::{closure#0}>>::{closure#0}>>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::ops::range::Range<usize>, <ui_cpu[6aec32a9d909eb5]::TextRows as ala[19492d470db44ba3]::element::Render>::render::{closure#0}>, <ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::ParentElement>::children<ala[19492d470db44ba3]::elements::div::Div, core[a9090a07a7fa7517]::iter::adapters::map::Map<core[a9090a07a7fa7517]::ops::range::Range<usize>, <ui_cpu[6aec32a9d909eb5]::TextRows as ala[19492d470db44ba3]::element::Render>::render::{closure#0}>>::{closure#0}> as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::next",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "ala[19492d470db44ba3]::color::rgb",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<core[a9090a07a7fa7517]::fmt::Formatter>::pad_integral",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "ala[19492d470db44ba3]::elements::div::div",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<std[c29fa2d9dbea2b0e]::time::Instant>::saturating_duration_since",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::profiler::journal::ForegroundJournalWriter>::record_entry",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::Vec<ala[19492d470db44ba3]::tab_stop::TabStopOperation> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<taffy[c1f23ef5926276af]::tree::taffy_tree::NodeData>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line_layout::LineLayoutCache>::finish_frame",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::WrappedLineLayout>>::drop_slow",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::raw::RawDrain<(alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::CacheKey>, alloc[12ca63220423dfc2]::sync::Arc<ala[19492d470db44ba3]::text_system::line_layout::WrappedLineLayout>)> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<core[a9090a07a7fa7517]::option::Option<<ala[19492d470db44ba3]::element::AnyElement>::new<ala[19492d470db44ba3]::view::ViewElement<ala[19492d470db44ba3]::view::AnyView>>::{closure#0}>>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::ElementArenaScope as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::present",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "std[c29fa2d9dbea2b0e]::thread::current::current",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<alloc[12ca63220423dfc2]::vec::into_iter::IntoIter<(ala[19492d470db44ba3]::window::AnyWindowHandle, ala[19492d470db44ba3]::platform::test::window::TestWindow)> as core[a9090a07a7fa7517]::ops::drop::Drop>::drop",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::tab_stop::TabStopMap>::clear",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<hashbrown[ec5eb3d1610e94b1]::raw::RawTable<(u64, ala[19492d470db44ba3]::element::GlobalElementId)>>::clear",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::TextStyle as ala[19492d470db44ba3]::refineable::Refineable>::refine",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<fontdb[522db155ebbe510a]::Database>::load_font_file_impl",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ttf_parser[ab30ac93695dd42]::tables::name::Table>::parse",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ttf_parser[ab30ac93695dd42]::tables::name::NamesIter as core[a9090a07a7fa7517]::iter::traits::iterator::Iterator>::next",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "fontdb[522db155ebbe510a]::name_to_unicode",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<std[c29fa2d9dbea2b0e]::fs::File>::metadata",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<std[c29fa2d9dbea2b0e]::hash::random::RandomState as core[a9090a07a7fa7517]::hash::BuildHasher>::hash_one::<&std[c29fa2d9dbea2b0e]::path::PathBuf>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<std[c29fa2d9dbea2b0e]::hash::random::DefaultHasher as core[a9090a07a7fa7517]::hash::Hasher>::write",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Interactivity>::new",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::style::StyleRefinement as core[a9090a07a7fa7517]::default::Default>::default",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::gpos::PairPosFormat2Marker>>::value_format2",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::layout::CoverageFormat1Marker>>::glyph_array",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::layout::CoverageFormat2Marker>>::range_records",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::match_input::<<read_fonts[fbeccfa1e7fc88b5]::table_ref::TableRef<read_fonts[fbeccfa1e7fc88b5]::tables::layout::ChainedSequenceContextFormat3Marker> as harfrust[4be6d866ffb55c48]::hb::ot_layout_gsubgpos::Apply>::apply::{closure#2}>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "std[c29fa2d9dbea2b0e]::sys::fs::unix::try_statx",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::text_system::line_layout::LineLayoutCache>::clear_if_font_generation_changed",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::slice::memchr::memchr_aligned",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::key_dispatch::DispatchTree>::push_node",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_optional_element_state::<ala[19492d470db44ba3]::elements::div::InteractiveElementState, (), <ala[19492d470db44ba3]::elements::div::Interactivity>::paint<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::paint::{closure#1}::{closure#0}>::{closure#1}>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "core[a9090a07a7fa7517]::ptr::drop_glue::<core[a9090a07a7fa7517]::option::Option<ala[19492d470db44ba3]::elements::div::InteractiveElementState>>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div>>::request_layout",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::with_optional_element_state::<ala[19492d470db44ba3]::elements::div::InteractiveElementState, ala[19492d470db44ba3]::taffy::LayoutId, <ala[19492d470db44ba3]::elements::div::Interactivity>::request_layout<<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::Element>::request_layout::{closure#1}::{closure#0}>::{closure#0}>",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::elements::div::Div as ala[19492d470db44ba3]::element::IntoElement>::into_any_element",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "ala[19492d470db44ba3]::window::with_element_arena::<ala[19492d470db44ba3]::arena::ArenaBox<ala[19492d470db44ba3]::element::Drawable<ala[19492d470db44ba3]::elements::div::Div>>, <ala[19492d470db44ba3]::element::AnyElement>::new<ala[19492d470db44ba3]::elements::div::Div>::{closure#0}>::{closure#0}",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    },
+    {
+      "symbol": "<ala[19492d470db44ba3]::window::Window>::layout_bounds",
+      "sample_weight": 2004008,
+      "percent": 0.018660197798096658
+    }
+  ]
+}

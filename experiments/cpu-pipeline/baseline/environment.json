@@ -1,0 +1,31 @@
+{
+  "machine": {
+    "system": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "host": "fd56cdf262a0",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "logical_cpus": 5,
+    "affinity": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "cpu_quota": "400000 100000",
+    "governor": null
+  },
+  "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "tools": {
+    "perf": "/workspace/.ala-perf/sysroot/usr/bin/perf",
+    "valgrind": "/workspace/.ala-perf/sysroot/usr/bin/valgrind",
+    "vulkaninfo": "/workspace/.ala-perf/sysroot/usr/bin/vulkaninfo",
+    "c++filt": "/usr/bin/c++filt",
+    "inferno-collapse-perf": "/home/agent/.cargo/bin/inferno-collapse-perf",
+    "inferno-flamegraph": "/home/agent/.cargo/bin/inferno-flamegraph"
+  },
+  "perf_user_cpu_clock": "available",
+  "perf_user_cycles": "No such file or directory",
+  "gpu_devices": [],
+  "display": null,
+  "perf_event_paranoid": "2"
+}

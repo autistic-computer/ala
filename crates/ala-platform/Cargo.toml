@@ -71,6 +71,11 @@ name = "invalidation"
 harness = false
 required-features = ["bench-support"]
 
+[[bench]]
+name = "ui_cpu"
+harness = false
+required-features = ["bench-support"]
+
 [dependencies]
 anyhow.workspace = true
 ala.workspace = true

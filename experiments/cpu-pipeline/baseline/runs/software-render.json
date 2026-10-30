@@ -1,0 +1,182 @@
+{
+  "metadata": {
+    "schema_version": 1,
+    "commit": "b9b22210d37bd7157161a238f602136a65095723",
+    "worktree_sha256": "24d31c4bbf1eed0e9df4095d889ae540cb50c1d2b40e82cae503635e2710cd3d",
+    "dirty": true,
+    "machine": {
+      "system": "Linux-6.18.55-x86_64-with-glibc2.41",
+      "host": "fd56cdf262a0",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "logical_cpus": 5,
+      "affinity": [
+        0
+      ],
+      "cpu_quota": "400000 100000",
+      "governor": null
+    },
+    "rust": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "features": "bench-support,font-kit,wayland,x11",
+    "rustflags": "-C force-frame-pointers=yes",
+    "bench": "invalidation",
+    "filter": "^keyboard_focus_pane$",
+    "binary": "/workspace/ala/target/perf/deps/invalidation-345414e6fd41753e",
+    "binary_sha256": "a6e9cebe9a1f634f75242f9e1bb948c6b263b6002f82e73f03ba2edd506d6c33",
+    "renderer": "headless (verify adapter separately)",
+    "runtime": {
+      "VK_DRIVER_FILES": "/workspace/.ala-perf/sysroot/usr/share/vulkan/icd.d/lvp_icd.json",
+      "VK_ICD_FILENAMES": null,
+      "LP_NUM_THREADS": "4",
+      "ALA_PERF_SYSROOT": "/workspace/.ala-perf/sysroot"
+    },
+    "frames": false,
+    "warmup": 1,
+    "measurement": 3,
+    "samples": 30,
+    "command": [
+      "/workspace/ala/target/perf/deps/invalidation-345414e6fd41753e",
+      "--bench",
+      "--noplot",
+      "--warm-up-time",
+      "1",
+      "--measurement-time",
+      "3",
+      "--sample-size",
+      "30",
+      "^keyboard_focus_pane$"
+    ]
+  },
+  "summary": {
+    "keyboard_focus_pane": {
+      "mean_ns": 220444171.66666666,
+      "lower_ns": 219307965.94083333,
+      "upper_ns": 221709244.08833334,
+      "median_ns": 220280160.5
+    }
+  },
+  "criterion": {
+    "keyboard_focus_pane": {
+      "sample": {
+        "sampling_mode": "Flat",
+        "iters": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "times": [
+          222086570.0,
+          220699779.0,
+          225145746.0,
+          220184706.0,
+          219897141.0,
+          225228358.0,
+          223841687.0,
+          220807193.0,
+          220663280.0,
+          224060636.0,
+          220375615.0,
+          215927133.0,
+          215746186.0,
+          218544376.0,
+          221541210.0,
+          217623884.0,
+          232087021.0,
+          218298714.0,
+          219901124.0,
+          219503236.0,
+          221329048.0,
+          219887074.0,
+          220602402.0,
+          215917011.0,
+          215907417.0,
+          215897953.0,
+          220742149.0,
+          219019530.0,
+          221949695.0,
+          219909276.0
+        ]
+      },
+      "estimates": {
+        "mean": {
+          "confidence_interval": {
+            "confidence_level": 0.95,
+            "lower_bound": 219307965.94083333,
+            "upper_bound": 221709244.08833334
+          },
+          "point_estimate": 220444171.66666666,
+          "standard_error": 612937.6210705963
+        },
+        "median": {
+          "confidence_interval": {
+            "confidence_level": 0.95,
+            "lower_bound": 219695155.0,
+            "upper_bound": 220774671.0
+          },
+          "point_estimate": 220280160.5,
+          "standard_error": 375236.13035406807
+        },
+        "median_abs_dev": {
+          "confidence_interval": {
+            "confidence_level": 0.95,
+            "lower_bound": 937227.9269883877,
+            "upper_bound": 4609257.282069325
+          },
+          "point_estimate": 2172441.880631447,
+          "standard_error": 878608.483488157
+        },
+        "slope": null,
+        "std_dev": {
+          "confidence_interval": {
+            "confidence_level": 0.95,
+            "lower_bound": 2115275.3391924156,
+            "upper_bound": 4625353.428730224
+          },
+          "point_estimate": 3409138.867289351,
+          "standard_error": 671923.7317511984
+        }
+      },
+      "benchmark": {
+        "group_id": "keyboard_focus_pane",
+        "function_id": null,
+        "value_str": null,
+        "throughput": null,
+        "full_id": "keyboard_focus_pane",
+        "directory_name": "keyboard_focus_pane",
+        "title": "keyboard_focus_pane"
+      },
+      "tukey": [
+        210188149.5,
+        214425657.0,
+        225725677.0,
+        229963184.5
+      ]
+    }
+  }
+}

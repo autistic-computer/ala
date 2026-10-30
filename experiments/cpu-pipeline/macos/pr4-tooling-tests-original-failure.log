@@ -1,0 +1,18 @@
+..F.
+======================================================================
+FAIL: test_frozen_variant_preserves_source_identity_and_rejects_changed_binary (test_perf.PerfTests.test_frozen_variant_preserves_source_identity_and_rejects_changed_binary)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/demfabris/dev/ala/tools/test_perf.py", line 78, in test_frozen_variant_preserves_source_identity_and_rejects_changed_binary
+    self.assertEqual(binary, str(variant / executable))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '/private/var/folders/5v/y9xj61494d1gb8rl7wl8v5cc0000gn/T/tmp9q8700sm/benchmark' != '/var/folders/5v/y9xj61494d1gb8rl7wl8v5cc0000gn/T/tmp9q8700sm/benchmark'
+- /private/var/folders/5v/y9xj61494d1gb8rl7wl8v5cc0000gn/T/tmp9q8700sm/benchmark
+? --------
++ /var/folders/5v/y9xj61494d1gb8rl7wl8v5cc0000gn/T/tmp9q8700sm/benchmark
+
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.003s
+
+FAILED (failures=1)
