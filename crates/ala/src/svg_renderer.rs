@@ -3,11 +3,13 @@ use crate::{
     swap_rgba_pa_to_bgra,
 };
 use image::Frame;
+use parking_lot::{Mutex, RwLock};
 use resvg::tiny_skia::Pixmap;
 use smallvec::SmallVec;
 use std::{
+    borrow::Cow,
     hash::Hash,
-    sync::{Arc, LazyLock, OnceLock},
+    sync::{Arc, LazyLock},
 };
 
 #[cfg(target_os = "macos")]
@@ -86,6 +88,67 @@ pub struct RenderSvgParams {
     pub size: Size<DevicePixels>,
 }
 
+type FontBytes = Arc<dyn AsRef<[u8]> + Send + Sync>;
+
+#[derive(Clone, Default)]
+pub(crate) struct SvgFonts(Arc<RwLock<Vec<FontBytes>>>);
+
+impl SvgFonts {
+    pub(crate) fn sources(fonts: &[Cow<'static, [u8]>]) -> Vec<FontBytes> {
+        fonts
+            .iter()
+            .map(|font| -> FontBytes {
+                match font {
+                    Cow::Borrowed(bytes) => Arc::new(*bytes),
+                    Cow::Owned(bytes) => Arc::new(bytes.clone()),
+                }
+            })
+            .collect()
+    }
+
+    pub(crate) fn extend(&self, sources: Vec<FontBytes>) {
+        self.0.write().extend(sources);
+    }
+
+    fn snapshot(&self) -> Vec<FontBytes> {
+        self.0.read().clone()
+    }
+}
+
+static SYSTEM_FONT_DB: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| {
+    let mut db = usvg::fontdb::Database::new();
+    db.load_system_fonts();
+    Arc::new(db)
+});
+
+struct SvgFontDb {
+    asset_source: Arc<dyn AssetSource>,
+    fonts: SvgFonts,
+    built: Mutex<Option<(usize, Arc<usvg::fontdb::Database>)>>,
+}
+
+impl SvgFontDb {
+    fn database(&self) -> Arc<usvg::fontdb::Database> {
+        let fonts = self.fonts.snapshot();
+        let mut built = self.built.lock();
+        if let Some((count, db)) = built.as_ref()
+            && *count == fonts.len()
+        {
+            return db.clone();
+        }
+        let mut db = (**SYSTEM_FONT_DB).clone();
+        load_bundled_fonts(&*self.asset_source, &mut db);
+        let count = fonts.len();
+        for font in fonts {
+            db.load_font_source(usvg::fontdb::Source::Binary(font));
+        }
+        fix_generic_font_families(&mut db);
+        let db = Arc::new(db);
+        *built = Some((count, db.clone()));
+        db
+    }
+}
+
 #[derive(Clone)]
 pub struct SvgRenderer {
     asset_source: Arc<dyn AssetSource>,
@@ -109,26 +172,21 @@ impl From<f32> for SvgSize {
 
 impl SvgRenderer {
     pub fn new(asset_source: Arc<dyn AssetSource>) -> Self {
-        static SYSTEM_FONT_DB: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| {
-            let mut db = usvg::fontdb::Database::new();
-            db.load_system_fonts();
-            Arc::new(db)
-        });
+        Self::with_fonts(asset_source, SvgFonts::default())
+    }
 
-        let enriched_fontdb: Arc<OnceLock<Arc<usvg::fontdb::Database>>> = Arc::new(OnceLock::new());
+    pub(crate) fn with_fonts(asset_source: Arc<dyn AssetSource>, fonts: SvgFonts) -> Self {
+        let fontdb = SvgFontDb {
+            asset_source: asset_source.clone(),
+            fonts,
+            built: Mutex::new(None),
+        };
 
         let default_font_resolver = usvg::FontResolver::default_font_selector();
         let font_resolver = Box::new({
-            let asset_source = asset_source.clone();
             move |font: &usvg::Font, db: &mut Arc<usvg::fontdb::Database>| {
                 if db.is_empty() {
-                    let fontdb = enriched_fontdb.get_or_init(|| {
-                        let mut db = (**SYSTEM_FONT_DB).clone();
-                        load_bundled_fonts(&*asset_source, &mut db);
-                        fix_generic_font_families(&mut db);
-                        Arc::new(db)
-                    });
-                    *db = fontdb.clone();
+                    *db = fontdb.database();
                 }
                 if let Some(id) = default_font_resolver(font, db) {
                     return Some(id);
@@ -297,28 +355,46 @@ fn load_bundled_fonts(asset_source: &dyn AssetSource, db: &mut usvg::fontdb::Dat
 fn fix_generic_font_families(db: &mut usvg::fontdb::Database) {
     use usvg::fontdb::{Family, Query};
 
-    let families_and_fallbacks: &[(Family<'_>, &str)] = &[
-        (Family::SansSerif, "IBM Plex Sans"),
-        (Family::Serif, "IBM Plex Sans"),
-        (Family::Monospace, "Lilex"),
-        (Family::Cursive, "IBM Plex Sans"),
-        (Family::Fantasy, "IBM Plex Sans"),
+    let families_and_fallbacks: &[(Family<'_>, &str, bool)] = &[
+        (Family::SansSerif, "IBM Plex Sans", false),
+        (Family::Serif, "IBM Plex Sans", false),
+        (Family::Monospace, "Lilex", true),
+        (Family::Cursive, "IBM Plex Sans", false),
+        (Family::Fantasy, "IBM Plex Sans", false),
     ];
 
-    for (family, fallback_name) in families_and_fallbacks {
-        let query = Query {
-            families: &[*family],
-            ..Default::default()
+    for (family, preferred, monospaced) in families_and_fallbacks {
+        let resolves = |db: &usvg::fontdb::Database, family: Family<'_>| {
+            db.query(&Query {
+                families: &[family],
+                ..Default::default()
+            })
+            .is_some()
         };
-        if db.query(&query).is_none() {
-            match family {
-                Family::SansSerif => db.set_sans_serif_family(*fallback_name),
-                Family::Serif => db.set_serif_family(*fallback_name),
-                Family::Monospace => db.set_monospace_family(*fallback_name),
-                Family::Cursive => db.set_cursive_family(*fallback_name),
-                Family::Fantasy => db.set_fantasy_family(*fallback_name),
-                _ => {}
-            }
+        if resolves(db, *family) {
+            continue;
+        }
+        let fallback = if resolves(db, Family::Name(preferred)) {
+            (*preferred).to_owned()
+        } else {
+            let Some(name) = db
+                .faces()
+                .find(|face| face.monospaced == *monospaced)
+                .or_else(|| db.faces().next())
+                .and_then(|face| face.families.first())
+                .map(|(name, _)| name.clone())
+            else {
+                return;
+            };
+            name
+        };
+        match family {
+            Family::SansSerif => db.set_sans_serif_family(fallback),
+            Family::Serif => db.set_serif_family(fallback),
+            Family::Monospace => db.set_monospace_family(fallback),
+            Family::Cursive => db.set_cursive_family(fallback),
+            Family::Fantasy => db.set_fantasy_family(fallback),
+            _ => {}
         }
     }
 }
@@ -466,6 +542,46 @@ mod tests {
         assert_eq!(selected, lilex);
         assert!(!font_has_char(&db, ibm_plex_sans, '│'));
         assert!(font_has_char(&db, selected, '│'));
+    }
+
+    #[test]
+    fn generic_families_fall_back_to_whatever_was_registered() {
+        let mut db = Database::new();
+        db.load_font_data(LILEX_REGULAR.to_vec());
+        fix_generic_font_families(&mut db);
+
+        for family in [Family::SansSerif, Family::Monospace] {
+            let id = db
+                .query(&Query {
+                    families: &[family],
+                    ..Default::default()
+                })
+                .unwrap_or_else(|| panic!("{family:?} should resolve to the registered font"));
+            let face = db.face(id).expect("face");
+            assert!(face.families.iter().any(|(name, _)| name == "Lilex"));
+        }
+    }
+
+    #[ala::test]
+    fn fonts_added_to_the_text_system_reach_svg_text(cx: &mut crate::TestAppContext) {
+        const TEXT: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><text y="10" font-family="Lilex, sans-serif">hi</text></svg>"#;
+        let faces = |cx: &mut crate::TestAppContext| {
+            cx.update(|cx| {
+                cx.svg_renderer()
+                    .parse_svg(TEXT)
+                    .expect("SVG text should parse")
+                    .0
+                    .fontdb()
+                    .len()
+            })
+        };
+        let before = faces(cx);
+        cx.update(|cx| {
+            cx.text_system()
+                .add_fonts(vec![Cow::Borrowed(LILEX_REGULAR)])
+        })
+        .expect("the font should load");
+        assert_eq!(faces(cx), before + 1);
     }
 
     #[test]

@@ -182,7 +182,8 @@ impl Application {
         let mut context_lock = self.0.borrow_mut();
         let asset_source = Arc::new(asset_source);
         context_lock.asset_source = asset_source.clone();
-        context_lock.svg_renderer = SvgRenderer::new(asset_source);
+        context_lock.svg_renderer =
+            SvgRenderer::with_fonts(asset_source, context_lock.text_system.svg_fonts());
         drop(context_lock);
         self
     }
@@ -770,6 +771,7 @@ impl App {
         let synced_animation_epoch = background_executor.now();
 
         let text_system = Arc::new(TextSystem::new(platform.text_system()));
+        let svg_fonts = text_system.svg_fonts();
         let entities = EntityMap::new();
         let keyboard_layout = platform.keyboard_layout();
         let keyboard_mapper = platform.keyboard_mapper();
@@ -793,7 +795,7 @@ impl App {
                 foreground_executor,
                 #[cfg(feature = "profiler")]
                 foreground_journal,
-                svg_renderer: SvgRenderer::new(asset_source.clone()),
+                svg_renderer: SvgRenderer::with_fonts(asset_source.clone(), svg_fonts),
                 loading_assets: Default::default(),
                 asset_source,
                 http_client,

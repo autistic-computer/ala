@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::collections::{FxHashMap, FxHashSet};
 use crate::{
     Bounds, DevicePixels, Hsla, Pixels, PlatformTextSystem, Point, Result, SharedString, Size,
-    StrikethroughStyle, TextRenderingMode, UnderlineStyle, px,
+    StrikethroughStyle, TextRenderingMode, UnderlineStyle, px, svg_renderer::SvgFonts,
 };
 use anyhow::{Context as _, anyhow};
 use core::fmt;
@@ -214,6 +214,7 @@ pub struct TextSystem {
     font_generation: Arc<AtomicUsize>,
     missing_glyph_reporter: Arc<MissingGlyphReporter>,
     missing_glyph_receiver: Mutex<Option<MissingGlyphReceiver>>,
+    svg_fonts: SvgFonts,
 }
 
 impl TextSystem {
@@ -252,6 +253,7 @@ impl TextSystem {
                 generation: missing_glyph_generation,
                 receiver,
             })),
+            svg_fonts: SvgFonts::default(),
         }
     }
 
@@ -263,12 +265,18 @@ impl TextSystem {
     }
 
     pub fn add_fonts(&self, fonts: Vec<Cow<'static, [u8]>>) -> Result<()> {
+        let sources = SvgFonts::sources(&fonts);
         self.platform_text_system.add_fonts(fonts)?;
+        self.svg_fonts.extend(sources);
         self.font_ids_by_font.write().clear();
         self.resolved_fonts.write().clear();
         self.missing_glyph_reporter.reset();
         self.font_generation.fetch_add(1, Ordering::Release);
         Ok(())
+    }
+
+    pub(crate) fn svg_fonts(&self) -> SvgFonts {
+        self.svg_fonts.clone()
     }
 
     pub(crate) fn take_missing_glyph_receiver(&self) -> Option<MissingGlyphReceiver> {
