@@ -346,7 +346,7 @@ fn load_bundled_fonts(asset_source: &dyn AssetSource, db: &mut usvg::fontdb::Dat
     for path in font_paths {
         match asset_source.load(path) {
             Ok(Some(data)) => db.load_font_data(data.into_owned()),
-            Ok(None) => log::warn!("Bundled font not found: {path}"),
+            Ok(None) => log::debug!("Bundled font not found: {path}"),
             Err(error) => log::warn!("Failed to load bundled font {path}: {error}"),
         }
     }
