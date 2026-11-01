@@ -9,7 +9,7 @@ penna and nidus build on it as a git dependency.
 - The 89 commits after that one are the old patch fork's `zz-patches` branch (tip
   `5a00ac89a4`), replayed under new IDs. That fork stays up as an archive and zebrilus's knowledge
   pages cite its commit IDs; the same commits exist here with the same subjects.
-- Upstream license: Apache-2.0, retained as `LICENSE-APACHE`. Third-party notices are in `NOTICE`.
+- Upstream license: Apache-2.0, retained as `LICENSE-APACHE`. Third-party notices are in `NOTICE.md`.
 
 ## Layout
 
