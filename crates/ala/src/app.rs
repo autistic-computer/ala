@@ -183,7 +183,7 @@ impl Application {
         let asset_source = Arc::new(asset_source);
         context_lock.asset_source = asset_source.clone();
         context_lock.svg_renderer =
-            SvgRenderer::with_fonts(asset_source, context_lock.text_system.svg_fonts());
+            SvgRenderer::with_text_system(asset_source, &context_lock.text_system);
         drop(context_lock);
         self
     }

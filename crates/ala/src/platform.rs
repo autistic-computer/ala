@@ -931,6 +931,9 @@ pub trait PlatformTextSystem: Send + Sync {
     fn font_generation(&self) -> u64 {
         0
     }
+    fn system_font_family(&self) -> Option<String> {
+        None
+    }
     fn font_metrics(&self, font_id: FontId) -> FontMetrics;
     fn typographic_bounds(&self, font_id: FontId, glyph_id: GlyphId) -> Result<Bounds<f32>>;
     fn advance(&self, font_id: FontId, glyph_id: GlyphId) -> Result<Size<f32>>;

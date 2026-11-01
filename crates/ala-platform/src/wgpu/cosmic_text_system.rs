@@ -205,6 +205,10 @@ impl PlatformTextSystem for CosmicTextSystem {
         self.1.load(Ordering::Relaxed)
     }
 
+    fn system_font_family(&self) -> Option<String> {
+        Some(self.0.read().system_font_fallback.clone())
+    }
+
     fn add_fonts(&self, fonts: Vec<Cow<'static, [u8]>>) -> Result<()> {
         self.0.write().add_fonts(fonts)
     }
@@ -1330,8 +1334,13 @@ mod tests {
 
         assert!(!platform.set_system_font_family(["Missing Sans", "ibm plex sans"]));
         assert_eq!(text_system.resolve_font(&system), plex);
+        assert_eq!(
+            platform.system_font_family().as_deref(),
+            Some("IBM Plex Sans")
+        );
 
         assert!(platform.set_system_font_family(["Missing Sans", "lilex"]));
+        assert_eq!(platform.system_font_family().as_deref(), Some("Lilex"));
         let lilex = text_system.resolve_font(&system);
         assert_ne!(lilex, plex);
         assert_eq!(text_system.resolve_font(&system), lilex);

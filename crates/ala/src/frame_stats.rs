@@ -437,6 +437,10 @@ impl PlatformTextSystem for RecordingTextSystem {
         self.inner.font_generation()
     }
 
+    fn system_font_family(&self) -> Option<String> {
+        self.inner.system_font_family()
+    }
+
     fn font_metrics(&self, font_id: FontId) -> FontMetrics {
         self.inner.font_metrics(font_id)
     }

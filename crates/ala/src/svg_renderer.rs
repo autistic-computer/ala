@@ -1,6 +1,6 @@
 use crate::{
-    AssetSource, DevicePixels, IsZero, RenderImage, Result, SharedString, Size,
-    swap_rgba_pa_to_bgra,
+    AssetSource, DevicePixels, IsZero, PlatformTextSystem, RenderImage, Result, SharedString, Size,
+    TextSystem, font_name_with_fallbacks, swap_rgba_pa_to_bgra,
 };
 use image::Frame;
 use parking_lot::{Mutex, RwLock};
@@ -91,7 +91,10 @@ pub struct RenderSvgParams {
 type FontBytes = Arc<dyn AsRef<[u8]> + Send + Sync>;
 
 #[derive(Clone, Default)]
-pub(crate) struct SvgFonts(Arc<RwLock<Vec<FontBytes>>>);
+pub(crate) struct SvgFonts {
+    sources: Arc<RwLock<Vec<FontBytes>>>,
+    system: Option<Arc<dyn PlatformTextSystem>>,
+}
 
 impl SvgFonts {
     pub(crate) fn sources(fonts: &[Cow<'static, [u8]>]) -> Vec<FontBytes> {
@@ -106,12 +109,23 @@ impl SvgFonts {
             .collect()
     }
 
+    pub(crate) fn with_system(system: Arc<dyn PlatformTextSystem>) -> Self {
+        Self {
+            sources: Arc::default(),
+            system: Some(system),
+        }
+    }
+
     pub(crate) fn extend(&self, sources: Vec<FontBytes>) {
-        self.0.write().extend(sources);
+        self.sources.write().extend(sources);
     }
 
     fn snapshot(&self) -> Vec<FontBytes> {
-        self.0.read().clone()
+        self.sources.read().clone()
+    }
+
+    fn system_family(&self) -> Option<String> {
+        self.system.as_ref()?.system_font_family()
     }
 }
 
@@ -175,7 +189,12 @@ impl SvgRenderer {
         Self::with_fonts(asset_source, SvgFonts::default())
     }
 
+    pub fn with_text_system(asset_source: Arc<dyn AssetSource>, text_system: &TextSystem) -> Self {
+        Self::with_fonts(asset_source, text_system.svg_fonts())
+    }
+
     pub(crate) fn with_fonts(asset_source: Arc<dyn AssetSource>, fonts: SvgFonts) -> Self {
+        let system = fonts.clone();
         let fontdb = SvgFontDb {
             asset_source: asset_source.clone(),
             fonts,
@@ -187,6 +206,9 @@ impl SvgRenderer {
             move |font: &usvg::Font, db: &mut Arc<usvg::fontdb::Database>| {
                 if db.is_empty() {
                     *db = fontdb.database();
+                }
+                if let Some(id) = private_family_face(font, db, &system) {
+                    return Some(id);
                 }
                 if let Some(id) = default_font_resolver(font, db) {
                     return Some(id);
@@ -336,6 +358,60 @@ fn rasterize_tree(tree: &usvg::Tree, size: SvgSize) -> Result<Pixmap, usvg::Erro
     resvg::render(tree, transform, &mut pixmap.as_mut());
 
     Ok(pixmap)
+}
+
+fn private_family_face(
+    font: &usvg::Font,
+    db: &usvg::fontdb::Database,
+    fonts: &SvgFonts,
+) -> Option<usvg::fontdb::ID> {
+    use usvg::{FontFamily, fontdb::Family};
+
+    let private = |name: &str| name.eq_ignore_ascii_case("system-ui") || name.starts_with('.');
+    if !font
+        .families()
+        .iter()
+        .any(|family| matches!(family, FontFamily::Named(name) if private(name)))
+    {
+        return None;
+    }
+    let system = fonts.system_family();
+    let names = font
+        .families()
+        .iter()
+        .map(|family| match family {
+            FontFamily::Named(name) if private(name) => {
+                let mapped = font_name_with_fallbacks(name, "");
+                if mapped == name.as_str() || mapped.is_empty() {
+                    system.clone()
+                } else {
+                    Some(mapped.to_owned())
+                }
+            }
+            FontFamily::Named(name) => Some(name.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let families = font
+        .families()
+        .iter()
+        .zip(&names)
+        .filter_map(|(family, name)| match (family, name) {
+            (_, Some(name)) => Some(Family::Name(name)),
+            (FontFamily::Serif, None) => Some(Family::Serif),
+            (FontFamily::SansSerif, None) => Some(Family::SansSerif),
+            (FontFamily::Cursive, None) => Some(Family::Cursive),
+            (FontFamily::Fantasy, None) => Some(Family::Fantasy),
+            (FontFamily::Monospace, None) => Some(Family::Monospace),
+            (FontFamily::Named(_), None) => None,
+        })
+        .collect::<Vec<_>>();
+    db.query(&usvg::fontdb::Query {
+        families: &families,
+        weight: usvg::fontdb::Weight(font.weight()),
+        stretch: font.stretch().into(),
+        style: font.style().into(),
+    })
 }
 
 fn load_bundled_fonts(asset_source: &dyn AssetSource, db: &mut usvg::fontdb::Database) {

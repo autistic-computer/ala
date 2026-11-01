@@ -91,7 +91,7 @@ rand = "0.9"
 raw-window-handle = "0.6.2"
 rayon = "1.8"
 regex = "1.13.1"
-resvg = { version = "0.46.0", default-features = false, features = [
+resvg = { version = "0.48.1", default-features = false, features = [
     "text",
     "system-fonts",
     "memmap-fonts",
@@ -116,7 +116,7 @@ unicode-bidi = { version = "0.3.18", default-features = false, features = [
 ] }
 unicode-segmentation = "1.10"
 url = "=2.5.8"
-usvg = { version = "0.46.0", default-features = false }
+usvg = { version = "0.48.1", default-features = false }
 uuid = { version = "1.1.2", features = ["v4", "v5", "v7", "serde"] }
 wasm-bindgen = "0.2.120"
 wasm-bindgen-futures = "0.4"

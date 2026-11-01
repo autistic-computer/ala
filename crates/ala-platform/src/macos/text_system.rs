@@ -100,6 +100,10 @@ impl PlatformTextSystem for MacTextSystem {
         self.0.write().add_fonts(fonts)
     }
 
+    fn system_font_family(&self) -> Option<String> {
+        Some("System Font".to_owned())
+    }
+
     fn all_font_names(&self) -> Vec<String> {
         let mut names = Vec::new();
         let collection = core_text::font_collection::create_for_all_families();
@@ -755,6 +759,43 @@ mod tests {
     use super::{synthetic_bold_device_line_width, synthetic_bold_user_space_line_width};
     use crate::macos::MacTextSystem;
     use ala::{FontRun, GlyphId, PlatformTextSystem, font, px};
+    use std::sync::Arc;
+
+    fn drawn_width(renderer: &ala::SvgRenderer, family: &str, text: &str, size: f32) -> f32 {
+        let svg = format!(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"40\"><text x=\"10\" y=\"26\" font-size=\"{size}\" font-family=\"{family}\" fill=\"#000\">{text}</text></svg>"
+        );
+        let image = renderer.render_single_frame(svg.as_bytes(), 1.0).unwrap();
+        let width = i32::from(image.size(0).width) as usize;
+        let scale = width as f32 / 800.0;
+        let bytes = image.as_bytes(0).unwrap();
+        let inked = (0..width)
+            .filter(|x| bytes.chunks_exact(4 * width).any(|row| row[4 * x + 3] > 32))
+            .collect::<Vec<_>>();
+        (inked.last().unwrap() - inked.first().unwrap() + 1) as f32 / scale
+    }
+
+    #[test]
+    fn svg_text_in_the_system_ui_font_matches_what_the_text_system_measures() {
+        let text_system = Arc::new(ala::TextSystem::new(Arc::new(MacTextSystem::new())));
+        let renderer = ala::SvgRenderer::with_text_system(Arc::new(()), &text_system);
+        let text = "Agent loop Use a tool? Read result Transcript ChatView";
+        let size = 13.0;
+        let font_id = text_system.resolve_font(&font(".SystemUIFont"));
+        let measured = text
+            .chars()
+            .map(|character| f32::from(text_system.layout_width(font_id, px(size), character)))
+            .sum::<f32>();
+        for family in ["system-ui, sans-serif", "'.SystemUIFont', serif"] {
+            let drawn = drawn_width(&renderer, family, text, size);
+            let off = (drawn - measured).abs() / measured;
+            assert!(
+                off < 0.015,
+                "{family}: drawn {drawn}, measured {measured}, {:.2}% apart",
+                off * 100.0
+            );
+        }
+    }
 
     #[test]
     fn lines_laid_out_with_kept_fonts_match_the_first_layout() {

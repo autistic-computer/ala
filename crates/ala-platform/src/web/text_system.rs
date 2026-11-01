@@ -257,6 +257,10 @@ impl PlatformTextSystem for WebTextSystem {
         self.native.all_font_names()
     }
 
+    fn system_font_family(&self) -> Option<String> {
+        self.native.system_font_family()
+    }
+
     fn font_id(&self, font: &Font) -> Result<FontId> {
         let font_id = self.native.font_id(font)?;
         ensure!(
