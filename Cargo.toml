@@ -92,6 +92,7 @@ raw-window-handle = "0.6.2"
 rayon = "1.8"
 regex = "1.13.1"
 resvg = { version = "0.48.1", default-features = false, features = [
+    "svgz",
     "text",
     "system-fonts",
     "memmap-fonts",
