@@ -642,6 +642,7 @@ impl WebWindowInner {
 
             let is_held = event.repeat();
             let key_char = compute_key_char(&event, &key, &modifiers);
+            let enter = key == "enter";
 
             let keystroke = Keystroke {
                 modifiers,
@@ -668,6 +669,7 @@ impl WebWindowInner {
                 return;
             }
 
+            this.enter_key_dispatched.set(enter);
             if keystroke_inserts_text(&modifiers, this.is_mac)
                 && let Some(text) = key_char
             {
@@ -684,6 +686,7 @@ impl WebWindowInner {
         let this = Rc::clone(self);
         self.listen_input("keyup", move |event: JsValue| {
             let event: web_sys::KeyboardEvent = event.unchecked_into();
+            this.enter_key_dispatched.set(false);
 
             let modifiers = modifiers_from_keyboard_event(&event, this.is_mac);
             let capslock = capslock_from_keyboard_event(&event);
@@ -857,7 +860,9 @@ impl WebWindowInner {
             match event.input_type().as_str() {
                 "insertLineBreak" | "insertParagraph" => {
                     event.prevent_default();
-                    this.dispatch_synthetic_keystroke("enter", Modifiers::default());
+                    if !this.enter_key_dispatched.replace(false) {
+                        this.dispatch_synthetic_keystroke("enter", Modifiers::default());
+                    }
                     this.schedule_ime_mirror_sync();
                 }
                 _ => {}
