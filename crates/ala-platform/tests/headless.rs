@@ -119,7 +119,7 @@ fn scrolled_list_rows_replay_with_the_pixels_of_a_fresh_render() -> anyhow::Resu
             })
             .collect();
         cx.new(|_| Rows {
-            list: ListState::new(40, ListAlignment::Top, px(0.)),
+            list: ListState::new(40, ListAlignment::Top, px(0.)).replay_unchanged_rows(),
             rows,
         })
     })?;
@@ -183,6 +183,7 @@ fn scrolled_list_rows_replay_with_the_pixels_of_a_fresh_render() -> anyhow::Resu
 struct DocState {
     items: Vec<(String, bool)>,
     width: f32,
+    highlight: usize,
 }
 
 struct Doc(DocState);
@@ -202,7 +203,12 @@ impl Render for Doc {
                     .flex()
                     .gap(px(3.))
                     .child(div().flex_none().w(px(12.)).h(px(12.)).bg(red()))
-                    .child(div().flex_1().child(text.clone()))
+                    .child(
+                        div()
+                            .flex_1()
+                            .when(ix == self.0.highlight, |text| text.text_color(red()))
+                            .child(text.clone()),
+                    )
                     .when(ix % 3 == 0, |item| {
                         item.child(
                             div()
@@ -229,6 +235,7 @@ fn retained_layout_matches_a_fresh_window() -> anyhow::Result<()> {
             .map(|ix| (format!("item {ix} {}", "word ".repeat(ix * 2 + 1)), ix % 2 == 0))
             .collect(),
         width: 200.,
+        highlight: 1,
     };
     let initial = state.clone();
     let window = cx.open_window(size(px(220.), px(400.)), move |_, cx| cx.new(|_| Doc(initial)))?;
@@ -243,6 +250,7 @@ fn retained_layout_matches_a_fresh_window() -> anyhow::Result<()> {
         Box::new(|s| s.width = 150.),
         Box::new(|s| s.width = 200.),
         Box::new(|s| s.items.swap(1, 3)),
+        Box::new(|s| s.highlight = 2),
         Box::new(|_| {}),
     ];
     for (step, edit) in edits.iter().enumerate() {

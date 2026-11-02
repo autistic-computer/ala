@@ -6,7 +6,7 @@ use crate::{
     FocusHandle, GlobalElementId, Hitbox, HitboxBehavior, InspectorElementId, IntoElement,
     Overflow, Overscroll, PaintIndex, Pixels, Point, PrepaintStateIndex, RubberBand, ScaledPixels,
     ScrollDelta, ScrollKey, ScrollWheelEvent, Size, Style, StyleRefinement, Styled, TextStyle,
-    TouchPhase, Window, point, px, size,
+    TouchPhase, Window, WindowId, point, px, size,
 };
 use std::{cell::RefCell, ops::Range, rc::Rc};
 
@@ -64,6 +64,9 @@ struct StateInner {
     overscroll: RubberBand,
     replays: FxHashMap<usize, ItemReplay>,
     replays_drawn: u64,
+    replays_window: Option<WindowId>,
+    replay_rows: bool,
+    replay_blocked_draw: u64,
 }
 
 #[derive(Clone)]
@@ -73,6 +76,7 @@ struct ItemReplay {
     size: Size<Pixels>,
     width: Option<Pixels>,
     key: ReplayKey,
+    layout: Range<PrepaintStateIndex>,
     prepaint: Range<PrepaintStateIndex>,
     paint: Range<PaintIndex>,
     accessed: Rc<FxHashSet<EntityId>>,
@@ -94,6 +98,7 @@ struct ReplayKey {
     opacity: f32,
     text_fade: Option<(ScaledPixels, ScaledPixels)>,
     raster: u64,
+    fonts: usize,
 }
 
 impl ReplayKey {
@@ -105,6 +110,7 @@ impl ReplayKey {
             opacity: window.element_opacity(),
             text_fade: window.text_fade,
             raster: window.text_raster_state_key(),
+            fonts: window.text_system().font_cache_generation(),
         }
     }
 }
@@ -236,6 +242,8 @@ struct ItemLayout {
     record: bool,
     accessed: FxHashSet<EntityId>,
     bounds: Bounds<Pixels>,
+    key: Option<ReplayKey>,
+    layout: Option<Range<PrepaintStateIndex>>,
     prepaint: Option<Range<PrepaintStateIndex>>,
 }
 
@@ -251,6 +259,8 @@ impl ItemLayout {
             record: false,
             accessed: FxHashSet::default(),
             bounds: Bounds::default(),
+            key: None,
+            layout: None,
             prepaint: None,
         }
     }
@@ -342,6 +352,9 @@ impl ListState {
             overscroll: RubberBand::default(),
             replays: FxHashMap::default(),
             replays_drawn: 0,
+            replays_window: None,
+            replay_rows: false,
+            replay_blocked_draw: 0,
         })));
         this.splice(0..0, item_count);
         this
@@ -349,6 +362,11 @@ impl ListState {
 
     pub fn measure_all(self) -> Self {
         self.0.borrow_mut().measuring_behavior = ListMeasuringBehavior::Measure(false);
+        self
+    }
+
+    pub fn replay_unchanged_rows(self) -> Self {
+        self.0.borrow_mut().replay_rows = true;
         self
     }
 
@@ -959,13 +977,18 @@ impl StateInner {
         width: Option<Pixels>,
         window: &Window,
     ) -> Result<ItemReplay, bool> {
-        if window.refreshing || self.replays_drawn + 1 != window.draw_number {
+        if window.refreshing
+            || self.replays_drawn + 1 != window.draw_number
+            || self.replays_window != Some(window.window_handle().window_id())
+            || self.replay_blocked_draw == window.draw_number
+        {
             return Err(true);
         }
         let Some(replay) = self.replays.get(&ix).filter(|replay| replay.view == view) else {
             return Err(true);
         };
         let changed = replay.width != width
+            || replay.key != ReplayKey::new(window)
             || replay
                 .accessed
                 .iter()
@@ -987,11 +1010,16 @@ impl StateInner {
         cx: &mut App,
     ) -> ItemLayout {
         let mut element = render_item(ix, window, cx);
-        let view = element.view_entity();
+        let view = element
+            .view_entity()
+            .filter(|_| self.replay_rows && !window.a11y.is_active());
         let mut record = false;
         if let Some(view) = view {
             match self.replay_for(ix, view, width, window) {
                 Ok(replay) => {
+                    let layout_start = window.prepaint_index();
+                    window.reuse_layout_reads(replay.layout.clone());
+                    let layout = Some(layout_start..window.prepaint_index());
                     return ItemLayout {
                         index: ix,
                         element: None,
@@ -1002,15 +1030,19 @@ impl StateInner {
                         record: false,
                         accessed: FxHashSet::default(),
                         bounds: Bounds::default(),
+                        key: None,
+                        layout,
                         prepaint: None,
                     };
                 }
                 Err(clean) => record = clean,
             }
         }
+        let layout_start = window.prepaint_index();
         let (size, accessed) = cx.detect_accessed_entities(|cx| {
             element.layout_as_root(available_item_space, window, cx)
         });
+        let layout = Some(layout_start..window.prepaint_index());
         ItemLayout {
             index: ix,
             element: Some(element),
@@ -1021,6 +1053,8 @@ impl StateInner {
             record,
             accessed,
             bounds: Bounds::default(),
+            key: Some(ReplayKey::new(window)),
+            layout,
             prepaint: None,
         }
     }
@@ -1536,6 +1570,7 @@ impl Element for List {
                 Ok(layout) => layout,
                 Err(autoscroll_request) => {
                     state.logical_scroll_top = Some(autoscroll_request);
+                    state.replay_blocked_draw = window.draw_number;
                     state
                         .prepaint_items(bounds, padding, false, &mut self.render_item, window, cx)
                         .unwrap()
@@ -1600,7 +1635,13 @@ impl Element for List {
         let mut state = self.state.0.borrow_mut();
         state.replays = replays;
         state.replays_drawn = window.draw_number;
+        state.replays_window = Some(window.window_handle().window_id());
     }
+}
+
+fn unclipped() -> Bounds<Pixels> {
+    let extent = px(1.0e7);
+    Bounds::new(point(-extent, -extent), size(extent * 2.0, extent * 2.0))
 }
 
 fn whole_device_pixels(offset: Point<Pixels>, scale_factor: f32) -> bool {
@@ -1617,7 +1658,6 @@ fn prepaint_item(
 ) {
     item.bounds = Bounds::new(origin, item.size);
     if let Some(replay) = &item.replay
-        && replay.key == ReplayKey::new(window)
         && whole_device_pixels(origin - replay.origin, window.scale_factor())
     {
         let start = window.prepaint_index();
@@ -1649,7 +1689,7 @@ fn prepaint_item(
     let record = item.record;
     let ((), accessed) = cx.detect_accessed_entities(|cx| {
         if record {
-            window.prepaint_detached(item.bounds, |window| {
+            window.prepaint_detached(unclipped(), |window| {
                 element.prepaint_at(origin, window, cx);
             });
         } else {
@@ -1661,17 +1701,23 @@ fn prepaint_item(
 }
 
 fn paint_item(item: &mut ItemLayout, window: &mut Window, cx: &mut App) -> Option<ItemReplay> {
-    let (Some(view), Some(prepaint)) = (item.view, item.prepaint.clone()) else {
+    let (Some(view), Some(prepaint), Some(layout)) =
+        (item.view, item.prepaint.clone(), item.layout.clone())
+    else {
         if let Some(element) = &mut item.element {
             element.paint(window, cx);
         }
         return None;
     };
-    let key = ReplayKey::new(window);
+    let key = item
+        .replay
+        .as_ref()
+        .map(|replay| replay.key.clone())
+        .or_else(|| item.key.clone())?;
     let replayable = item.record || item.replay.is_some();
     let (paint, accessed, origin) = if let Some(replay) = item.replay.take() {
         let offset = item.bounds.origin - replay.origin;
-        let paint = window.paint_detached(item.bounds, offset, |window| {
+        let paint = window.paint_detached(unclipped(), offset, |window| {
             let start = window.paint_index();
             window.reuse_paint(replay.paint.clone());
             start..window.paint_index()
@@ -1687,7 +1733,7 @@ fn paint_item(item: &mut ItemLayout, window: &mut Window, cx: &mut App) -> Optio
                 start..window.paint_index()
             };
             if record {
-                window.paint_detached(item.bounds, Point::default(), paint)
+                window.paint_detached(unclipped(), Point::default(), paint)
             } else {
                 paint(window)
             }
@@ -1710,6 +1756,7 @@ fn paint_item(item: &mut ItemLayout, window: &mut Window, cx: &mut App) -> Optio
         size: item.size,
         width: item.width,
         key,
+        layout,
         prepaint,
         paint,
         accessed,

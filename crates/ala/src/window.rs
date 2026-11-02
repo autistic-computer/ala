@@ -3734,6 +3734,18 @@ impl Window {
             && paint.start.tab_handle_index == paint.end.tab_handle_index
     }
 
+    pub(crate) fn reuse_layout_reads(&mut self, range: Range<PrepaintStateIndex>) {
+        self.next_frame.accessed_element_states.extend(
+            self.rendered_frame.accessed_element_states[range.start.accessed_element_states_index
+                ..range.end.accessed_element_states_index]
+                .iter()
+                .map(|(id, type_id)| (id.clone(), *type_id)),
+        );
+        self.reuse_input_reads(range.start.input_reads_index..range.end.input_reads_index);
+        self.text_system
+            .reuse_layouts(range.start.line_layout_index..range.end.line_layout_index);
+    }
+
     pub(crate) fn prepaint_detached<R>(
         &mut self,
         bounds: Bounds<Pixels>,
