@@ -2,15 +2,16 @@ use crate::collections::HashMap;
 use crate::refineable::Refineable;
 use crate::util::ResultExt;
 use crate::{
-    Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, Bounds, ClickEvent, DispatchPhase,
-    Display, Element, ElementId, Entity, EntityId, ExternalDragPayload, ExternalDragPayloadSource,
-    FileDropEvent, FocusHandle, Global, GlobalElementId, Hitbox, HitboxBehavior, HitboxId,
-    InspectorElementId, IntoElement, IsZero, KeyContext, KeyDownEvent, KeyUpEvent, KeyboardButton,
-    KeyboardClickEvent, LayoutId, LongPressEvent, ModifiersChangedEvent, MouseButton,
-    MouseClickEvent, MouseDownEvent, MouseExitEvent, MouseMoveEvent, MousePressureEvent,
-    MouseUpEvent, OngoingScroll, Overflow, Overscroll, ParentElement, PinchEvent, Pixels, Point,
-    Render, ScrollKey, ScrollWheelEvent, SharedString, Size, Style, StyleRefinement, Styled, Task,
-    TooltipId, TouchPhase, Visibility, Window, WindowControlArea, point, px, size,
+    Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, BackGestureEvent, Bounds, ClickEvent,
+    DispatchPhase, Display, Element, ElementId, Entity, EntityId, ExternalDragPayload,
+    ExternalDragPayloadSource, FileDropEvent, FocusHandle, Global, GlobalElementId, Hitbox,
+    HitboxBehavior, HitboxId, InspectorElementId, IntoElement, IsZero, KeyContext, KeyDownEvent,
+    KeyUpEvent, KeyboardButton, KeyboardClickEvent, LayoutId, LongPressEvent,
+    ModifiersChangedEvent, MouseButton, MouseClickEvent, MouseDownEvent, MouseExitEvent,
+    MouseMoveEvent, MousePressureEvent, MouseUpEvent, OngoingScroll, Overflow, Overscroll,
+    ParentElement, PinchEvent, Pixels, Point, Render, ScrollKey, ScrollWheelEvent, SharedString,
+    Size, Style, StyleRefinement, Styled, Task, TooltipId, TouchPhase, Visibility, Window,
+    WindowControlArea, point, px, size,
 };
 use smallvec::SmallVec;
 use std::{
@@ -308,6 +309,20 @@ impl Interactivity {
             .push(Box::new(move |event, phase, hitbox, window, cx| {
                 if phase == DispatchPhase::Bubble && hitbox.is_hovered(window) {
                     (listener)(event, window, cx);
+                }
+            }));
+    }
+
+    pub fn on_back_gesture(
+        &mut self,
+        listener: impl Fn(&BackGestureEvent, &mut Window, &mut App) + 'static,
+    ) {
+        self.back_gesture_listeners
+            .push(Box::new(move |event, phase, hitbox, window, cx| {
+                if phase == DispatchPhase::Bubble && hitbox.is_hovered(window) {
+                    (listener)(event, window, cx);
+                    window.prevent_default();
+                    cx.stop_propagation();
                 }
             }));
     }
@@ -773,6 +788,14 @@ pub trait InteractiveElement: Sized {
 
     fn on_pinch(mut self, listener: impl Fn(&PinchEvent, &mut Window, &mut App) + 'static) -> Self {
         self.interactivity().on_pinch(listener);
+        self
+    }
+
+    fn on_back_gesture(
+        mut self,
+        listener: impl Fn(&BackGestureEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.interactivity().on_back_gesture(listener);
         self
     }
 
@@ -1254,6 +1277,9 @@ pub(crate) type ScrollWheelListener =
 
 pub(crate) type PinchListener =
     Box<dyn Fn(&PinchEvent, DispatchPhase, &Hitbox, &mut Window, &mut App) + 'static>;
+
+pub(crate) type BackGestureListener =
+    Box<dyn Fn(&BackGestureEvent, DispatchPhase, &Hitbox, &mut Window, &mut App) + 'static>;
 
 pub(crate) type ClickListener = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
@@ -1742,6 +1768,7 @@ pub struct Interactivity {
     pub(crate) file_drop_exit_listeners: LazyVec<FileDropExitListener>,
     pub(crate) scroll_wheel_listeners: LazyVec<ScrollWheelListener>,
     pub(crate) pinch_listeners: LazyVec<PinchListener>,
+    pub(crate) back_gesture_listeners: LazyVec<BackGestureListener>,
     pub(crate) key_down_listeners: LazyVec<KeyDownListener>,
     pub(crate) key_up_listeners: LazyVec<KeyUpListener>,
     pub(crate) modifiers_changed_listeners: LazyVec<ModifiersChangedListener>,
@@ -1987,6 +2014,7 @@ impl Interactivity {
             || !self.aux_click_listeners.is_empty()
             || !self.scroll_wheel_listeners.is_empty()
             || self.has_pinch_listeners()
+            || !self.back_gesture_listeners.is_empty()
             || self.drag_listener.is_some()
             || !self.drop_listeners.is_empty()
             || !self.drag_over_styles.is_empty()
@@ -2379,6 +2407,13 @@ impl Interactivity {
         for listener in self.pinch_listeners.drain(..) {
             let hitbox = hitbox.clone();
             window.on_mouse_event(move |event: &PinchEvent, phase, window, cx| {
+                listener(event, phase, &hitbox, window, cx);
+            })
+        }
+
+        for listener in self.back_gesture_listeners.drain(..) {
+            let hitbox = hitbox.clone();
+            window.on_mouse_event(move |event: &BackGestureEvent, phase, window, cx| {
                 listener(event, phase, &hitbox, window, cx);
             })
         }
