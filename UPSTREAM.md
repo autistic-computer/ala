@@ -59,6 +59,14 @@ From zebrilus, apply the same patch with `git am -3 --directory=libs/ala`. Limit
 the crates the fix touches. Never bulk-merge upstream: take what you need, read it, and run the GPU
 tests for the renderers it touches.
 
+## Last review
+
+Upstream reviewed through `bc6fc11` (2026-11-02); start the next pass there. Still open from that
+pass: `0373366` (CAMetalDisplayLink frame pacing, ported on the `upstream-macos` branch, untested
+with zz's underlay), and the perf changes `772a8a9`, `3389d87`, `b4ecc45` and `1dd9bbf`. Skipped
+for good: the objc2 migration, upstream's iOS backend, `ScrollWheelEvent` rename, frame telemetry,
+hang monitor, benchmarks, and the Low Power Mode 30 fps cap.
+
 ## What ala adds
 
 `git log` is the authority, and zebrilus's [ala reference][reference] has the long version. The
