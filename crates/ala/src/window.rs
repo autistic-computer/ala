@@ -1179,6 +1179,13 @@ struct ModifierState {
     saw_other_input: bool,
 }
 
+const THERMAL_FRAME_INTERVAL: Duration = Duration::from_micros(16667);
+const FRAME_INTERVAL_TOLERANCE: Duration = Duration::from_millis(1);
+
+fn frame_request_arrived_too_early(elapsed: Duration, minimum_interval: Duration) -> bool {
+    elapsed < minimum_interval.saturating_sub(FRAME_INTERVAL_TOLERANCE)
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct InputRateTracker {
     timestamps: Vec<Instant>,
@@ -1655,18 +1662,19 @@ impl Window {
                         .update(&mut cx, |_, _, cx| cx.thermal_state())
                         .log_err()
                     {
-                        Some(Duration::from_micros(16667))
+                        Some(THERMAL_FRAME_INTERVAL)
                     } else {
                         None
                     };
 
                 let now = Instant::now();
-                let wait = min_frame_interval
-                    .zip(last_frame_time.get())
-                    .and_then(|(min_interval, last_frame)| {
-                        min_interval.checked_sub(now.duration_since(last_frame))
-                    })
-                    .filter(|wait| !wait.is_zero());
+                let wait = min_frame_interval.zip(last_frame_time.get()).and_then(
+                    |(min_interval, last_frame)| {
+                        let elapsed = now.duration_since(last_frame);
+                        frame_request_arrived_too_early(elapsed, min_interval)
+                            .then(|| min_interval - elapsed)
+                    },
+                );
                 if let Some(wait) = wait {
                     deferred_force_render |= force_render;
                     handle
@@ -8593,6 +8601,22 @@ mod tests {
 
         let widen = |root: &mut Root, _: &mut Window, _: &mut Context<Root>| root.width = px(300.);
         assert_eq!(update_and_draw(window, &child, cx, widen).0, 1.);
+    }
+
+    #[test]
+    fn frame_throttle_accepts_display_link_rounding() {
+        assert!(!super::frame_request_arrived_too_early(
+            Duration::from_micros(16_666),
+            super::THERMAL_FRAME_INTERVAL,
+        ));
+    }
+
+    #[test]
+    fn frame_throttle_rejects_an_extra_display_refresh() {
+        assert!(super::frame_request_arrived_too_early(
+            Duration::from_micros(8_333),
+            super::THERMAL_FRAME_INTERVAL,
+        ));
     }
 
     struct OpensWindowOnPaint {
