@@ -258,11 +258,7 @@ impl WindowsPlatform {
     }
 
     pub(crate) fn window_from_hwnd(&self, hwnd: HWND) -> Option<Rc<WindowsWindowInner>> {
-        self.raw_window_handles
-            .read()
-            .iter()
-            .find(|entry| entry.as_raw() == hwnd)
-            .and_then(|hwnd| window_from_hwnd(hwnd.as_raw()))
+        self.inner.window_from_hwnd(hwnd)
     }
 
     #[inline]
@@ -400,16 +396,6 @@ impl WindowsPlatform {
     }
 }
 
-fn translate_accelerator(msg: &MSG) -> Option<()> {
-    if msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN {
-        return None;
-    }
-
-    let result =
-        unsafe { SendMessageW(msg.hwnd, WM_ALA_KEYDOWN, Some(msg.wParam), Some(msg.lParam)) };
-    (result.0 == 0).then_some(())
-}
-
 fn encode_restart_arguments(arguments: &[OsString]) -> OsString {
     let mut encoded = Vec::new();
 
@@ -496,7 +482,7 @@ impl Platform for WindowsPlatform {
         let mut msg = MSG::default();
         unsafe {
             while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-                if translate_accelerator(&msg).is_none() {
+                if !self.inner.translate_accelerator(&msg) {
                     _ = TranslateMessage(&msg);
                     DispatchMessageW(&msg);
                 }
@@ -812,7 +798,7 @@ impl Platform for WindowsPlatform {
         if self.inner.state.current_cursor.get().map(|c| c.0) != hcursor.map(|c| c.0) {
             self.post_message(
                 WM_ALA_CURSOR_STYLE_CHANGED,
-                WPARAM(0),
+                WPARAM(self.inner.validation_number),
                 LPARAM(hcursor.map_or(0, |c| c.0 as isize)),
             );
             self.inner.state.current_cursor.set(hcursor);
@@ -987,6 +973,24 @@ impl WindowsPlatformInner {
         }))
     }
 
+    fn window_from_hwnd(&self, hwnd: HWND) -> Option<Rc<WindowsWindowInner>> {
+        self.raw_window_handles
+            .upgrade()?
+            .read()
+            .iter()
+            .find(|window| window.as_raw() == hwnd)
+            .and_then(|window| window_from_hwnd(window.as_raw()))
+    }
+
+    fn translate_accelerator(&self, msg: &MSG) -> bool {
+        if msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN {
+            return false;
+        }
+
+        self.window_from_hwnd(msg.hwnd)
+            .is_some_and(|window| window.handle_keydown_msg(msg.wParam, msg.lParam) == Some(0))
+    }
+
     fn with_callback<T>(
         &self,
         project: impl Fn(&PlatformCallbacks) -> &Cell<Option<T>>,
@@ -1083,7 +1087,7 @@ impl WindowsPlatformInner {
                     log::debug!("foreground task timeout reached");
                     let mut msg = MSG::default();
                     let process_message = |msg: &_| {
-                        if translate_accelerator(msg).is_none() {
+                        if !self.translate_accelerator(msg) {
                             _ = unsafe { TranslateMessage(msg) };
                             unsafe { DispatchMessageW(msg) };
                         }
