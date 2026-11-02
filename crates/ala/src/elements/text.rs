@@ -555,9 +555,24 @@ fn text_content_key(
 ) -> u64 {
     let mut hasher = crate::collections::FxHasher::default();
     text.hash(&mut hasher);
+    let mut hash_color = |color: Option<crate::Hsla>, hasher: &mut crate::collections::FxHasher| {
+        color
+            .map(|color| [color.h, color.s, color.l, color.a].map(f32::to_bits))
+            .hash(hasher)
+    };
     for run in runs {
         run.len.hash(&mut hasher);
         run.font.hash(&mut hasher);
+        hash_color(Some(run.color), &mut hasher);
+        hash_color(run.background_color, &mut hasher);
+        if let Some(underline) = &run.underline {
+            (1u8, underline.thickness.0.to_bits(), underline.wavy).hash(&mut hasher);
+            hash_color(underline.color, &mut hasher);
+        }
+        if let Some(strikethrough) = &run.strikethrough {
+            (2u8, strikethrough.thickness.0.to_bits()).hash(&mut hasher);
+            hash_color(strikethrough.color, &mut hasher);
+        }
     }
     text_style.font().hash(&mut hasher);
     font_size.0.to_bits().hash(&mut hasher);

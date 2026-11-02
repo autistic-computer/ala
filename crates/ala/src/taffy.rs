@@ -63,8 +63,12 @@ impl RetainedNodes {
         style: &taffy::Style,
         children: &[LayoutId],
         measured: Option<u64>,
+        rem_size: Pixels,
+        scale_factor: f32,
     ) -> Option<u64> {
         let mut hasher = crate::collections::FxHasher::default();
+        rem_size.0.to_bits().hash(&mut hasher);
+        scale_factor.to_bits().hash(&mut hasher);
         style_fingerprint(style, &mut hasher);
         measured.hash(&mut hasher);
         for child in children {
@@ -166,7 +170,9 @@ impl TaffyLayoutEngine {
         children: &[LayoutId],
     ) -> LayoutId {
         let taffy_style = style.to_taffy(rem_size, scale_factor);
-        let key = self.retained.key(&taffy_style, children, None);
+        let key = self
+            .retained
+            .key(&taffy_style, children, None, rem_size, scale_factor);
         if let Some(key) = key
             && let Some(node) = self.take_candidate(key, &taffy_style, children, false)
         {
@@ -230,7 +236,9 @@ impl TaffyLayoutEngine {
         let taffy_style = style.to_taffy(rem_size, scale_factor);
         #[cfg(feature = "stacker")]
         let measure = StackSafe::new(measure);
-        let key = self.retained.key(&taffy_style, &[], Some(content_key));
+        let key = self
+            .retained
+            .key(&taffy_style, &[], Some(content_key), rem_size, scale_factor);
         if let Some(key) = key
             && let Some(node) = self.take_candidate(key, &taffy_style, &[], true)
         {
