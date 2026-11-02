@@ -367,6 +367,10 @@ impl PlatformWindow for TestWindow {
         lock.bounds.size = size;
     }
 
+    fn set_bounds(&mut self, bounds: Bounds<Pixels>) {
+        self.0.lock().bounds = bounds;
+    }
+
     fn scale_factor(&self) -> f32 {
         self.0.lock().scale_factor
     }

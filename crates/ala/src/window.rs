@@ -2545,6 +2545,10 @@ impl Window {
         self.platform_window.resize(size);
     }
 
+    pub fn set_bounds(&mut self, bounds: Bounds<Pixels>) {
+        self.platform_window.set_bounds(bounds);
+    }
+
     pub fn is_fullscreen(&self) -> bool {
         self.platform_window.is_fullscreen()
     }
