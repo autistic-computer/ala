@@ -291,15 +291,11 @@ impl AndroidWindow {
                 ),
             })?
         };
-        let context = WgpuContext::new(instance, &surface, None)?;
+        let config = surface_config(surface_size);
+        let context = WgpuContext::new(instance, &surface, &config, None)?;
         drop(surface);
         let gpu_context: GpuContext = Rc::new(RefCell::new(Some(context)));
-        let renderer = WgpuRenderer::new(
-            gpu_context.clone(),
-            &raw,
-            surface_config(surface_size),
-            None,
-        )?;
+        let renderer = WgpuRenderer::new(gpu_context.clone(), &raw, config, None)?;
         let key = NEXT_KEY.get();
         NEXT_KEY.set(key + 1);
         let (safe_area, ime, ime_rest) = INSETS.get();

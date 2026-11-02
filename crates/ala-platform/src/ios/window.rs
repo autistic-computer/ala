@@ -157,20 +157,21 @@ impl IosWindow {
                     )),
                 },
             )?;
-            let context = crate::wgpu::WgpuContext::new(instance, &surface, None)?;
+            let config = crate::wgpu::WgpuSurfaceConfig {
+                size: size(
+                    DevicePixels((screen_bounds.size.width * scale) as i32),
+                    DevicePixels((screen_bounds.size.height * scale) as i32),
+                ),
+                transparent: false,
+                preferred_present_mode: None,
+            };
+            let context = crate::wgpu::WgpuContext::new(instance, &surface, &config, None)?;
             drop(surface);
             let gpu_context = Rc::new(std::cell::RefCell::new(Some(context)));
             let renderer = crate::wgpu::WgpuRenderer::new(
                 gpu_context,
                 &IosRawWindow(native_view as usize),
-                crate::wgpu::WgpuSurfaceConfig {
-                    size: size(
-                        DevicePixels((screen_bounds.size.width * scale) as i32),
-                        DevicePixels((screen_bounds.size.height * scale) as i32),
-                    ),
-                    transparent: false,
-                    preferred_present_mode: None,
-                },
+                config,
                 None,
             )?;
 

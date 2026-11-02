@@ -513,6 +513,7 @@ impl WgpuRenderer {
             .map_err(|e| anyhow::anyhow!("Failed to get window handle: {e}"))?;
 
         let mut ctx_ref = gpu_context.borrow_mut();
+        let surface_configured = ctx_ref.is_none();
         let (context, surface) = match ctx_ref.as_mut() {
             Some(context) => {
                 let surface = create_surface(&context.instance, window_handle.as_raw())?;
@@ -523,6 +524,7 @@ impl WgpuRenderer {
                 let (context, surface) = create_context_and_surface(
                     window,
                     window_handle.as_raw(),
+                    &config,
                     compositor_gpu,
                     false,
                 )?;
@@ -537,6 +539,7 @@ impl WgpuRenderer {
             context,
             surface,
             config,
+            surface_configured,
             compositor_gpu,
             atlas,
         )
@@ -563,18 +566,19 @@ impl WgpuRenderer {
         config: WgpuSurfaceConfig,
     ) -> anyhow::Result<Self> {
         let atlas = Arc::new(WgpuAtlas::from_context(context));
-        Self::new_internal(None, context, surface, config, None, atlas)
+        Self::new_internal(None, context, surface, config, false, None, atlas)
     }
 
-    fn new_internal(
-        gpu_context: Option<GpuContext>,
-        context: &WgpuContext,
-        surface: wgpu::Surface<'static>,
-        config: WgpuSurfaceConfig,
-        compositor_gpu: Option<CompositorGpuHint>,
-        atlas: Arc<WgpuAtlas>,
-    ) -> anyhow::Result<Self> {
-        let surface_caps = surface.get_capabilities(&context.adapter);
+    pub(crate) fn surface_configuration(
+        surface_caps: &wgpu::SurfaceCapabilities,
+        adapter: &wgpu::Adapter,
+        device: &wgpu::Device,
+        config: &WgpuSurfaceConfig,
+    ) -> anyhow::Result<(
+        wgpu::SurfaceConfiguration,
+        wgpu::CompositeAlphaMode,
+        wgpu::CompositeAlphaMode,
+    )> {
         let preferred_formats = [
             wgpu::TextureFormat::Bgra8Unorm,
             wgpu::TextureFormat::Rgba8Unorm,
@@ -588,7 +592,7 @@ impl WgpuRenderer {
             .ok_or_else(|| {
                 anyhow::anyhow!(
                     "Surface reports no supported texture formats for adapter {:?}",
-                    context.adapter.get_info().name
+                    adapter.get_info().name
                 )
             })?;
 
@@ -602,7 +606,7 @@ impl WgpuRenderer {
                     .ok_or_else(|| {
                         anyhow::anyhow!(
                             "Surface reports no supported alpha modes for adapter {:?}",
-                            context.adapter.get_info().name
+                            adapter.get_info().name
                         )
                     })
             };
@@ -623,7 +627,6 @@ impl WgpuRenderer {
             opaque_alpha_mode
         };
 
-        let device = Arc::clone(&context.device);
         let max_texture_size = device.limits().max_texture_dimension_2d;
 
         let requested_width = config.size.width.0 as u32;
@@ -639,8 +642,6 @@ impl WgpuRenderer {
             );
         }
 
-        let backdrop_sampling = surface_caps.usages.contains(wgpu::TextureUsages::COPY_SRC)
-            || context.adapter.get_info().backend == wgpu::Backend::BrowserWebGpu;
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -655,9 +656,35 @@ impl WgpuRenderer {
             color_space: wgpu::SurfaceColorSpace::Auto,
             view_formats: vec![],
         };
-        surface.configure(&context.device, &surface_config);
 
-        let core = WgpuRendererCore::new(context, atlas.clone(), surface_format, alpha_mode);
+        Ok((surface_config, transparent_alpha_mode, opaque_alpha_mode))
+    }
+
+    fn new_internal(
+        gpu_context: Option<GpuContext>,
+        context: &WgpuContext,
+        surface: wgpu::Surface<'static>,
+        config: WgpuSurfaceConfig,
+        surface_configured: bool,
+        compositor_gpu: Option<CompositorGpuHint>,
+        atlas: Arc<WgpuAtlas>,
+    ) -> anyhow::Result<Self> {
+        let surface_caps = surface.get_capabilities(&context.adapter);
+        let (surface_config, transparent_alpha_mode, opaque_alpha_mode) =
+            Self::surface_configuration(&surface_caps, &context.adapter, &context.device, &config)?;
+        if !surface_configured {
+            surface.configure(&context.device, &surface_config);
+        }
+
+        let backdrop_sampling = surface_caps.usages.contains(wgpu::TextureUsages::COPY_SRC)
+            || context.adapter.get_info().backend == wgpu::Backend::BrowserWebGpu;
+        let max_texture_size = context.device.limits().max_texture_dimension_2d;
+        let core = WgpuRendererCore::new(
+            context,
+            atlas.clone(),
+            surface_config.format,
+            surface_config.alpha_mode,
+        );
 
         Ok(Self {
             context: gpu_context,
@@ -2758,6 +2785,15 @@ impl WgpuRenderer {
             .window_handle()
             .map_err(|e| anyhow::anyhow!("Failed to get window handle: {e}"))?;
 
+        let config = WgpuSurfaceConfig {
+            size: ala::Size {
+                width: ala::DevicePixels(self.surface_config.width as i32),
+                height: ala::DevicePixels(self.surface_config.height as i32),
+            },
+            transparent: self.surface_config.alpha_mode != wgpu::CompositeAlphaMode::Opaque,
+            preferred_present_mode: Some(self.surface_config.present_mode),
+        };
+
         let surface = if needs_new_context {
             log::warn!("GPU device lost, recreating context...");
 
@@ -2769,6 +2805,7 @@ impl WgpuRenderer {
             let (new_context, surface) = create_context_and_surface(
                 window,
                 window_handle.as_raw(),
+                &config,
                 self.compositor_gpu,
                 true,
             )?;
@@ -2780,14 +2817,6 @@ impl WgpuRenderer {
             create_surface(instance, window_handle.as_raw())?
         };
 
-        let config = WgpuSurfaceConfig {
-            size: ala::Size {
-                width: ala::DevicePixels(self.surface_config.width as i32),
-                height: ala::DevicePixels(self.surface_config.height as i32),
-            },
-            transparent: self.surface_config.alpha_mode != wgpu::CompositeAlphaMode::Opaque,
-            preferred_present_mode: Some(self.surface_config.present_mode),
-        };
         let gpu_context = Rc::clone(gpu_context);
         let ctx_ref = gpu_context.borrow();
         let context = ctx_ref.as_ref().expect("context should exist");
@@ -2801,6 +2830,7 @@ impl WgpuRenderer {
             context,
             surface,
             config,
+            needs_new_context,
             self.compositor_gpu,
             self.atlas.clone(),
         )?;
@@ -3255,6 +3285,7 @@ fn instance_range(range: Range<usize>) -> Range<u32> {
 fn create_context_and_surface<W>(
     window: &W,
     raw_window_handle: raw_window_handle::RawWindowHandle,
+    config: &WgpuSurfaceConfig,
     compositor_gpu: Option<CompositorGpuHint>,
     reject_software: bool,
 ) -> anyhow::Result<(WgpuContext, wgpu::Surface<'static>)>
@@ -3270,9 +3301,9 @@ where
                 WgpuContext::instance_with_backends(Some(Box::new(window.clone())), backends);
             let surface = create_surface(&instance, raw_window_handle)?;
             let context = if reject_software {
-                WgpuContext::new_rejecting_software(instance, &surface, compositor_gpu)?
+                WgpuContext::new_rejecting_software(instance, &surface, config, compositor_gpu)?
             } else {
-                WgpuContext::new(instance, &surface, compositor_gpu)?
+                WgpuContext::new(instance, &surface, config, compositor_gpu)?
             };
             if backends == wgpu::Backends::VULKAN {
                 anyhow::ensure!(
@@ -3534,7 +3565,12 @@ mod tests {
                     raw_window_handle::WaylandWindowHandle::new(window),
                 ),
             )?;
-            let context = WgpuContext::new(instance, &gpu_surface, None)?;
+            let config = WgpuSurfaceConfig {
+                size: device_size(128, 128),
+                transparent: false,
+                preferred_present_mode: Some(wgpu::PresentMode::Mailbox),
+            };
+            let context = WgpuContext::new(instance, &gpu_surface, &config, None)?;
             let adapter = context.adapter.get_info();
             assert_eq!(adapter.backend, wgpu::Backend::Vulkan);
             eprintln!("frame recovery test adapter: {adapter:?}");
@@ -3542,11 +3578,8 @@ mod tests {
                 None,
                 &context,
                 gpu_surface,
-                WgpuSurfaceConfig {
-                    size: device_size(128, 128),
-                    transparent: false,
-                    preferred_present_mode: Some(wgpu::PresentMode::Mailbox),
-                },
+                config,
+                true,
                 None,
                 Arc::new(WgpuAtlas::from_context(&context)),
             )?;
