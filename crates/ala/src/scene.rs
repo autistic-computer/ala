@@ -325,10 +325,9 @@ impl Scene {
         };
         let mut placed = primitive.clone();
         transform.apply(&mut placed);
-        if self.target().place_primitive(&mut placed) {
-            self.paint_operations
-                .push(PaintOperation::Primitive(primitive));
-        }
+        self.target().place_primitive(&mut placed);
+        self.paint_operations
+            .push(PaintOperation::Primitive(primitive));
     }
 
     fn place_primitive(&mut self, primitive: &mut Primitive) -> bool {

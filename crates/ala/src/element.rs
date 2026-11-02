@@ -3,6 +3,7 @@ use crate::InspectorElementPath;
 use crate::collections::FxHashMap;
 use crate::{
     A11ySubtreeBuilder, App, ArenaBox, AvailableSpace, Bounds, Context, DispatchNodeId, ElementId,
+    EntityId,
     FocusHandle, InspectorElementId, LayoutId, Pixels, Point, SharedString, Size, Style, Window,
     util::FluentBuilder, window::with_element_arena,
 };
@@ -232,6 +233,8 @@ impl GlobalElementId {
 
 trait ElementObject {
     fn inner_element(&mut self) -> &mut dyn Any;
+
+    fn element_id(&self) -> Option<ElementId>;
 
     fn request_layout(&mut self, window: &mut Window, cx: &mut App) -> LayoutId;
 
@@ -574,6 +577,10 @@ where
         &mut self.element
     }
 
+    fn element_id(&self) -> Option<ElementId> {
+        self.element.id()
+    }
+
     #[inline]
     fn request_layout(&mut self, window: &mut Window, cx: &mut App) -> LayoutId {
         Drawable::request_layout(self, window, cx)
@@ -615,6 +622,13 @@ impl AnyElement {
 
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.0.inner_element().downcast_mut::<T>()
+    }
+
+    pub(crate) fn view_entity(&self) -> Option<EntityId> {
+        match self.0.element_id() {
+            Some(ElementId::View(entity_id)) => Some(entity_id),
+            _ => None,
+        }
     }
 
     pub fn request_layout(&mut self, window: &mut Window, cx: &mut App) -> LayoutId {

@@ -286,7 +286,7 @@ impl A11y {
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct A11yIndex {
-    nodes: usize,
+    pub(crate) nodes: usize,
     children: usize,
     focus: Option<NodeId>,
     active_descendant: Option<NodeId>,

@@ -1,11 +1,12 @@
-use crate::collections::VecDeque;
+use crate::collections::{FxHashMap, FxHashSet, VecDeque};
 use crate::refineable::Refineable as _;
 use crate::sum_tree::{Bias, Dimensions, SumTree};
 use crate::{
     AnyElement, App, AvailableSpace, Bounds, ContentMask, DispatchPhase, Edges, Element, EntityId,
     FocusHandle, GlobalElementId, Hitbox, HitboxBehavior, InspectorElementId, IntoElement,
-    Overflow, Overscroll, Pixels, Point, RubberBand, ScrollDelta, ScrollKey, ScrollWheelEvent,
-    Size, Style, StyleRefinement, Styled, TouchPhase, Window, point, px, size,
+    Overflow, Overscroll, PaintIndex, Pixels, Point, PrepaintStateIndex, RubberBand, ScaledPixels,
+    ScrollDelta, ScrollKey, ScrollWheelEvent, Size, Style, StyleRefinement, Styled, TextStyle,
+    TouchPhase, Window, point, px, size,
 };
 use std::{cell::RefCell, ops::Range, rc::Rc};
 
@@ -61,6 +62,51 @@ struct StateInner {
     pending_scroll: Option<PendingScroll>,
     follow_state: FollowState,
     overscroll: RubberBand,
+    replays: FxHashMap<usize, ItemReplay>,
+    replays_drawn: u64,
+}
+
+#[derive(Clone)]
+struct ItemReplay {
+    view: EntityId,
+    origin: Point<Pixels>,
+    size: Size<Pixels>,
+    width: Option<Pixels>,
+    key: ReplayKey,
+    prepaint: Range<PrepaintStateIndex>,
+    paint: Range<PaintIndex>,
+    accessed: Rc<FxHashSet<EntityId>>,
+    state: ReplayState,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum ReplayState {
+    Ready,
+    Volatile,
+    Positional,
+}
+
+#[derive(Clone, PartialEq)]
+struct ReplayKey {
+    text_style: TextStyle,
+    rem_size: Pixels,
+    scale_factor: f32,
+    opacity: f32,
+    text_fade: Option<(ScaledPixels, ScaledPixels)>,
+    raster: u64,
+}
+
+impl ReplayKey {
+    fn new(window: &Window) -> Self {
+        Self {
+            text_style: window.text_style(),
+            rem_size: window.rem_size(),
+            scale_factor: window.scale_factor(),
+            opacity: window.element_opacity(),
+            text_fade: window.text_fade,
+            raster: window.text_raster_state_key(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -182,8 +228,32 @@ struct LayoutItemsResponse {
 
 struct ItemLayout {
     index: usize,
-    element: AnyElement,
+    element: Option<AnyElement>,
     size: Size<Pixels>,
+    view: Option<EntityId>,
+    width: Option<Pixels>,
+    replay: Option<ItemReplay>,
+    record: bool,
+    accessed: FxHashSet<EntityId>,
+    bounds: Bounds<Pixels>,
+    prepaint: Option<Range<PrepaintStateIndex>>,
+}
+
+impl ItemLayout {
+    fn rendered(index: usize, element: AnyElement, size: Size<Pixels>) -> Self {
+        Self {
+            index,
+            element: Some(element),
+            size,
+            view: None,
+            width: None,
+            replay: None,
+            record: false,
+            accessed: FxHashSet::default(),
+            bounds: Bounds::default(),
+            prepaint: None,
+        }
+    }
 }
 
 pub struct ListPrepaintState {
@@ -270,6 +340,8 @@ impl ListState {
             pending_scroll: None,
             follow_state: FollowState::default(),
             overscroll: RubberBand::default(),
+            replays: FxHashMap::default(),
+            replays_drawn: 0,
         })));
         this.splice(0..0, item_count);
         this
@@ -334,6 +406,11 @@ impl ListState {
 
     fn remeasure_items_with_scroll_anchor(&self, range: Range<usize>, scroll_anchor: ScrollAnchor) {
         let state = &mut *self.0.borrow_mut();
+        for (ix, replay) in &mut state.replays {
+            if range.contains(ix) && replay.state == ReplayState::Ready {
+                replay.state = ReplayState::Volatile;
+            }
+        }
 
         if let Some(scroll_top) = state.logical_scroll_top {
             if range.contains(&scroll_top.item_ix) {
@@ -418,6 +495,7 @@ impl ListState {
         focus_handles: impl IntoIterator<Item = Option<FocusHandle>>,
     ) {
         let state = &mut *self.0.borrow_mut();
+        state.replays.retain(|ix, _| *ix < old_range.start);
 
         let mut old_items = state.items.cursor::<Count>(());
         let mut new_items = old_items.slice(&Count(old_range.start), Bias::Right);
@@ -874,6 +952,79 @@ impl StateInner {
         self.items = SumTree::from_iter(measured_items, ());
     }
 
+    fn replay_for(
+        &self,
+        ix: usize,
+        view: EntityId,
+        width: Option<Pixels>,
+        window: &Window,
+    ) -> Result<ItemReplay, bool> {
+        if window.refreshing || self.replays_drawn + 1 != window.draw_number {
+            return Err(true);
+        }
+        let Some(replay) = self.replays.get(&ix).filter(|replay| replay.view == view) else {
+            return Err(true);
+        };
+        let changed = replay.width != width
+            || replay
+                .accessed
+                .iter()
+                .any(|entity| window.dirty_views.contains(entity));
+        match (changed, replay.state) {
+            (false, ReplayState::Ready) => Ok(replay.clone()),
+            (false, ReplayState::Volatile) => Err(true),
+            _ => Err(false),
+        }
+    }
+
+    fn layout_item(
+        &self,
+        ix: usize,
+        available_item_space: Size<AvailableSpace>,
+        width: Option<Pixels>,
+        render_item: &mut RenderItemFn,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> ItemLayout {
+        let mut element = render_item(ix, window, cx);
+        let view = element.view_entity();
+        let mut record = false;
+        if let Some(view) = view {
+            match self.replay_for(ix, view, width, window) {
+                Ok(replay) => {
+                    return ItemLayout {
+                        index: ix,
+                        element: None,
+                        size: replay.size,
+                        view: Some(view),
+                        width,
+                        replay: Some(replay),
+                        record: false,
+                        accessed: FxHashSet::default(),
+                        bounds: Bounds::default(),
+                        prepaint: None,
+                    };
+                }
+                Err(clean) => record = clean,
+            }
+        }
+        let (size, accessed) = cx.detect_accessed_entities(|cx| {
+            element.layout_as_root(available_item_space, window, cx)
+        });
+        ItemLayout {
+            index: ix,
+            element: Some(element),
+            size,
+            view,
+            width,
+            replay: None,
+            record,
+            accessed,
+            bounds: Bounds::default(),
+            prepaint: None,
+        }
+    }
+
     fn layout_items(
         &mut self,
         available_width: Option<Pixels>,
@@ -920,8 +1071,15 @@ impl StateInner {
 
             if visible_height < available_height || size.is_none() {
                 let item_index = scroll_top.item_ix + ix;
-                let mut element = render_item(item_index, window, cx);
-                let element_size = element.layout_as_root(available_item_space, window, cx);
+                let layout = self.layout_item(
+                    item_index,
+                    available_item_space,
+                    available_width,
+                    render_item,
+                    window,
+                    cx,
+                );
+                let element_size = layout.size;
                 size = Some(element_size);
 
                 if ix == 0 {
@@ -946,11 +1104,7 @@ impl StateInner {
                 }
 
                 if visible_height < available_height {
-                    item_layouts.push_back(ItemLayout {
-                        index: item_index,
-                        element,
-                        size: element_size,
-                    });
+                    item_layouts.push_back(layout);
                     if item.contains_focused(window, cx) {
                         rendered_focused_item = true;
                     }
@@ -974,19 +1128,22 @@ impl StateInner {
                 cursor.prev();
                 if let Some(item) = cursor.item() {
                     let item_index = cursor.start().0;
-                    let mut element = render_item(item_index, window, cx);
-                    let element_size = element.layout_as_root(available_item_space, window, cx);
+                    let layout = self.layout_item(
+                        item_index,
+                        available_item_space,
+                        available_width,
+                        render_item,
+                        window,
+                        cx,
+                    );
+                    let element_size = layout.size;
                     let focus_handle = item.focus_handle();
                     rendered_height += element_size.height;
                     measured_items.push_front(ListItem::Measured {
                         size: element_size,
                         focus_handle,
                     });
-                    item_layouts.push_front(ItemLayout {
-                        index: item_index,
-                        element,
-                        size: element_size,
-                    });
+                    item_layouts.push_front(layout);
                     if item.contains_focused(window, cx) {
                         rendered_focused_item = true;
                     }
@@ -1063,11 +1220,7 @@ impl StateInner {
                     let item_index = cursor.start().0;
                     let mut element = render_item(cursor.start().0, window, cx);
                     let size = element.layout_as_root(available_item_space, window, cx);
-                    item_layouts.push_back(ItemLayout {
-                        index: item_index,
-                        element,
-                        size,
-                    });
+                    item_layouts.push_back(ItemLayout::rendered(item_index, element, size));
                     break;
                 }
                 cursor.next();
@@ -1118,7 +1271,7 @@ impl StateInner {
                 item_origin.y -= layout_response.scroll_top.offset_in_item;
                 for item in &mut layout_response.item_layouts {
                     window.with_content_mask(Some(ContentMask { bounds }), |window| {
-                        item.element.prepaint_at(item_origin + shift, window, cx);
+                        prepaint_item(item, item_origin + shift, render_item, window, cx);
                     });
 
                     if let Some(autoscroll_bounds) = window
@@ -1436,12 +1589,132 @@ impl Element for List {
             }
         });
 
+        let mut replays = FxHashMap::default();
         window.with_content_mask(Some(ContentMask { bounds }), |window| {
             for item in &mut prepaint.layout.item_layouts {
-                item.element.paint(window, cx);
+                if let Some(replay) = paint_item(item, window, cx) {
+                    replays.insert(item.index, replay);
+                }
             }
         });
+        let mut state = self.state.0.borrow_mut();
+        state.replays = replays;
+        state.replays_drawn = window.draw_number;
     }
+}
+
+fn whole_device_pixels(offset: Point<Pixels>, scale_factor: f32) -> bool {
+    let whole = |value: Pixels| (value.0 * scale_factor).fract() == 0.0;
+    whole(offset.x) && whole(offset.y)
+}
+
+fn prepaint_item(
+    item: &mut ItemLayout,
+    origin: Point<Pixels>,
+    render_item: &mut RenderItemFn,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    item.bounds = Bounds::new(origin, item.size);
+    if let Some(replay) = &item.replay
+        && replay.key == ReplayKey::new(window)
+        && whole_device_pixels(origin - replay.origin, window.scale_factor())
+    {
+        let start = window.prepaint_index();
+        window.reuse_prepaint(replay.prepaint.clone());
+        cx.entities.extend_accessed(replay.accessed.iter().copied());
+        item.prepaint = Some(start..window.prepaint_index());
+        return;
+    }
+    item.replay = None;
+    let element = item.element.get_or_insert_with(|| {
+        let mut element = render_item(item.index, window, cx);
+        let available = Size {
+            width: item
+                .width
+                .map_or(AvailableSpace::MaxContent, AvailableSpace::Definite),
+            height: AvailableSpace::MinContent,
+        };
+        let ((), accessed) = cx.detect_accessed_entities(|cx| {
+            element.layout_as_root(available, window, cx);
+        });
+        item.accessed.extend(accessed);
+        element
+    });
+    if item.view.is_none() {
+        element.prepaint_at(origin, window, cx);
+        return;
+    }
+    let start = window.prepaint_index();
+    let record = item.record;
+    let ((), accessed) = cx.detect_accessed_entities(|cx| {
+        if record {
+            window.prepaint_detached(item.bounds, |window| {
+                element.prepaint_at(origin, window, cx);
+            });
+        } else {
+            element.prepaint_at(origin, window, cx);
+        }
+    });
+    item.accessed.extend(accessed);
+    item.prepaint = Some(start..window.prepaint_index());
+}
+
+fn paint_item(item: &mut ItemLayout, window: &mut Window, cx: &mut App) -> Option<ItemReplay> {
+    let (Some(view), Some(prepaint)) = (item.view, item.prepaint.clone()) else {
+        if let Some(element) = &mut item.element {
+            element.paint(window, cx);
+        }
+        return None;
+    };
+    let key = ReplayKey::new(window);
+    let replayable = item.record || item.replay.is_some();
+    let (paint, accessed, origin) = if let Some(replay) = item.replay.take() {
+        let offset = item.bounds.origin - replay.origin;
+        let paint = window.paint_detached(item.bounds, offset, |window| {
+            let start = window.paint_index();
+            window.reuse_paint(replay.paint.clone());
+            start..window.paint_index()
+        });
+        (paint, replay.accessed, replay.origin)
+    } else {
+        let element = item.element.as_mut()?;
+        let record = item.record;
+        let (paint, accessed) = cx.detect_accessed_entities(|cx| {
+            let mut paint = |window: &mut Window| {
+                let start = window.paint_index();
+                element.paint(window, cx);
+                start..window.paint_index()
+            };
+            if record {
+                window.paint_detached(item.bounds, Point::default(), paint)
+            } else {
+                paint(window)
+            }
+        });
+        item.accessed.extend(accessed);
+        (
+            paint,
+            Rc::new(std::mem::take(&mut item.accessed)),
+            item.bounds.origin,
+        )
+    };
+    let state = match (window.output_is_positionless(&prepaint, &paint), replayable) {
+        (false, _) => ReplayState::Positional,
+        (true, true) => ReplayState::Ready,
+        (true, false) => ReplayState::Volatile,
+    };
+    Some(ItemReplay {
+        view,
+        origin,
+        size: item.size,
+        width: item.width,
+        key,
+        prepaint,
+        paint,
+        accessed,
+        state,
+    })
 }
 
 impl IntoElement for List {

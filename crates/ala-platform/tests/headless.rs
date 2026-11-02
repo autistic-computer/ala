@@ -1,12 +1,13 @@
 #![cfg(all(target_os = "linux", feature = "test-support"))]
 
 use ala::{
-    GlyphRasterData, GlyphRenderOptions, HeadlessAppContext, ShapedLine, TextAlign, TextRun,
-    Window, blue, canvas, div, font, hsla, point, prelude::*, px, red, size, white,
+    Entity, GlyphRasterData, GlyphRenderOptions, HeadlessAppContext, ListAlignment, ListState,
+    ShapedLine, TextAlign, TextRun, Window, blue, canvas, div, font, hsla, list, point,
+    prelude::*, px, red, size, white,
 };
 use ala_platform::{current_headless_renderer, wgpu::CosmicTextSystem};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     rc::Rc,
     sync::Arc,
     time::{Duration, Instant},
@@ -49,6 +50,131 @@ fn window_screenshot_shows_the_laid_out_scene() -> anyhow::Result<()> {
         (60, [0, 0, 0, 255]),
     ] {
         assert_eq!(image.get_pixel(x, 8).0, expected, "pixel at x = {x}");
+    }
+    Ok(())
+}
+
+struct Row {
+    ix: usize,
+    edits: usize,
+    renders: Rc<Cell<usize>>,
+}
+
+impl Render for Row {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        self.renders.set(self.renders.get() + 1);
+        let ix = self.ix;
+        div()
+            .id(ix)
+            .when(ix % 4 == 2, |row| row.on_click(|_, _, _| {}))
+            .p(px(6.))
+            .bg(hsla(ix as f32 * 0.07 % 1.0, 0.5, 0.3, 1.0))
+            .child(
+                div()
+                    .h(px(20. + (ix % 3) as f32 * 7.))
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_color(white())
+                    .child(format!(
+                        "row {ix}.{} {}",
+                        self.edits,
+                        "lorem ipsum ".repeat(ix % 5 + 1)
+                    )),
+            )
+    }
+}
+
+struct Rows {
+    list: ListState,
+    rows: Vec<Entity<Row>>,
+}
+
+impl Render for Rows {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        list(
+            self.list.clone(),
+            cx.processor(|this, ix: usize, _, _| this.rows[ix].clone().into_any_element()),
+        )
+        .size_full()
+    }
+}
+
+#[test]
+fn scrolled_list_rows_replay_with_the_pixels_of_a_fresh_render() -> anyhow::Result<()> {
+    let mut cx = HeadlessAppContext::with_platform(
+        Arc::new(CosmicTextSystem::new("DejaVu Sans")),
+        Arc::new(()),
+        current_headless_renderer,
+    );
+    let renders = Rc::new(Cell::new(0));
+    let window = cx.open_window(size(px(200.), px(160.)), |_, cx| {
+        let rows = (0..40)
+            .map(|ix| {
+                let renders = renders.clone();
+                cx.new(|_| Row {
+                    ix,
+                    edits: 0,
+                    renders,
+                })
+            })
+            .collect();
+        cx.new(|_| Rows {
+            list: ListState::new(40, ListAlignment::Top, px(0.)),
+            rows,
+        })
+    })?;
+    let mut frame = |cx: &mut HeadlessAppContext, scroll: f32, refresh: bool| {
+        renders.set(0);
+        cx.update_window(window.into(), |root, window, cx| {
+            let rows = root.downcast::<Rows>().unwrap();
+            rows.update(cx, |rows, cx| {
+                rows.list.scroll_by(px(scroll));
+                cx.notify();
+            });
+            if refresh {
+                window.refresh();
+            }
+            window.draw(cx).clear(cx);
+        })
+        .unwrap();
+        renders.get()
+    };
+
+    let visible = frame(&mut cx, 0., true);
+    assert!(visible >= 4, "{visible} rows rendered on the first frame");
+    let differing = |a: &image::RgbaImage, b: &image::RgbaImage| {
+        a.pixels().zip(b.pixels()).filter(|(a, b)| a != b).count()
+    };
+    for scroll in [37., 37., -61., 15., 90.] {
+        let renders = frame(&mut cx, scroll, false);
+        let scrolled = cx.capture_screenshot(window.into())?;
+        frame(&mut cx, 0., true);
+        let fresh = cx.capture_screenshot(window.into())?;
+        assert!(renders < visible, "{renders} rows rendered scrolling {scroll}");
+        assert_eq!(differing(&scrolled, &fresh), 0, "scrolling {scroll}");
+
+        frame(&mut cx, 0., false);
+        let renders = frame(&mut cx, 0., false);
+        let still = cx.capture_screenshot(window.into())?;
+        assert!(renders <= 2, "{renders} rows rendered on an unchanged frame after scrolling {scroll}");
+        assert_eq!(differing(&still, &fresh), 0, "unchanged after scrolling {scroll}");
+    }
+
+    let rows = cx.update_window(window.into(), |root, _, _| root.downcast::<Rows>().unwrap())?;
+    for _ in 0..3 {
+        cx.update(|cx| {
+            let rows = rows.read(cx);
+            let row = rows.rows[rows.list.logical_scroll_top().item_ix + 1].clone();
+            row.update(cx, |row, cx| {
+                row.edits += 1;
+                cx.notify();
+            });
+        });
+        frame(&mut cx, 0., false);
+        let edited = cx.capture_screenshot(window.into())?;
+        frame(&mut cx, 0., true);
+        let fresh = cx.capture_screenshot(window.into())?;
+        assert_eq!(differing(&edited, &fresh), 0, "after editing a visible row");
     }
     Ok(())
 }

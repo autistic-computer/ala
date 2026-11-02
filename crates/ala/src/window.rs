@@ -1111,6 +1111,7 @@ pub struct Window {
     pub(crate) text_fade: Option<(ScaledPixels, ScaledPixels)>,
     pub(crate) glass_groups: Vec<crate::GlassGroupShapes>,
     pub(crate) content_mask_stack: Vec<ContentMask<Pixels>>,
+    pub(crate) draw_number: u64,
     pub(crate) requested_autoscroll: Option<Bounds<Pixels>>,
     last_text_input_configuration: Option<TextInputConfiguration>,
     focused_text_input_active: bool,
@@ -1942,6 +1943,7 @@ impl Window {
             rendered_entity_stack: Vec::new(),
             element_offset_stack: Vec::new(),
             content_mask_stack: Vec::new(),
+            draw_number: 0,
             element_opacity: 1.0,
             text_fade: None,
             glass_groups: Vec::new(),
@@ -3182,6 +3184,7 @@ impl Window {
         self.window_profiler.begin_draw();
 
         let arena_scope = ElementArenaScope::enter(&cx.element_arena);
+        self.draw_number += 1;
 
         if self.platform_window.prepare_frame() {
             self.refresh();
@@ -3342,6 +3345,7 @@ impl Window {
         let mut views = self.invalidator.take_views();
         for entity in views.drain() {
             self.mark_view_dirty(entity);
+            self.dirty_views.insert(entity);
         }
         self.invalidator.replace_views(views);
     }
@@ -3713,6 +3717,67 @@ impl Window {
             line_layout_index: self.text_system.layout_index(),
             a11y_index: self.a11y.index(),
         }
+    }
+
+    pub(crate) fn output_is_positionless(
+        &self,
+        prepaint: &Range<PrepaintStateIndex>,
+        paint: &Range<PaintIndex>,
+    ) -> bool {
+        prepaint.start.hitboxes_index == prepaint.end.hitboxes_index
+            && prepaint.start.tooltips_index == prepaint.end.tooltips_index
+            && prepaint.start.deferred_draws_index == prepaint.end.deferred_draws_index
+            && prepaint.start.a11y_index.nodes == prepaint.end.a11y_index.nodes
+            && paint.start.mouse_listeners_index == paint.end.mouse_listeners_index
+            && paint.start.input_handlers_index == paint.end.input_handlers_index
+            && paint.start.cursor_styles_index == paint.end.cursor_styles_index
+            && paint.start.tab_handle_index == paint.end.tab_handle_index
+    }
+
+    pub(crate) fn prepaint_detached<R>(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.invalidator.debug_assert_prepaint();
+        let clip = self.content_mask();
+        let hitboxes_start = self.next_frame.hitboxes.len();
+        let deferred_start = self.next_frame.deferred_draws.len();
+        self.content_mask_stack.push(ContentMask { bounds });
+        let result = f(self);
+        self.content_mask_stack.pop();
+        for hitbox in &mut self.next_frame.hitboxes[hitboxes_start..] {
+            hitbox.content_mask = hitbox.content_mask.intersect(&clip);
+        }
+        for deferred in &mut self.next_frame.deferred_draws[deferred_start..] {
+            deferred.content_mask = Some(
+                deferred
+                    .content_mask
+                    .map_or(clip, |mask| mask.intersect(&clip)),
+            );
+        }
+        result
+    }
+
+    pub(crate) fn paint_detached<R>(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        offset: Point<Pixels>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.invalidator.debug_assert_paint();
+        let scale_factor = self.scale_factor();
+        let transform = crate::scene::SceneTransform {
+            scale: 1.0,
+            offset: offset.scale(scale_factor),
+            clip: self.content_mask().bounds.scale(scale_factor),
+        };
+        self.content_mask_stack.push(ContentMask { bounds });
+        self.next_frame.scene.push_transform(transform);
+        let result = f(self);
+        self.next_frame.scene.pop_transform();
+        self.content_mask_stack.pop();
+        result
     }
 
     pub(crate) fn reuse_prepaint(&mut self, range: Range<PrepaintStateIndex>) {
