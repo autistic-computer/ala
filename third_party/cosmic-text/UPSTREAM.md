@@ -28,6 +28,9 @@ identical shaped output and no consistent CPU penalty in 15 alternating pairs.
 Ordinary one-face text saved only 704 bytes. See the RAM follow-up in
 `knowledge/research/2026-10-16-linux-performance.md` for workloads and limits.
 
+The shaped-run cache key also carries the span direction, so a word shaped in a
+right-to-left span (mirrored brackets) is not reused in a left-to-right one.
+
 To refresh this snapshot, diff the library source against the pinned release,
 apply the cache, exact-growth and database-invalidation changes, and run the
 plan cache tests plus the ala platform text tests. Remove this snapshot when an
