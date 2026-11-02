@@ -335,7 +335,7 @@ x11-clipboard = { version = "0.9.3", optional = true }
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_family = "wasm", target_os = "ios", target_os = "android"))'.dependencies]
 bytemuck = "1"
 naga = { version = "30.0.1", features = ["wgsl-in"] }
-cosmic-text = { path = "../../third_party/cosmic-text", version = "0.19.0" }
+cosmic-text = { path = "../../third_party/cosmic-text", version = "0.19.0", features = ["shape-run-cache"] }
 etagere.workspace = true
 itertools.workspace = true
 image = { workspace = true, features = [

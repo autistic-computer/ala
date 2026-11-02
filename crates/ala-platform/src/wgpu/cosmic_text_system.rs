@@ -64,7 +64,11 @@ struct CosmicTextSystemState {
     weighted_fonts: HashMap<(FontId, u16), FontId>,
     system_font_fallback: String,
     missing_glyph_sink: Option<Arc<dyn MissingGlyphSink>>,
+    lines_since_trim: u32,
 }
+
+const SHAPED_WORD_TRIM_LINES: u32 = 1024;
+const SHAPED_WORD_KEEP_TRIMS: u64 = 2;
 
 struct LoadedFont {
     font: Arc<CosmicTextFont>,
@@ -147,6 +151,7 @@ impl CosmicTextSystem {
                 weighted_fonts: HashMap::default(),
                 system_font_fallback: system_font_fallback.to_string(),
                 missing_glyph_sink: None,
+                lines_since_trim: 0,
             }),
             AtomicU64::new(0),
         )
@@ -170,6 +175,7 @@ impl CosmicTextSystem {
                 weighted_fonts: HashMap::default(),
                 system_font_fallback: system_font_fallback.to_string(),
                 missing_glyph_sink: None,
+                lines_since_trim: 0,
             }),
             AtomicU64::new(0),
         )
@@ -372,6 +378,7 @@ impl CosmicTextSystemState {
     #[profiling::function]
     fn add_fonts(&mut self, fonts: Vec<Cow<'static, [u8]>>) -> Result<()> {
         self.font_ids_by_family_cache.clear();
+        self.font_system.shape_run_cache = Default::default();
         let db = self.font_system.db_mut();
         for bytes in fonts {
             db.load_font_source(cosmic_text::fontdb::Source::Binary(Arc::new(bytes)));
@@ -659,6 +666,11 @@ impl CosmicTextSystemState {
 
     #[profiling::function]
     fn layout_line(&mut self, text: &str, font_size: Pixels, font_runs: &[FontRun]) -> LineLayout {
+        self.lines_since_trim += 1;
+        if self.lines_since_trim >= SHAPED_WORD_TRIM_LINES {
+            self.lines_since_trim = 0;
+            self.font_system.shape_run_cache.trim(SHAPED_WORD_KEEP_TRIMS);
+        }
         if contains_paragraph_separator(text) {
             self.layout_line_with_separators(text, font_size, font_runs)
         } else {
