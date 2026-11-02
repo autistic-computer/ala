@@ -2,8 +2,8 @@
 
 ala is GPUI, split out of its upstream repository on 2026-10-05 and owned since. It
 is not a patch branch: nothing gets rebased onto upstream, and upstream fixes come in by hand when
-we want them. [zebrilus][zebrilus] carries ala as the git subtree `libs/ala` and edits it there;
-penna and nidus build on it as a git dependency.
+we want them. [zebrilus][zebrilus] and nidus carry ala as the git subtree `libs/ala` and edit it
+there; the penna repo builds on it as a git dependency.
 
 - Forked from: upstream at `933d8d9381`, limited to the gpui crates.
 - The 89 commits after that one are the old patch fork's `zz-patches` branch (tip
