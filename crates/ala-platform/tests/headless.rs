@@ -145,12 +145,14 @@ fn scrolled_list_rows_replay_with_the_pixels_of_a_fresh_render() -> anyhow::Resu
     let differing = |a: &image::RgbaImage, b: &image::RgbaImage| {
         a.pixels().zip(b.pixels()).filter(|(a, b)| a != b).count()
     };
-    for scroll in [37., 37., -61., 15., 90.] {
+    for scroll in [37., 37., -61., 0.25, 15., 90.] {
         let renders = frame(&mut cx, scroll, false);
         let scrolled = cx.capture_screenshot(window.into())?;
         frame(&mut cx, 0., true);
         let fresh = cx.capture_screenshot(window.into())?;
-        assert!(renders < visible, "{renders} rows rendered scrolling {scroll}");
+        if (scroll * 2.0_f32).fract() == 0.0 {
+            assert!(renders < visible, "{renders} rows rendered scrolling {scroll}");
+        }
         assert_eq!(differing(&scrolled, &fresh), 0, "scrolling {scroll}");
 
         frame(&mut cx, 0., false);

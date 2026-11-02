@@ -8,7 +8,7 @@ use crate::{
     ScrollDelta, ScrollKey, ScrollWheelEvent, Size, Style, StyleRefinement, Styled, TextStyle,
     TouchPhase, Window, WindowId, point, px, size,
 };
-use std::{cell::RefCell, ops::Range, rc::Rc};
+use std::{cell::RefCell, mem, ops::Range, rc::Rc};
 
 type RenderItemFn = dyn FnMut(usize, &mut Window, &mut App) -> AnyElement + 'static;
 
@@ -67,6 +67,7 @@ struct StateInner {
     replays_window: Option<WindowId>,
     replay_rows: bool,
     replay_blocked_draw: u64,
+    laid_out_draw: u64,
 }
 
 #[derive(Clone)]
@@ -355,6 +356,7 @@ impl ListState {
             replays_window: None,
             replay_rows: false,
             replay_blocked_draw: 0,
+            laid_out_draw: 0,
         })));
         this.splice(0..0, item_count);
         this
@@ -1277,6 +1279,10 @@ impl StateInner {
         window: &mut Window,
         cx: &mut App,
     ) -> Result<LayoutItemsResponse, ListOffset> {
+        if self.laid_out_draw == window.draw_number {
+            self.replay_blocked_draw = window.draw_number;
+        }
+        self.laid_out_draw = window.draw_number;
         window.transact(|window| {
             match self.measuring_behavior {
                 ListMeasuringBehavior::Measure(has_measured) if !has_measured => {
@@ -1570,10 +1576,12 @@ impl Element for List {
                 Ok(layout) => layout,
                 Err(autoscroll_request) => {
                     state.logical_scroll_top = Some(autoscroll_request);
-                    state.replay_blocked_draw = window.draw_number;
-                    state
+                    let refreshing = mem::replace(&mut window.refreshing, true);
+                    let layout = state
                         .prepaint_items(bounds, padding, false, &mut self.render_item, window, cx)
-                        .unwrap()
+                        .unwrap();
+                    window.refreshing = refreshing;
+                    layout
                 }
             };
 
@@ -1644,9 +1652,18 @@ fn unclipped() -> Bounds<Pixels> {
     Bounds::new(point(-extent, -extent), size(extent * 2.0, extent * 2.0))
 }
 
-fn whole_device_pixels(offset: Point<Pixels>, scale_factor: f32) -> bool {
+fn translation_preserves_snapping(
+    from: Point<Pixels>,
+    to: Point<Pixels>,
+    scale_factor: f32,
+) -> bool {
     let whole = |value: Pixels| (value.0 * scale_factor).fract() == 0.0;
-    whole(offset.x) && whole(offset.y)
+    let offset = to - from;
+    whole(offset.x) && whole(offset.y) && non_negative(from) && non_negative(to)
+}
+
+fn non_negative(origin: Point<Pixels>) -> bool {
+    origin.x >= Pixels::ZERO && origin.y >= Pixels::ZERO
 }
 
 fn prepaint_item(
@@ -1658,7 +1675,7 @@ fn prepaint_item(
 ) {
     item.bounds = Bounds::new(origin, item.size);
     if let Some(replay) = &item.replay
-        && whole_device_pixels(origin - replay.origin, window.scale_factor())
+        && translation_preserves_snapping(replay.origin, origin, window.scale_factor())
     {
         let start = window.prepaint_index();
         window.reuse_prepaint(replay.prepaint.clone());
@@ -1686,6 +1703,7 @@ fn prepaint_item(
         return;
     }
     let start = window.prepaint_index();
+    item.record &= non_negative(origin);
     let record = item.record;
     let ((), accessed) = cx.detect_accessed_entities(|cx| {
         if record {
@@ -1713,7 +1731,7 @@ fn paint_item(item: &mut ItemLayout, window: &mut Window, cx: &mut App) -> Optio
         .replay
         .as_ref()
         .map(|replay| replay.key.clone())
-        .or_else(|| item.key.clone())?;
+        .or_else(|| item.key.clone());
     let replayable = item.record || item.replay.is_some();
     let (paint, accessed, origin) = if let Some(replay) = item.replay.take() {
         let offset = item.bounds.origin - replay.origin;
@@ -1745,6 +1763,7 @@ fn paint_item(item: &mut ItemLayout, window: &mut Window, cx: &mut App) -> Optio
             item.bounds.origin,
         )
     };
+    let key = key?;
     let state = match (window.output_is_positionless(&prepaint, &paint), replayable) {
         (false, _) => ReplayState::Positional,
         (true, true) => ReplayState::Ready,
