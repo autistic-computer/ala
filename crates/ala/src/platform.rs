@@ -636,6 +636,7 @@ pub enum AppLifecyclePhase {
 pub struct WindowInsets {
     pub safe_area: Edges<Pixels>,
     pub ime: Edges<Pixels>,
+    pub corner_radii: crate::Corners<Pixels>,
 }
 
 impl WindowInsets {

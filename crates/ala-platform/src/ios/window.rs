@@ -2,14 +2,14 @@ use crate::ios::keyboard_inset::{KeyboardMotion, Spring};
 use crate::ios::{CGPoint, CGRect, IosDisplay, id, nil, ns_array};
 use ala::accesskit;
 use ala::{
-    AnyWindowHandle, Bounds, Capslock, CursorStyle, DevicePixels, DispatchEventResult,
-    KeyDownEvent, KeyUpEvent, Keystroke, Modifiers, ModifiersChangedEvent, MouseButton,
-    MouseDownEvent, MouseExitEvent, MouseMoveEvent, MouseUpEvent, PinchEvent, Pixels,
-    PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, Point,
-    PromptButton, PromptLevel, RequestFrameOptions, ScrollDelta, ScrollWheelEvent, Size,
-    TextInputAction, TextInputConfiguration, TextInputMode, TextInputStateChange, TouchEvent,
-    TouchId, TouchPhase, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowParams,
-    point, px, size,
+    AnyWindowHandle, BackGestureEvent, BackGesturePhase, Bounds, Capslock, CursorStyle,
+    DevicePixels, DispatchEventResult, KeyDownEvent, KeyUpEvent, Keystroke, Modifiers,
+    ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseExitEvent, MouseMoveEvent,
+    MouseUpEvent, PinchEvent, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
+    PlatformInputHandler, PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions,
+    ScrollDelta, ScrollWheelEvent, Size, TextInputAction, TextInputConfiguration, TextInputMode,
+    TextInputStateChange, TouchEvent, TouchId, TouchPhase, WindowAppearance,
+    WindowBackgroundAppearance, WindowBounds, WindowParams, point, px, size,
 };
 use futures::channel::oneshot;
 use objc::{
@@ -73,6 +73,7 @@ pub(crate) struct IosWindowState {
     touch_gestures: bool,
     touches: HashMap<usize, (TouchId, Point<Pixels>)>,
     pinch: Option<crate::ios::pinch::Pinch>,
+    back_gesture_start: Option<Point<Pixels>>,
     next_touch: u64,
     pointer_button: Option<MouseButton>,
     momentum: Option<crate::ios::momentum::Momentum>,
@@ -213,6 +214,7 @@ impl IosWindow {
                 touch_gestures,
                 touches: HashMap::new(),
                 pinch: None,
+                back_gesture_start: None,
                 next_touch: 0,
                 pointer_button: None,
                 momentum: None,
@@ -244,6 +246,8 @@ impl IosWindow {
             ];
 
             state.borrow_mut().pointer_interaction = install_pointer_input(native_view);
+            install_back_gesture(native_view);
+            follow_display_corners(native_view);
             observe_hardware_keyboard(native_view);
             crate::ios::drop::install(native_view);
             let edit_menu: id = msg_send![class!(UIEditMenuInteraction), alloc];
@@ -663,6 +667,14 @@ fn register_view_class() {
         }
         decl.add_method(sel!(alaHover:), hover as extern "C" fn(&Object, Sel, id));
         decl.add_method(sel!(alaScroll:), scroll as extern "C" fn(&Object, Sel, id));
+        decl.add_method(
+            sel!(alaBackGesture:),
+            back_gesture as extern "C" fn(&Object, Sel, id),
+        );
+        decl.add_method(
+            sel!(gestureRecognizerShouldBegin:),
+            gesture_recognizer_should_begin as extern "C" fn(&Object, Sel, id) -> BOOL,
+        );
         decl.add_method(sel!(alaWheel:), wheel as extern "C" fn(&Object, Sel, id));
         decl.add_method(
             sel!(pointerInteraction:styleForRegion:),
@@ -1040,6 +1052,7 @@ fn viewport_changed(this: &Object) {
 fn view_insets(view: id, keyboard_overlap: f64) -> ala::WindowInsets {
     let insets: crate::ios::UIEdgeInsets = unsafe { msg_send![view, safeAreaInsets] };
     ala::WindowInsets {
+        corner_radii: display_corner_radii(view),
         safe_area: ala::Edges {
             top: px(insets.top as f32),
             right: px(insets.right as f32),
@@ -1050,6 +1063,50 @@ fn view_insets(view: id, keyboard_overlap: f64) -> ala::WindowInsets {
             bottom: px(keyboard_overlap as f32),
             ..Default::default()
         },
+    }
+}
+
+const UI_RECT_CORNER_TOP_LEFT: usize = 1;
+const UI_RECT_CORNER_TOP_RIGHT: usize = 2;
+const UI_RECT_CORNER_BOTTOM_LEFT: usize = 4;
+const UI_RECT_CORNER_BOTTOM_RIGHT: usize = 8;
+
+fn reports_corner_radii(view: id) -> bool {
+    let responds: BOOL =
+        unsafe { msg_send![view, respondsToSelector: sel!(effectiveRadiusForCorner:)] };
+    responds == YES
+}
+
+unsafe fn follow_display_corners(view: id) {
+    if !reports_corner_radii(view) {
+        return;
+    }
+    let (Some(configuration), Some(radius)) = (
+        Class::get("UICornerConfiguration"),
+        Class::get("UICornerRadius"),
+    ) else {
+        return;
+    };
+    unsafe {
+        let radius: id = msg_send![radius, containerConcentricRadius];
+        let configuration: id = msg_send![configuration, configurationWithRadius: radius];
+        let _: () = msg_send![view, setCornerConfiguration: configuration];
+    }
+}
+
+fn display_corner_radii(view: id) -> ala::Corners<Pixels> {
+    if !reports_corner_radii(view) {
+        return ala::Corners::default();
+    }
+    let radius = |corner: usize| {
+        let radius: f64 = unsafe { msg_send![view, effectiveRadiusForCorner: corner] };
+        px(radius as f32)
+    };
+    ala::Corners {
+        top_left: radius(UI_RECT_CORNER_TOP_LEFT),
+        top_right: radius(UI_RECT_CORNER_TOP_RIGHT),
+        bottom_right: radius(UI_RECT_CORNER_BOTTOM_RIGHT),
+        bottom_left: radius(UI_RECT_CORNER_BOTTOM_LEFT),
     }
 }
 
@@ -2057,6 +2114,107 @@ extern "C" fn hover(this: &Object, _: Sel, recognizer: id) {
         _ => return,
     };
     dispatch_event(this, input);
+}
+
+const UI_RECT_EDGE_LEFT: usize = 2;
+const UI_RECT_EDGE_RIGHT: usize = 8;
+const UI_USER_INTERFACE_LAYOUT_DIRECTION_RIGHT_TO_LEFT: isize = 1;
+const BACK_COMMIT_VELOCITY: f64 = 300.;
+
+unsafe fn install_back_gesture(view: id) {
+    unsafe {
+        let recognizer: id = msg_send![class!(UIScreenEdgePanGestureRecognizer), alloc];
+        let recognizer: id =
+            msg_send![recognizer, initWithTarget: view action: sel!(alaBackGesture:)];
+        let direction: isize = msg_send![view, effectiveUserInterfaceLayoutDirection];
+        let edge = if direction == UI_USER_INTERFACE_LAYOUT_DIRECTION_RIGHT_TO_LEFT {
+            UI_RECT_EDGE_RIGHT
+        } else {
+            UI_RECT_EDGE_LEFT
+        };
+        let _: () = msg_send![recognizer, setEdges: edge];
+        let _: () = msg_send![recognizer, setDelegate: view];
+        let _: () = msg_send![view, addGestureRecognizer: recognizer];
+        let _: () = msg_send![recognizer, release];
+    }
+}
+
+fn is_back_gesture(recognizer: id) -> bool {
+    let is_edge_pan: BOOL =
+        unsafe { msg_send![recognizer, isKindOfClass: class!(UIScreenEdgePanGestureRecognizer)] };
+    is_edge_pan == YES
+}
+
+extern "C" fn gesture_recognizer_should_begin(this: &Object, _: Sel, recognizer: id) -> BOOL {
+    if !is_back_gesture(recognizer) {
+        return unsafe {
+            msg_send![super(this, class!(UIView)), gestureRecognizerShouldBegin: recognizer]
+        };
+    }
+    let start_position = recognizer_point(this, recognizer);
+    if unsafe { get_window_state(this) }
+        .borrow()
+        .back_gesture_start
+        == Some(start_position)
+    {
+        return YES;
+    }
+    let claimed = dispatch_event(
+        this,
+        PlatformInput::BackGesture(BackGestureEvent {
+            phase: BackGesturePhase::Started,
+            start_position,
+            progress: 0.,
+        }),
+    )
+    .default_prevented;
+    unsafe { get_window_state(this) }
+        .borrow_mut()
+        .back_gesture_start = claimed.then_some(start_position);
+    if claimed { YES } else { NO }
+}
+
+extern "C" fn back_gesture(this: &Object, _: Sel, recognizer: id) {
+    let state = unsafe { get_window_state(this) };
+    let Some(start_position) = state.borrow().back_gesture_start else {
+        return;
+    };
+    let view = this as *const Object as id;
+    let edge: usize = unsafe { msg_send![recognizer, edges] };
+    let direction = if edge == UI_RECT_EDGE_RIGHT { -1. } else { 1. };
+    let bounds: CGRect = unsafe { msg_send![view, bounds] };
+    let translation: CGPoint = unsafe { msg_send![recognizer, translationInView: view] };
+    let progress = (translation.x * direction / bounds.size.width.max(1.)).clamp(0., 1.);
+    let phase = match unsafe { msg_send![recognizer, state] } {
+        1isize | 2 => BackGesturePhase::Progressed,
+        3 => {
+            let velocity: CGPoint = unsafe { msg_send![recognizer, velocityInView: view] };
+            let velocity = velocity.x * direction;
+            if velocity > BACK_COMMIT_VELOCITY
+                || (progress > 0.5 && velocity > -BACK_COMMIT_VELOCITY)
+            {
+                BackGesturePhase::Committed
+            } else {
+                BackGesturePhase::Cancelled
+            }
+        }
+        4 | 5 => BackGesturePhase::Cancelled,
+        _ => return,
+    };
+    if matches!(
+        phase,
+        BackGesturePhase::Committed | BackGesturePhase::Cancelled
+    ) {
+        state.borrow_mut().back_gesture_start = None;
+    }
+    dispatch_event(
+        this,
+        PlatformInput::BackGesture(BackGestureEvent {
+            phase,
+            start_position,
+            progress: progress as f32,
+        }),
+    );
 }
 
 const UI_SCROLL_TYPE_MASK_DISCRETE: isize = 1;

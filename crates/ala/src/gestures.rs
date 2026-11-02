@@ -535,6 +535,31 @@ impl InputEvent for TouchDragEvent {
 impl GestureEvent for TouchDragEvent {}
 impl MouseEvent for TouchDragEvent {}
 
+#[derive(Clone, Debug, Default)]
+pub struct BackGestureEvent {
+    pub phase: BackGesturePhase,
+    pub start_position: Point<Pixels>,
+    pub progress: f32,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BackGesturePhase {
+    #[default]
+    Started,
+    Progressed,
+    Committed,
+    Cancelled,
+}
+
+impl Sealed for BackGestureEvent {}
+impl InputEvent for BackGestureEvent {
+    fn to_platform_input(self) -> PlatformInput {
+        PlatformInput::BackGesture(self)
+    }
+}
+impl GestureEvent for BackGestureEvent {}
+impl MouseEvent for BackGestureEvent {}
+
 #[derive(Clone, Debug)]
 pub struct LongPressEvent {
     pub phase: TouchPhase,

@@ -164,6 +164,7 @@ impl AndroidWindowState {
                 bottom: px(self.ime as f32 / scale),
                 ..Default::default()
             },
+            ..Default::default()
         }
     }
 
