@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::{borrow::Cow, sync::LazyLock};
 
 use ala::collections::FxHashMap;
 use anyhow::Result;
@@ -177,11 +177,16 @@ fn is_image_format(format: u32) -> bool {
 }
 
 fn write_string(item: &ClipboardString) -> Result<()> {
-    let wide: Vec<u16> = item.text.encode_utf16().chain(Some(0)).collect_vec();
+    let text = if item.text.contains('\0') {
+        Cow::Owned(item.text.replace('\0', " "))
+    } else {
+        Cow::Borrowed(item.text.as_str())
+    };
+    let wide: Vec<u16> = text.encode_utf16().chain(Some(0)).collect_vec();
     set_clipboard_bytes(&wide, CF_UNICODETEXT.0 as u32)?;
 
     if let Some(metadata) = item.metadata.as_ref() {
-        let hash_bytes = ClipboardString::text_hash(&item.text).to_ne_bytes();
+        let hash_bytes = ClipboardString::text_hash(&text).to_ne_bytes();
         set_clipboard_bytes(&hash_bytes, *CLIPBOARD_HASH_FORMAT)?;
 
         let wide: Vec<u16> = metadata.encode_utf16().chain(Some(0)).collect_vec();
