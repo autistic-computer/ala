@@ -7,7 +7,15 @@ use crate::{
         round_to_device_pixel,
     },
 };
-use std::{fmt::Debug, ops::Range};
+use smallvec::SmallVec;
+use std::{
+    any::Any,
+    fmt::Debug,
+    hash::{Hash as _, Hasher as _},
+    mem,
+    ops::Range,
+    rc::Rc,
+};
 use taffy::{
     TaffyTree, TraversePartialTree as _,
     geometry::{Point as TaffyPoint, Rect as TaffyRect, Size as TaffySize},
@@ -27,13 +35,64 @@ type NodeMeasureFn = StackSafe<Box<MeasureFn>>;
 
 struct NodeContext {
     measure: NodeMeasureFn,
+    state: Option<Rc<dyn Any>>,
 }
+
 pub struct TaffyLayoutEngine {
     taffy: TaffyTree<NodeContext>,
     absolute_layout_bounds: FxHashMap<LayoutId, Bounds<Pixels>>,
     absolute_outer_origins: FxHashMap<LayoutId, Point<f32>>,
     computed_layouts: FxHashSet<LayoutId>,
     layout_bounds_scratch_space: Vec<LayoutId>,
+    retained: RetainedNodes,
+}
+
+#[derive(Default)]
+struct RetainedNodes {
+    candidates: FxHashMap<u64, SmallVec<[NodeId; 1]>>,
+    next_candidates: FxHashMap<u64, SmallVec<[NodeId; 1]>>,
+    keys: FxHashMap<NodeId, u64>,
+    used: FxHashSet<NodeId>,
+    frame: Vec<NodeId>,
+    last_frame: Vec<NodeId>,
+}
+
+impl RetainedNodes {
+    fn key(
+        &self,
+        style: &taffy::Style,
+        children: &[LayoutId],
+        measured: Option<u64>,
+    ) -> Option<u64> {
+        let mut hasher = crate::collections::FxHasher::default();
+        style_fingerprint(style, &mut hasher);
+        measured.hash(&mut hasher);
+        for child in children {
+            self.keys.get(&child.0)?.hash(&mut hasher);
+        }
+        Some(hasher.finish())
+    }
+
+    fn record(&mut self, node: NodeId, key: Option<u64>) {
+        self.frame.push(node);
+        self.used.insert(node);
+        if let Some(key) = key {
+            self.keys.insert(node, key);
+            self.next_candidates.entry(key).or_default().push(node);
+        }
+    }
+}
+
+fn style_fingerprint(style: &taffy::Style, hasher: &mut crate::collections::FxHasher) {
+    mem::discriminant(&style.display).hash(hasher);
+    mem::discriminant(&style.position).hash(hasher);
+    mem::discriminant(&style.flex_direction).hash(hasher);
+    for dimension in [style.size.width, style.size.height] {
+        dimension.tag().hash(hasher);
+        dimension.value().to_bits().hash(hasher);
+    }
+    style.flex_grow.to_bits().hash(hasher);
+    style.flex_shrink.to_bits().hash(hasher);
 }
 
 const EXPECT_MESSAGE: &str = "we should avoid taffy layout errors by construction if possible";
@@ -48,14 +107,55 @@ impl TaffyLayoutEngine {
             absolute_outer_origins: FxHashMap::default(),
             computed_layouts: FxHashSet::default(),
             layout_bounds_scratch_space: Vec::new(),
+            retained: RetainedNodes::default(),
         }
     }
 
     pub fn clear(&mut self) {
-        self.taffy.clear();
+        let retained = &mut self.retained;
+        for node in retained.last_frame.drain(..) {
+            if !retained.used.contains(&node) {
+                self.taffy.remove(node).expect(EXPECT_MESSAGE);
+            }
+        }
+        mem::swap(&mut retained.last_frame, &mut retained.frame);
+        retained.candidates = mem::take(&mut retained.next_candidates);
+        retained.keys.clear();
+        retained.used.clear();
         self.absolute_layout_bounds.clear();
         self.absolute_outer_origins.clear();
         self.computed_layouts.clear();
+    }
+
+    fn take_candidate(
+        &mut self,
+        key: u64,
+        style: &taffy::Style,
+        children: &[LayoutId],
+        measured: bool,
+    ) -> Option<NodeId> {
+        let taffy = &self.taffy;
+        let retained = &mut self.retained;
+        let candidates = retained.candidates.get_mut(&key)?;
+        let position = candidates.iter().position(|&node| {
+            !retained.used.contains(&node)
+                && taffy.get_node_context(node).is_some() == measured
+                && taffy.style(node).is_ok_and(|old| old == style)
+                && taffy
+                    .children(node)
+                    .is_ok_and(|old| old.as_slice() == LayoutId::to_taffy_slice(children))
+        })?;
+        Some(candidates.remove(position))
+    }
+
+    fn adopt(&mut self, children: &[LayoutId]) {
+        for child in children {
+            if let Some(parent) = self.taffy.parent(child.0) {
+                self.taffy
+                    .remove_child(parent, child.0)
+                    .expect(EXPECT_MESSAGE);
+            }
+        }
     }
 
     pub fn request_layout(
@@ -66,18 +166,24 @@ impl TaffyLayoutEngine {
         children: &[LayoutId],
     ) -> LayoutId {
         let taffy_style = style.to_taffy(rem_size, scale_factor);
+        let key = self.retained.key(&taffy_style, children, None);
+        if let Some(key) = key
+            && let Some(node) = self.take_candidate(key, &taffy_style, children, false)
+        {
+            self.retained.record(node, Some(key));
+            return node.into();
+        }
 
-        if children.is_empty() {
-            self.taffy
-                .new_leaf(taffy_style)
-                .expect(EXPECT_MESSAGE)
-                .into()
+        let node = if children.is_empty() {
+            self.taffy.new_leaf(taffy_style).expect(EXPECT_MESSAGE)
         } else {
+            self.adopt(children);
             self.taffy
                 .new_with_children(taffy_style, LayoutId::to_taffy_slice(children))
                 .expect(EXPECT_MESSAGE)
-                .into()
-        }
+        };
+        self.retained.record(node, key);
+        node.into()
     }
 
     pub fn request_measured_layout(
@@ -98,10 +204,55 @@ impl TaffyLayoutEngine {
         #[cfg(feature = "stacker")]
         let measure = StackSafe::new(measure);
 
-        self.taffy
-            .new_leaf_with_context(taffy_style, NodeContext { measure })
-            .expect(EXPECT_MESSAGE)
-            .into()
+        let node = self
+            .taffy
+            .new_leaf_with_context(
+                taffy_style,
+                NodeContext {
+                    measure,
+                    state: None,
+                },
+            )
+            .expect(EXPECT_MESSAGE);
+        self.retained.record(node, None);
+        node.into()
+    }
+
+    pub fn request_keyed_measured_layout(
+        &mut self,
+        style: Style,
+        rem_size: Pixels,
+        scale_factor: f32,
+        content_key: u64,
+        state: Rc<dyn Any>,
+        measure: Box<MeasureFn>,
+    ) -> (LayoutId, Option<Rc<dyn Any>>) {
+        let taffy_style = style.to_taffy(rem_size, scale_factor);
+        #[cfg(feature = "stacker")]
+        let measure = StackSafe::new(measure);
+        let key = self.retained.key(&taffy_style, &[], Some(content_key));
+        if let Some(key) = key
+            && let Some(node) = self.take_candidate(key, &taffy_style, &[], true)
+        {
+            let context = self.taffy.get_node_context_mut(node).expect(EXPECT_MESSAGE);
+            context.measure = measure;
+            let previous = context.state.replace(state);
+            self.retained.record(node, Some(key));
+            return (node.into(), previous);
+        }
+
+        let node = self
+            .taffy
+            .new_leaf_with_context(
+                taffy_style,
+                NodeContext {
+                    measure,
+                    state: Some(state),
+                },
+            )
+            .expect(EXPECT_MESSAGE);
+        self.retained.record(node, key);
+        (node.into(), None)
     }
 
     pub fn stretch_auto_size_to_fill(
@@ -178,6 +329,9 @@ impl TaffyLayoutEngine {
         window: &mut Window,
         cx: &mut App,
     ) {
+        if let Some(parent) = self.taffy.parent(id.0) {
+            self.taffy.remove_child(parent, id.0).expect(EXPECT_MESSAGE);
+        }
         if !self.computed_layouts.insert(id) {
             let stack = &mut self.layout_bounds_scratch_space;
             stack.push(id);
@@ -632,7 +786,7 @@ impl From<Size<Pixels>> for Size<AvailableSpace> {
 
 impl TaffyLayoutEngine {
     pub(crate) fn frame_stats_layout_node_count(&self) -> usize {
-        self.taffy.total_node_count()
+        self.retained.frame.len()
     }
 }
 

@@ -12,6 +12,7 @@ use smallvec::SmallVec;
 use std::{
     borrow::Cow,
     cell::{Cell, RefCell},
+    hash::{Hash as _, Hasher as _},
     mem,
     ops::{Deref, DerefMut, Range},
     rc::Rc,
@@ -532,6 +533,7 @@ impl IntoElement for StyledText {
 #[derive(Default, Clone)]
 pub struct TextLayout(Rc<RefCell<Option<TextLayoutInner>>>);
 
+#[derive(Clone)]
 struct TextLayoutInner {
     len: usize,
     lines: SmallVec<[WrappedLine; 1]>,
@@ -541,6 +543,39 @@ struct TextLayoutInner {
     fade: Option<Pixels>,
     size: Option<Size<Pixels>>,
     bounds: Option<Bounds<Pixels>>,
+}
+
+fn text_content_key(
+    text: &SharedString,
+    runs: &[TextRun],
+    text_style: &TextStyle,
+    font_size: Pixels,
+    line_height: Pixels,
+    window: &Window,
+) -> u64 {
+    let mut hasher = crate::collections::FxHasher::default();
+    text.hash(&mut hasher);
+    for run in runs {
+        run.len.hash(&mut hasher);
+        run.font.hash(&mut hasher);
+    }
+    text_style.font().hash(&mut hasher);
+    font_size.0.to_bits().hash(&mut hasher);
+    line_height.0.to_bits().hash(&mut hasher);
+    mem::discriminant(&text_style.white_space).hash(&mut hasher);
+    match &text_style.text_overflow {
+        None => 0u8.hash(&mut hasher),
+        Some(TextOverflow::Truncate(affix)) => (1u8, affix).hash(&mut hasher),
+        Some(TextOverflow::TruncateStart(affix)) => (2u8, affix).hash(&mut hasher),
+        Some(TextOverflow::TruncateMiddle(affix)) => (3u8, affix).hash(&mut hasher),
+        Some(TextOverflow::Fade(width)) => (4u8, width.0.to_bits()).hash(&mut hasher),
+    }
+    text_style.line_clamp.hash(&mut hasher);
+    window
+        .text_system()
+        .font_cache_generation()
+        .hash(&mut hasher);
+    hasher.finish()
 }
 
 impl TextLayout {
@@ -564,140 +599,157 @@ impl TextLayout {
         } else {
             vec![text_style.to_run(text.len())]
         };
-        window.request_measured_layout(Default::default(), {
-            let element_state = self.clone();
+        let content_key =
+            text_content_key(&text, &runs, &text_style, font_size, line_height, window);
+        let (layout_id, previous) = window.request_keyed_measured_layout(
+            Default::default(),
+            content_key,
+            self.0.clone(),
+            {
+                let element_state = self.clone();
 
-            move |known_dimensions, available_space, window, cx| {
-                let wrap_width = if text_style.white_space == WhiteSpace::Normal {
-                    known_dimensions.width.or(match available_space.width {
-                        crate::AvailableSpace::Definite(x) => Some(x),
-                        _ => None,
-                    })
-                } else {
-                    None
-                };
-
-                let (truncate_width, truncation_affix, truncate_from) =
-                    if let Some(text_overflow) = text_style.text_overflow.clone() {
-                        let width = known_dimensions.width.or(match available_space.width {
-                            crate::AvailableSpace::Definite(x) => match text_style.line_clamp {
-                                Some(max_lines) => Some(x * max_lines),
-                                None => Some(x),
-                            },
+                move |known_dimensions, available_space, window, cx| {
+                    let wrap_width = if text_style.white_space == WhiteSpace::Normal {
+                        known_dimensions.width.or(match available_space.width {
+                            crate::AvailableSpace::Definite(x) => Some(x),
                             _ => None,
-                        });
-
-                        match text_overflow {
-                            TextOverflow::Truncate(s) => (width, s, TruncateFrom::End),
-                            TextOverflow::TruncateStart(s) => (width, s, TruncateFrom::Start),
-                            TextOverflow::TruncateMiddle(s) => (width, s, TruncateFrom::Middle),
-                            TextOverflow::Fade(_) => (None, "".into(), TruncateFrom::End),
-                        }
+                        })
                     } else {
-                        (None, "".into(), TruncateFrom::End)
+                        None
                     };
 
-                let fade = match text_style.text_overflow {
-                    Some(TextOverflow::Fade(width)) => Some(width),
-                    _ => None,
-                };
-                let fit_width = fade.and(known_dimensions.width.or(match available_space.width {
-                    crate::AvailableSpace::Definite(x) => Some(x),
-                    _ => None,
-                }));
-                let fit = |mut size: Size<Pixels>| {
-                    if let Some(width) = fit_width {
-                        size.width = size.width.min(width);
+                    let (truncate_width, truncation_affix, truncate_from) =
+                        if let Some(text_overflow) = text_style.text_overflow.clone() {
+                            let width = known_dimensions.width.or(match available_space.width {
+                                crate::AvailableSpace::Definite(x) => match text_style.line_clamp {
+                                    Some(max_lines) => Some(x * max_lines),
+                                    None => Some(x),
+                                },
+                                _ => None,
+                            });
+
+                            match text_overflow {
+                                TextOverflow::Truncate(s) => (width, s, TruncateFrom::End),
+                                TextOverflow::TruncateStart(s) => (width, s, TruncateFrom::Start),
+                                TextOverflow::TruncateMiddle(s) => (width, s, TruncateFrom::Middle),
+                                TextOverflow::Fade(_) => (None, "".into(), TruncateFrom::End),
+                            }
+                        } else {
+                            (None, "".into(), TruncateFrom::End)
+                        };
+
+                    let fade = match text_style.text_overflow {
+                        Some(TextOverflow::Fade(width)) => Some(width),
+                        _ => None,
+                    };
+                    let fit_width =
+                        fade.and(known_dimensions.width.or(match available_space.width {
+                            crate::AvailableSpace::Definite(x) => Some(x),
+                            _ => None,
+                        }));
+                    let fit = |mut size: Size<Pixels>| {
+                        if let Some(width) = fit_width {
+                            size.width = size.width.min(width);
+                        }
+                        size
+                    };
+
+                    if let Some(text_layout) = element_state.0.borrow().as_ref()
+                        && let Some(size) = text_layout.size
+                        && (wrap_width == text_layout.wrap_width
+                            || (text_layout.wrap_width.is_none()
+                                && wrap_width.is_some_and(|wrap_width| size.width <= wrap_width)))
+                        && truncate_width.is_none()
+                        && text_layout.truncate_width.is_none()
+                    {
+                        return fit(size);
                     }
-                    size
-                };
 
-                if let Some(text_layout) = element_state.0.borrow().as_ref()
-                    && let Some(size) = text_layout.size
-                    && (wrap_width == text_layout.wrap_width
-                        || (text_layout.wrap_width.is_none()
-                            && wrap_width.is_some_and(|wrap_width| size.width <= wrap_width)))
-                    && truncate_width.is_none()
-                    && text_layout.truncate_width.is_none()
-                {
-                    return fit(size);
-                }
-
-                let mut line_wrapper = cx.text_system().line_wrapper(text_style.font(), font_size);
-                let (text, runs) = if let Some(truncate_width) = truncate_width {
-                    if let Some(max_lines) = text_style.line_clamp
-                        && let Some(wrap_width) = wrap_width
-                    {
-                        line_wrapper.truncate_wrapped_line(
-                            text.clone(),
-                            wrap_width,
-                            max_lines,
-                            &truncation_affix,
-                            &runs,
-                            truncate_from,
-                        )
-                    } else if let Some(unclipped) = window
-                        .text_system()
-                        .shape_text(text.clone(), font_size, &runs, None, None)
-                        .log_err()
-                        && unclipped
-                            .iter()
-                            .all(|line| line.size(line_height).width <= truncate_width)
-                    {
-                        (text.clone(), Cow::Borrowed(&*runs))
+                    let mut line_wrapper =
+                        cx.text_system().line_wrapper(text_style.font(), font_size);
+                    let (text, runs) = if let Some(truncate_width) = truncate_width {
+                        if let Some(max_lines) = text_style.line_clamp
+                            && let Some(wrap_width) = wrap_width
+                        {
+                            line_wrapper.truncate_wrapped_line(
+                                text.clone(),
+                                wrap_width,
+                                max_lines,
+                                &truncation_affix,
+                                &runs,
+                                truncate_from,
+                            )
+                        } else if let Some(unclipped) = window
+                            .text_system()
+                            .shape_text(text.clone(), font_size, &runs, None, None)
+                            .log_err()
+                            && unclipped
+                                .iter()
+                                .all(|line| line.size(line_height).width <= truncate_width)
+                        {
+                            (text.clone(), Cow::Borrowed(&*runs))
+                        } else {
+                            line_wrapper.truncate_line(
+                                text.clone(),
+                                truncate_width,
+                                &truncation_affix,
+                                &runs,
+                                truncate_from,
+                            )
+                        }
                     } else {
-                        line_wrapper.truncate_line(
-                            text.clone(),
-                            truncate_width,
-                            &truncation_affix,
-                            &runs,
-                            truncate_from,
-                        )
-                    }
-                } else {
-                    (text.clone(), Cow::Borrowed(&*runs))
-                };
-                let len = text.len();
+                        (text.clone(), Cow::Borrowed(&*runs))
+                    };
+                    let len = text.len();
 
-                let Some(lines) = window
-                    .text_system()
-                    .shape_text(text, font_size, &runs, wrap_width, text_style.line_clamp)
-                    .log_err()
-                else {
+                    let Some(lines) = window
+                        .text_system()
+                        .shape_text(text, font_size, &runs, wrap_width, text_style.line_clamp)
+                        .log_err()
+                    else {
+                        element_state.0.borrow_mut().replace(TextLayoutInner {
+                            lines: Default::default(),
+                            len: 0,
+                            line_height,
+                            wrap_width,
+                            truncate_width,
+                            fade,
+                            size: Some(Size::default()),
+                            bounds: None,
+                        });
+                        return Size::default();
+                    };
+
+                    let mut size: Size<Pixels> = Size::default();
+                    for line in &lines {
+                        let line_size = line.size(line_height);
+                        size.height += line_size.height;
+                        size.width = size.width.max(line_size.width).ceil();
+                    }
+
                     element_state.0.borrow_mut().replace(TextLayoutInner {
-                        lines: Default::default(),
-                        len: 0,
+                        lines,
+                        len,
                         line_height,
                         wrap_width,
                         truncate_width,
                         fade,
-                        size: Some(Size::default()),
+                        size: Some(size),
                         bounds: None,
                     });
-                    return Size::default();
-                };
 
-                let mut size: Size<Pixels> = Size::default();
-                for line in &lines {
-                    let line_size = line.size(line_height);
-                    size.height += line_size.height;
-                    size.width = size.width.max(line_size.width).ceil();
+                    fit(size)
                 }
-
-                element_state.0.borrow_mut().replace(TextLayoutInner {
-                    lines,
-                    len,
-                    line_height,
-                    wrap_width,
-                    truncate_width,
-                    fade,
-                    size: Some(size),
-                    bounds: None,
-                });
-
-                fit(size)
-            }
-        })
+            },
+        );
+        if let Some(previous) = previous
+            .and_then(|previous| previous.downcast::<RefCell<Option<TextLayoutInner>>>().ok())
+            && !Rc::ptr_eq(&previous, &self.0)
+        {
+            let inner = previous.borrow().clone();
+            *self.0.borrow_mut() = inner;
+        }
+        layout_id
     }
 
     fn prepaint(&self, bounds: Bounds<Pixels>, text: &str) {

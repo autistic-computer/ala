@@ -5501,6 +5501,36 @@ impl Window {
             .request_measured_layout(style, rem_size, scale_factor, measure)
     }
 
+    pub(crate) fn request_keyed_measured_layout(
+        &mut self,
+        style: Style,
+        content_key: u64,
+        state: Rc<dyn Any>,
+        measure: impl Fn(
+            Size<Option<Pixels>>,
+            Size<AvailableSpace>,
+            &mut Window,
+            &mut App,
+        ) -> Size<Pixels>
+        + 'static,
+    ) -> (LayoutId, Option<Rc<dyn Any>>) {
+        self.invalidator.debug_assert_prepaint();
+
+        let rem_size = self.rem_size();
+        let scale_factor = self.scale_factor();
+        self.layout_engine
+            .as_mut()
+            .unwrap()
+            .request_keyed_measured_layout(
+                style,
+                rem_size,
+                scale_factor,
+                content_key,
+                state,
+                Box::new(measure),
+            )
+    }
+
     pub fn compute_layout(
         &mut self,
         layout_id: LayoutId,

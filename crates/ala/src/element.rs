@@ -3,9 +3,8 @@ use crate::InspectorElementPath;
 use crate::collections::FxHashMap;
 use crate::{
     A11ySubtreeBuilder, App, ArenaBox, AvailableSpace, Bounds, Context, DispatchNodeId, ElementId,
-    EntityId,
-    FocusHandle, InspectorElementId, LayoutId, Pixels, Point, SharedString, Size, Style, Window,
-    util::FluentBuilder, window::with_element_arena,
+    EntityId, FocusHandle, InspectorElementId, LayoutId, Pixels, Point, SharedString, Size, Style,
+    Window, util::FluentBuilder, window::with_element_arena,
 };
 use derive_more::Deref;
 use std::{

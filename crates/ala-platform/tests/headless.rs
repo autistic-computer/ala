@@ -179,6 +179,97 @@ fn scrolled_list_rows_replay_with_the_pixels_of_a_fresh_render() -> anyhow::Resu
     Ok(())
 }
 
+#[derive(Clone)]
+struct DocState {
+    items: Vec<(String, bool)>,
+    width: f32,
+}
+
+struct Doc(DocState);
+
+impl Render for Doc {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .w(px(self.0.width))
+            .flex()
+            .flex_col()
+            .gap(px(4.))
+            .text_color(white())
+            .children(self.0.items.iter().enumerate().map(|(ix, (text, padded))| {
+                div()
+                    .when(*padded, |item| item.p(px(6.)))
+                    .bg(hsla(ix as f32 * 0.11 % 1.0, 0.5, 0.3, 1.0))
+                    .flex()
+                    .gap(px(3.))
+                    .child(div().flex_none().w(px(12.)).h(px(12.)).bg(red()))
+                    .child(div().flex_1().child(text.clone()))
+                    .when(ix % 3 == 0, |item| {
+                        item.child(
+                            div()
+                                .w(px(40.))
+                                .whitespace_nowrap()
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .child(text.clone()),
+                        )
+                    })
+            }))
+    }
+}
+
+#[test]
+fn retained_layout_matches_a_fresh_window() -> anyhow::Result<()> {
+    let mut cx = HeadlessAppContext::with_platform(
+        Arc::new(CosmicTextSystem::new("DejaVu Sans")),
+        Arc::new(()),
+        current_headless_renderer,
+    );
+    let mut state = DocState {
+        items: (0..9)
+            .map(|ix| (format!("item {ix} {}", "word ".repeat(ix * 2 + 1)), ix % 2 == 0))
+            .collect(),
+        width: 200.,
+    };
+    let initial = state.clone();
+    let window = cx.open_window(size(px(220.), px(400.)), move |_, cx| cx.new(|_| Doc(initial)))?;
+    let edits: Vec<Box<dyn Fn(&mut DocState)>> = vec![
+        Box::new(|_| {}),
+        Box::new(|s| s.items[2].0 = "edited text that is longer than before and wraps".into()),
+        Box::new(|s| s.items[5].1 = !s.items[5].1),
+        Box::new(|s| s.items.push(("appended".into(), true))),
+        Box::new(|s| {
+            s.items.remove(0);
+        }),
+        Box::new(|s| s.width = 150.),
+        Box::new(|s| s.width = 200.),
+        Box::new(|s| s.items.swap(1, 3)),
+        Box::new(|_| {}),
+    ];
+    for (step, edit) in edits.iter().enumerate() {
+        edit(&mut state);
+        let next = state.clone();
+        cx.update_window(window.into(), |root, window, cx| {
+            root.downcast::<Doc>().unwrap().update(cx, |doc, cx| {
+                doc.0 = next;
+                cx.notify();
+            });
+            window.draw(cx).clear(cx);
+        })?;
+        let retained = cx.capture_screenshot(window.into())?;
+        let fresh_state = state.clone();
+        let fresh_window =
+            cx.open_window(size(px(220.), px(400.)), move |_, cx| cx.new(|_| Doc(fresh_state)))?;
+        let fresh = cx.capture_screenshot(fresh_window.into())?;
+        let differing = retained
+            .pixels()
+            .zip(fresh.pixels())
+            .filter(|(a, b)| a != b)
+            .count();
+        assert_eq!(differing, 0, "step {step} differs from a fresh window");
+    }
+    Ok(())
+}
+
 #[derive(Default)]
 struct GlyphPaintTimes {
     ui_paint: Vec<Duration>,

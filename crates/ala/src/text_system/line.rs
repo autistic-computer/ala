@@ -663,7 +663,7 @@ fn glyph_raster_data_is_valid(
         && data.window_state == window_state
 }
 
-#[derive(Default, Debug, Deref, DerefMut)]
+#[derive(Clone, Default, Debug, Deref, DerefMut)]
 pub struct WrappedLine {
     #[deref]
     #[deref_mut]
