@@ -6209,9 +6209,14 @@ impl Window {
                     accepts
                 });
 
+            let standalone_modifier = matches!(
+                currently_pending.keystrokes.as_slice(),
+                [keystroke] if keystroke.is_modifier_key()
+            );
             let needs_timeout = previous_timeout.is_some()
                 || match_result.pending_has_binding
-                || text_input_requires_timeout;
+                || text_input_requires_timeout
+                || standalone_modifier;
             currently_pending.timeout = if needs_timeout {
                 match previous_timeout {
                     Some(mut timeout) if timeout.is_paused() => {
@@ -8417,6 +8422,64 @@ mod tests {
         }
         cx.run_until_parked();
         assert!(!cx.app.borrow().windows.contains_key(window.window_id()));
+    }
+
+    actions!(window_test, [StandaloneModifierAction]);
+
+    struct StandaloneModifierView {
+        focus_handle: FocusHandle,
+        action_count: usize,
+    }
+
+    impl Render for StandaloneModifierView {
+        fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .key_context("StandaloneModifier")
+                .track_focus(&self.focus_handle)
+                .on_action(cx.listener(|this, _: &StandaloneModifierAction, _, _| {
+                    this.action_count += 1;
+                }))
+        }
+    }
+
+    #[ala::test]
+    fn test_standalone_modifier_sequence_times_out(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            cx.bind_keys([crate::KeyBinding::new(
+                "shift shift",
+                StandaloneModifierAction,
+                Some("StandaloneModifier"),
+            )]);
+        });
+        let (view, cx) = cx.add_window_view(|window, cx| {
+            let focus_handle = cx.focus_handle();
+            window.focus(&focus_handle, cx);
+            StandaloneModifierView {
+                focus_handle,
+                action_count: 0,
+            }
+        });
+        let shift = Modifiers {
+            shift: true,
+            ..Modifiers::default()
+        };
+        cx.simulate_modifiers_change(shift);
+        cx.simulate_modifiers_change(Modifiers::default());
+        cx.background_executor.advance_clock(Duration::from_secs(2));
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            assert!(!window.has_pending_keystrokes());
+            assert_eq!(view.read(cx).action_count, 0);
+        });
+
+        cx.simulate_modifiers_change(shift);
+        cx.simulate_modifiers_change(Modifiers::default());
+        cx.simulate_modifiers_change(shift);
+        cx.simulate_modifiers_change(Modifiers::default());
+        cx.update(|window, cx| {
+            assert!(!window.has_pending_keystrokes());
+            assert_eq!(view.read(cx).action_count, 1);
+        });
     }
 
     struct OpensWindowOnPaint {

@@ -215,6 +215,13 @@ impl Keystroke {
         }
         self
     }
+
+    pub fn is_modifier_key(&self) -> bool {
+        matches!(
+            self.key.as_str(),
+            "shift" | "control" | "alt" | "platform" | "function"
+        )
+    }
 }
 
 impl KeybindingKeystroke {
