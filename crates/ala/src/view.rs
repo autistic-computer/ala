@@ -449,7 +449,7 @@ fn prepaint_view(
                     let prepaint_start = window.prepaint_index();
                     window.reuse_prepaint(element_state.prepaint_range.clone());
                     cx.entities
-                        .extend_accessed(&element_state.accessed_entities);
+                        .extend_accessed(element_state.accessed_entities.iter().copied());
                     let prepaint_end = window.prepaint_index();
                     element_state.prepaint_range = prepaint_start..prepaint_end;
 
@@ -513,7 +513,9 @@ fn paint_view(
                     let paint_start = window.paint_index();
 
                     if let Some(element) = element {
-                        element.paint(window, cx);
+                        let ((), accessed_entities) =
+                            cx.detect_accessed_entities(|cx| element.paint(window, cx));
+                        element_state.accessed_entities.extend(accessed_entities);
                     } else {
                         window.reuse_paint(element_state.paint_range.clone());
                     }
