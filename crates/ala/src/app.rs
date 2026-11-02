@@ -708,7 +708,7 @@ pub struct App {
     pub(crate) restart_observers: SubscriberSet<(), Handler>,
     pub(crate) window_closed_observers: SubscriberSet<(), WindowClosedHandler>,
 
-    pub(crate) element_arena: RefCell<Arena>,
+    pub(crate) element_arena: Rc<RefCell<Arena>>,
     pub(crate) event_arena: Arena,
 
     pub(crate) globals_by_type: TypeIdHashMap<Box<dyn Any>>,
@@ -849,7 +849,7 @@ impl App {
 
                 #[cfg(any(test, feature = "test-support", debug_assertions))]
                 name: None,
-                element_arena: RefCell::new(Arena::new(1024 * 1024)),
+                element_arena: Rc::new(RefCell::new(Arena::new(1024 * 1024))),
                 event_arena: Arena::new(1024 * 1024),
 
                 #[cfg(any(test, feature = "leak-detection"))]
