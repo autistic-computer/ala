@@ -548,7 +548,7 @@ impl MacTextSystemState {
 
         {
             let mut text = text;
-            let mut break_ligature = true;
+            let mut break_ligature = false;
             for run in font_runs {
                 let text_run;
                 (text_run, text) = text.split_at(run.len);
@@ -575,7 +575,9 @@ impl MacTextSystemState {
                 unsafe {
                     string.set_attribute(cf_range, kCTFontAttributeName, &native_font);
                 }
-                break_ligature = !break_ligature;
+                if length > 0 {
+                    break_ligature = !break_ligature;
+                }
             }
         }
         let line = CTLine::new_with_attributed_string(string.as_concrete_TypeRef());
