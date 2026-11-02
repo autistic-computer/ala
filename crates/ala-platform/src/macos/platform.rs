@@ -44,7 +44,7 @@ use objc::{
     runtime::{Class, Object, Sel},
     sel, sel_impl,
 };
-use objc2::{MainThreadMarker, runtime::AnyObject};
+use objc2::{MainThreadMarker, rc::Retained, runtime::AnyObject};
 use objc2_app_kit::{
     NSModalResponse, NSModalResponseOK, NSOpenPanel, NSSavePanel, NSWorkspace,
     NSWorkspaceDidWakeNotification, NSWorkspaceWillSleepNotification,
@@ -776,11 +776,15 @@ impl Platform for MacPlatform {
     ) -> oneshot::Receiver<Result<Option<Vec<PathBuf>>>> {
         use objc2_foundation::NSString;
 
-        let marker = self.1;
         let (done_tx, done_rx) = oneshot::channel();
         self.foreground_executor()
             .spawn(async move {
-                let panel = NSOpenPanel::openPanel(marker);
+                let panel: Option<Retained<NSOpenPanel>> =
+                    unsafe { objc2::msg_send![objc2::class!(NSOpenPanel), openPanel] };
+                let Some(panel) = panel else {
+                    _ = done_tx.send(Err(anyhow!("macOS could not create the open dialog")));
+                    return;
+                };
                 panel.setCanChooseDirectories(options.directories);
                 panel.setCanChooseFiles(options.files);
                 panel.setAllowsMultipleSelection(options.multiple);
@@ -828,10 +832,14 @@ impl Platform for MacPlatform {
         let url = NSURL::from_directory_path(directory);
         let suggested_name = suggested_name.map(NSString::from_str);
         let (done_tx, done_rx) = oneshot::channel();
-        let marker = self.1;
         self.foreground_executor()
             .spawn(async move {
-                let panel = NSSavePanel::savePanel(marker);
+                let panel: Option<Retained<NSSavePanel>> =
+                    unsafe { objc2::msg_send![objc2::class!(NSSavePanel), savePanel] };
+                let Some(panel) = panel else {
+                    _ = done_tx.send(Err(anyhow!("macOS could not create the save dialog")));
+                    return;
+                };
                 panel.setDirectoryURL(url.as_deref());
 
                 if let Some(suggested_name) = suggested_name {
