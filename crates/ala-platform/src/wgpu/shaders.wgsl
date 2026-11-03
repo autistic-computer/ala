@@ -602,7 +602,13 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
             corner_center_to_point.x >= 0 &&
             corner_center_to_point.y >= 0;
 
-    let straight_border_inner_corner_to_point = corner_to_point + reduced_border;
+    let far_border = vec2<f32>(
+        select(quad.border_widths.left, quad.border_widths.right, center_to_point.x < 0.0),
+        select(quad.border_widths.top, quad.border_widths.bottom, center_to_point.y < 0.0));
+    let far_border_to_point = select(vec2<f32>(-1.0e9), far_border - size - corner_to_point,
+        far_border > vec2<f32>(0.0));
+    let straight_border_inner_corner_to_point =
+        max(corner_to_point + reduced_border, far_border_to_point);
 
     let is_beyond_inner_straight_border =
             straight_border_inner_corner_to_point.x > 0 ||

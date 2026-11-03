@@ -2290,6 +2290,26 @@ mod tests {
         })
     }
 
+    #[test]
+    fn a_top_border_as_tall_as_its_box_fills_it() -> Result<()> {
+        let mut renderer =
+            MetalRenderer::new_headless(Arc::new(Mutex::new(InstanceBufferPool::default())));
+        let bounds = Bounds {
+            origin: point(ScaledPixels(0.0), ScaledPixels(2.0)),
+            size: size(ScaledPixels(8.0), ScaledPixels(2.0)),
+        };
+        let mut quad = solid_quad(bounds, ala::transparent_black());
+        quad.border_widths.top = ScaledPixels(2.0);
+        quad.border_color = ala::white();
+        let mut scene = Scene::default();
+        scene.insert_primitive(quad);
+        scene.finish();
+        let image = renderer.render_scene_to_image(&scene, size(8.into(), 8.into()))?;
+        let rows: Vec<u8> = (0..6).map(|y| image.get_pixel(4, y).0[0]).collect();
+        assert_eq!(rows, [0, 0, 255, 255, 0, 0]);
+        Ok(())
+    }
+
     const SWAP_OR_TINT: &str = r#"
 @group(0) @binding(0) var content: texture_2d<f32>;
 @group(0) @binding(1) var<uniform> tint: vec4<f32>;

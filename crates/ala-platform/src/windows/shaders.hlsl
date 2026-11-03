@@ -578,7 +578,16 @@ float4 quad_fragment(QuadFragmentInput input): SV_Target {
         corner_center_to_point.x >= 0.0 &&
         corner_center_to_point.y >= 0.0;
 
-    float2 straight_border_inner_corner_to_point = corner_to_point + reduced_border;
+    float2 far_border = float2(
+        center_to_point.x < 0.0 ? quad.border_widths.right : quad.border_widths.left,
+        center_to_point.y < 0.0 ? quad.border_widths.bottom : quad.border_widths.top
+    );
+    float2 far_border_to_point = float2(
+        far_border.x > 0.0 ? far_border.x - size.x - corner_to_point.x : -1.0e9,
+        far_border.y > 0.0 ? far_border.y - size.y - corner_to_point.y : -1.0e9
+    );
+    float2 straight_border_inner_corner_to_point =
+        max(corner_to_point + reduced_border, far_border_to_point);
 
     bool is_beyond_inner_straight_border =
         straight_border_inner_corner_to_point.x > 0.0 ||
