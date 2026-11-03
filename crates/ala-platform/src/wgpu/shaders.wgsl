@@ -413,12 +413,9 @@ fn prepare_gradient_color(tag: u32, color_space: u32,
         result.color0 = hsla_to_rgba(colors[0].color);
         result.color1 = hsla_to_rgba(colors[1].color);
 
-        if (color_space == 0u) {
-            result.color0 = linear_to_srgba(result.color0);
-            result.color1 = linear_to_srgba(result.color1);
-        } else if (color_space == 1u) {
-            result.color0 = linear_srgb_to_oklab(result.color0);
-            result.color1 = linear_srgb_to_oklab(result.color1);
+        if (color_space == 1u) {
+            result.color0 = linear_srgb_to_oklab(srgba_to_linear(result.color0));
+            result.color1 = linear_srgb_to_oklab(srgba_to_linear(result.color1));
         }
     }
 
@@ -461,11 +458,11 @@ fn gradient_color(background: Background, position: vec2<f32>, bounds: Bounds,
 
             switch (background.color_space) {
                 default: {
-                    background_color = srgba_to_linear(mix(color0, color1, t));
+                    background_color = mix(color0, color1, t);
                 }
                 case 1u: {
                     let oklab_color = mix(color0, color1, t);
-                    background_color = oklab_to_linear_srgb(oklab_color);
+                    background_color = linear_to_srgba(oklab_to_linear_srgb(oklab_color));
                 }
             }
         }
@@ -605,7 +602,13 @@ fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
             corner_center_to_point.x >= 0 &&
             corner_center_to_point.y >= 0;
 
-    let straight_border_inner_corner_to_point = corner_to_point + reduced_border;
+    let far_border = vec2<f32>(
+        select(quad.border_widths.left, quad.border_widths.right, center_to_point.x < 0.0),
+        select(quad.border_widths.top, quad.border_widths.bottom, center_to_point.y < 0.0));
+    let far_border_to_point = select(vec2<f32>(-1.0e9), far_border - size - corner_to_point,
+        far_border > vec2<f32>(0.0));
+    let straight_border_inner_corner_to_point =
+        max(corner_to_point + reduced_border, far_border_to_point);
 
     let is_beyond_inner_straight_border =
             straight_border_inner_corner_to_point.x > 0 ||

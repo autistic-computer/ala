@@ -331,9 +331,11 @@ impl Scene {
     }
 
     fn place_primitive(&mut self, primitive: &mut Primitive) -> bool {
-        let clipped_bounds = primitive
-            .bounds()
-            .intersect(&primitive.content_mask().bounds);
+        let painted_bounds = match &*primitive {
+            Primitive::Shadow(shadow) => shadow.painted_bounds(),
+            _ => *primitive.bounds(),
+        };
+        let clipped_bounds = painted_bounds.intersect(&primitive.content_mask().bounds);
 
         if clipped_bounds.is_empty() {
             return false;
@@ -922,6 +924,16 @@ pub struct Shadow {
     pub corner_smoothing: f32,
 }
 
+impl Shadow {
+    fn painted_bounds(&self) -> Bounds<ScaledPixels> {
+        if self.inset != 0 {
+            self.element_bounds
+        } else {
+            self.bounds.dilate(self.blur_radius * 3.0)
+        }
+    }
+}
+
 impl From<Shadow> for Primitive {
     fn from(shadow: Shadow) -> Self {
         Primitive::Shadow(shadow)
@@ -1406,6 +1418,34 @@ mod tests {
             .collect();
         drawn.sort_by(|a, b| a.0.total_cmp(&b.0));
         assert_eq!(drawn, [(0., true), (64., false), (128., false)]);
+    }
+
+    #[test]
+    fn a_blurred_shadow_draws_over_what_its_blur_reaches() {
+        let bounds = |y: f32| Bounds::new(point(px(0.), px(y)), size(px(40.), px(40.))).scale(1.0);
+        let window = ContentMask {
+            bounds: Bounds::new(point(px(0.), px(0.)), size(px(200.), px(200.))).scale(1.0),
+        };
+        let mut scene = Scene::default();
+        scene.insert_primitive(Quad {
+            bounds: bounds(0.),
+            content_mask: window,
+            ..Default::default()
+        });
+        scene.insert_primitive(Shadow {
+            order: 0,
+            blur_radius: ScaledPixels(8.),
+            bounds: bounds(50.),
+            corner_radii: Corners::default(),
+            content_mask: window,
+            color: Hsla::default(),
+            element_bounds: bounds(50.),
+            element_corner_radii: Corners::default(),
+            inset: 0,
+            corner_smoothing: 2.,
+        });
+        scene.finish();
+        assert_eq!((scene.quads[0].order, scene.shadows[0].order), (1, 2));
     }
 
     fn paint(scene: &mut Scene) {
