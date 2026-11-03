@@ -560,6 +560,9 @@ pub struct GlassUniform {
     pub shadow_radii: [f32; 4],
     pub shadow_color: [f32; 4],
     pub shadow: [f32; 4],
+    pub clip_rect: [f32; 4],
+    pub clip_radii: [f32; 4],
+    pub clip: [f32; 4],
 }
 
 impl GlassUniform {
@@ -637,7 +640,7 @@ pub struct Glass {
     pub order: crate::DrawOrder,
     pub bounds: Bounds<ScaledPixels>,
     pub backdrop_bounds: Bounds<ScaledPixels>,
-    pub content_mask: crate::ContentMask<ScaledPixels>,
+    pub content_mask: crate::ClipMask<ScaledPixels>,
     pub shapes: [(Bounds<ScaledPixels>, Corners<ScaledPixels>); GLASS_MAX_SHAPES],
     pub shape_count: u32,
     pub corner_smoothing: f32,
@@ -860,6 +863,28 @@ impl Glass {
                     0.,
                 ]
             }),
+            clip_rect: [
+                self.content_mask.rounded_bounds.origin.x.0,
+                self.content_mask.rounded_bounds.origin.y.0,
+                self.content_mask.rounded_bounds.size.width.0,
+                self.content_mask.rounded_bounds.size.height.0,
+            ],
+            clip_radii: [
+                self.content_mask.corner_radii.top_left.0,
+                self.content_mask.corner_radii.top_right.0,
+                self.content_mask.corner_radii.bottom_right.0,
+                self.content_mask.corner_radii.bottom_left.0,
+            ],
+            clip: [
+                self.content_mask.corner_smoothing,
+                if self.content_mask.is_rounded() {
+                    1.
+                } else {
+                    0.
+                },
+                0.,
+                0.,
+            ],
         }
     }
 
@@ -1222,7 +1247,7 @@ fn glass_scene_over(alpha: f32, material: Option<GlassMaterial>) -> crate::Scene
     };
     let quad = |bounds: Bounds<ScaledPixels>, color: Hsla| Quad {
         bounds,
-        content_mask: ContentMask { bounds },
+        content_mask: ContentMask { bounds }.into(),
         background: color.into(),
         corner_smoothing: 2.,
         ..Default::default()
@@ -1242,7 +1267,8 @@ fn glass_scene_over(alpha: f32, material: Option<GlassMaterial>) -> crate::Scene
             backdrop_bounds: shape.dilate(ScaledPixels(material.backdrop_reach().as_f32())),
             content_mask: ContentMask {
                 bounds: rect(0., 0., 64., 64.),
-            },
+            }
+            .into(),
             shapes,
             shape_count: 1,
             corner_smoothing: 2.,
@@ -1276,7 +1302,7 @@ pub fn bench_glass_rendering(
             let bounds = rect(index as f32 * stripe, 0., stripe, height);
             scene.insert_primitive(Quad {
                 bounds,
-                content_mask: ContentMask { bounds },
+                content_mask: ContentMask { bounds }.into(),
                 background: hsla(index as f32 / stripes as f32, 0.8, 0.5, 1.).into(),
                 ..Default::default()
             });
@@ -1284,7 +1310,7 @@ pub fn bench_glass_rendering(
         for (bounds, radius) in fills {
             scene.insert_primitive(Quad {
                 bounds: *bounds,
-                content_mask: ContentMask { bounds: viewport },
+                content_mask: ContentMask { bounds: viewport }.into(),
                 background: pane_color.into(),
                 border_color: hsla(0., 0., 1., 0.12),
                 corner_radii: Corners::all(ScaledPixels(*radius)),
@@ -1300,7 +1326,7 @@ pub fn bench_glass_rendering(
                 bounds: (*bounds + point(ScaledPixels(32.), ScaledPixels(48.)))
                     .dilate(ScaledPixels(16.)),
                 corner_radii: Corners::all(ScaledPixels(radius + 16.)),
-                content_mask: ContentMask { bounds: viewport },
+                content_mask: ContentMask { bounds: viewport }.into(),
                 color: hsla(0.6, 0.8, 0.6, 0.06),
                 element_bounds: *bounds,
                 element_corner_radii: Corners::all(ScaledPixels(*radius)),
@@ -1322,7 +1348,7 @@ pub fn bench_glass_rendering(
                 } else {
                     dilated
                 },
-                content_mask: ContentMask { bounds: viewport },
+                content_mask: ContentMask { bounds: viewport }.into(),
                 shapes,
                 shape_count: 1,
                 corner_smoothing: *smoothing,
@@ -1481,7 +1507,7 @@ pub fn check_glass_hides_the_frame_under_it(
     };
     let quad = |bounds: Bounds<ScaledPixels>, color: Hsla| Quad {
         bounds,
-        content_mask: ContentMask { bounds },
+        content_mask: ContentMask { bounds }.into(),
         background: color.into(),
         ..Default::default()
     };
@@ -1506,7 +1532,8 @@ pub fn check_glass_hides_the_frame_under_it(
             backdrop_bounds: shape.dilate(ScaledPixels(material.backdrop_reach().as_f32())),
             content_mask: ContentMask {
                 bounds: rect(0., 0., 64., 64.),
-            },
+            }
+            .into(),
             shapes,
             shape_count: 1,
             corner_smoothing: 2.,
@@ -1554,7 +1581,7 @@ pub fn check_rim_glass_lights_only_the_edge(
         let page = rect(0., 0., 64., 64.);
         scene.insert_primitive(Quad {
             bounds: page,
-            content_mask: ContentMask { bounds: page },
+            content_mask: ContentMask { bounds: page }.into(),
             background: hsla(0., 1., 0.5, 1.).into(),
             ..Default::default()
         });
@@ -1568,7 +1595,7 @@ pub fn check_rim_glass_lights_only_the_edge(
                 shadow: None,
                 bounds: shape.dilate(ScaledPixels(2.)),
                 backdrop_bounds: shape.dilate(ScaledPixels(2.)),
-                content_mask: ContentMask { bounds: page },
+                content_mask: ContentMask { bounds: page }.into(),
                 shapes,
                 shape_count: 1,
                 corner_smoothing: 2.,
@@ -1658,7 +1685,7 @@ pub fn check_glass_rendering(
     };
     covered.insert_primitive(crate::Quad {
         bounds: corner,
-        content_mask: crate::ContentMask { bounds: corner },
+        content_mask: crate::ContentMask { bounds: corner }.into(),
         background: hsla(1. / 3., 1., 0.5, 1.).into(),
         corner_smoothing: 2.,
         ..Default::default()
@@ -1713,7 +1740,7 @@ pub fn check_glass_rendering(
     };
     filled.insert_primitive(crate::Quad {
         bounds: shape,
-        content_mask: crate::ContentMask { bounds: shape },
+        content_mask: crate::ContentMask { bounds: shape }.into(),
         background: tint.into(),
         corner_radii: Corners::all(ScaledPixels(8.)),
         corner_smoothing: 2.,
@@ -1781,7 +1808,8 @@ pub fn check_glass_rendering(
                 origin: point(ScaledPixels(0.), ScaledPixels(0.)),
                 size: size(ScaledPixels(64.), ScaledPixels(64.)),
             },
-        },
+        }
+        .into(),
         shapes,
         shape_count: 1,
         corner_smoothing: 2.,
@@ -1968,7 +1996,7 @@ fn glass_body_scene(
         };
         scene.insert_primitive(Quad {
             bounds: cell,
-            content_mask: ContentMask { bounds: cell },
+            content_mask: ContentMask { bounds: cell }.into(),
             background: hsla((index as f32 * 0.137).fract(), 0.8, 0.5, 1.).into(),
             ..Default::default()
         });
@@ -2000,7 +2028,8 @@ fn glass_body_scene(
                 origin: point(ScaledPixels(0.), ScaledPixels(0.)),
                 size: size(ScaledPixels(64.), ScaledPixels(64.)),
             },
-        },
+        }
+        .into(),
         shapes: slots,
         shape_count: shapes.len() as u32,
         corner_smoothing,
@@ -2122,7 +2151,7 @@ mod tests {
 
     #[test]
     fn uniform_blocks_match_the_shader_layout() {
-        assert_eq!(std::mem::size_of::<GlassUniform>(), 560);
+        assert_eq!(std::mem::size_of::<GlassUniform>(), 608);
         assert_eq!(std::mem::size_of::<GlassBlurUniform>(), 32);
     }
 
@@ -2159,7 +2188,8 @@ mod tests {
                     point(ScaledPixels(0.), ScaledPixels(0.)),
                     size(ScaledPixels(1000.), ScaledPixels(1000.)),
                 ),
-            },
+            }
+            .into(),
             shapes,
             shape_count: 1,
             corner_smoothing: 2.,

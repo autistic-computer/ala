@@ -1,8 +1,8 @@
 use crate::apple::metal_atlas::MetalAtlas;
 use crate::apple::metal_glass::{MetalGlass, scene_has_glass};
 use ala::{
-    AtlasTextureId, Background, Bounds, ContentMask, CustomShader, DevicePixels, PaintSurface,
-    Path, Point, PrimitiveBatch, ScaledPixels, Scene, ShaderLayer, Size, point, size,
+    AtlasTextureId, Background, Bounds, ClipMask, CustomShader, DevicePixels, PaintSurface, Path,
+    Point, PrimitiveBatch, ScaledPixels, Scene, ShaderLayer, Size, point, size,
 };
 use anyhow::{Context as _, Result};
 use block2::RcBlock;
@@ -129,6 +129,7 @@ pub struct MetalRenderer {
     bgra_surfaces_pipeline_state: metal::RenderPipelineState,
     hole_surfaces_pipeline_state: metal::RenderPipelineState,
     shader_layer_vertex: metal::Function,
+    shader_layer_composite: metal::RenderPipelineState,
     shader_layer_sampler: metal::SamplerState,
     shader_layer_pipelines: HashMap<u64, Option<ShaderLayerPipeline>>,
     shader_layer_targets: Vec<metal::Texture>,
@@ -153,6 +154,7 @@ pub struct PathRasterizationVertex {
     pub st_position: Point<f32>,
     pub color: Background,
     pub bounds: Bounds<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
 }
 
 impl MetalRenderer {
@@ -331,6 +333,14 @@ impl MetalRenderer {
         let shader_layer_vertex = library
             .get_function("shader_layer_vertex", None)
             .expect("error locating vertex function");
+        let shader_layer_composite = build_premultiplied_pipeline_state(
+            &device,
+            &library,
+            "shader_layer_composite",
+            "shader_layer_vertex",
+            "shader_layer_composite_fragment",
+            MTLPixelFormat::BGRA8Unorm,
+        );
         let sampler_descriptor = metal::SamplerDescriptor::new();
         sampler_descriptor.set_min_filter(metal::MTLSamplerMinMagFilter::Linear);
         sampler_descriptor.set_mag_filter(metal::MTLSamplerMinMagFilter::Linear);
@@ -363,6 +373,7 @@ impl MetalRenderer {
             bgra_surfaces_pipeline_state,
             hole_surfaces_pipeline_state,
             shader_layer_vertex,
+            shader_layer_composite,
             shader_layer_sampler,
             shader_layer_pipelines: HashMap::default(),
             shader_layer_targets: Vec::new(),
@@ -939,8 +950,17 @@ impl MetalRenderer {
             },
             content_mask: layer.content_mask,
         };
-        let command_encoder =
-            new_command_encoder_for_texture(command_buffer, texture, viewport_size, None);
+        let rounded = layer.content_mask.is_rounded();
+        let command_encoder = if rounded {
+            new_command_encoder_for_texture(
+                command_buffer,
+                &target,
+                viewport_size,
+                Some(metal::MTLClearColor::new(0., 0., 0., 0.)),
+            )
+        } else {
+            new_command_encoder_for_texture(command_buffer, texture, viewport_size, None)
+        };
         command_encoder.set_render_pipeline_state(&pipeline.state);
         command_encoder.set_vertex_buffer(
             ShaderLayerInputIndex::Vertices as u64,
@@ -964,7 +984,41 @@ impl MetalRenderer {
         }
         command_encoder.draw_primitives(metal::MTLPrimitiveType::Triangle, 0, 6);
         command_encoder.end_encoding();
+        if rounded {
+            self.composite_shader_layer(command_buffer, &target, texture, &bounds, viewport_size);
+        }
         Ok(())
+    }
+
+    fn composite_shader_layer(
+        &self,
+        command_buffer: &metal::CommandBufferRef,
+        output: &metal::TextureRef,
+        texture: &metal::TextureRef,
+        bounds: &ShaderLayerBounds,
+        viewport_size: Size<DevicePixels>,
+    ) {
+        let command_encoder =
+            new_command_encoder_for_texture(command_buffer, texture, viewport_size, None);
+        command_encoder.set_render_pipeline_state(&self.shader_layer_composite);
+        command_encoder.set_vertex_buffer(
+            ShaderLayerInputIndex::Vertices as u64,
+            Some(&self.unit_vertices),
+            0,
+        );
+        let bounds_size = mem::size_of_val(bounds) as u64;
+        let bounds_bytes = bounds as *const ShaderLayerBounds as *const _;
+        let bounds_index = ShaderLayerInputIndex::Bounds as u64;
+        command_encoder.set_vertex_bytes(bounds_index, bounds_size, bounds_bytes);
+        command_encoder.set_fragment_bytes(bounds_index, bounds_size, bounds_bytes);
+        command_encoder.set_vertex_bytes(
+            ShaderLayerInputIndex::ViewportSize as u64,
+            mem::size_of_val(&viewport_size) as u64,
+            &viewport_size as *const Size<DevicePixels> as *const _,
+        );
+        command_encoder.set_fragment_texture(0, Some(output));
+        command_encoder.draw_primitives(metal::MTLPrimitiveType::Triangle, 0, 6);
+        command_encoder.end_encoding();
     }
 
     fn shader_layer_pipeline(&mut self, shader: &CustomShader) -> Option<ShaderLayerPipeline> {
@@ -1050,6 +1104,7 @@ impl MetalRenderer {
                 st_position: v.st_position,
                 color: path.color,
                 bounds: path.bounds.intersect(&path.content_mask.bounds),
+                content_mask: path.content_mask,
             }));
         }
         let vertex_instance_bindings = writer.write(&vertices)?;
@@ -1961,7 +2016,7 @@ pub struct PathSprite {
 #[repr(C)]
 pub struct ShaderLayerBounds {
     pub bounds: Bounds<ScaledPixels>,
-    pub content_mask: ContentMask<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
 }
 
 #[derive(Clone)]
@@ -2101,7 +2156,7 @@ fn build_shader_layer_pipeline(
 #[repr(C)]
 pub struct SurfaceBounds {
     pub bounds: Bounds<ScaledPixels>,
-    pub content_mask: ContentMask<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
     pub corner_radii: ala::Corners<ScaledPixels>,
     pub corner_smoothing: f32,
 }
@@ -2291,6 +2346,16 @@ mod tests {
     }
 
     #[test]
+    fn rounded_content_masks_clip_every_primitive() -> Result<()> {
+        let mut renderer =
+            MetalRenderer::new_headless(Arc::new(Mutex::new(InstanceBufferPool::default())));
+        let atlas = renderer.sprite_atlas.clone();
+        ala::check_rounded_clip_rendering(atlas.as_ref(), |scene| {
+            renderer.render_scene_to_image(scene, size(64.into(), 64.into()))
+        })
+    }
+
+    #[test]
     fn a_top_border_as_tall_as_its_box_fills_it() -> Result<()> {
         let mut renderer =
             MetalRenderer::new_headless(Arc::new(Mutex::new(InstanceBufferPool::default())));
@@ -2349,7 +2414,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
         ShaderLayer {
             order: 0,
             bounds,
-            content_mask: ContentMask { bounds },
+            content_mask: ala::ContentMask { bounds }.into(),
             shader: CustomShader::new(shader.to_owned()),
             uniforms: tint.iter().flat_map(|value| value.to_ne_bytes()).collect(),
             scene: std::rc::Rc::new(scene),
@@ -2442,7 +2507,8 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 content_mask: ala::ContentMask {
                     bounds: Bounds::new(point(px(0.0), px(0.0)), size(px(136.0), px(136.0)))
                         .scale(1.0),
-                },
+                }
+                .into(),
                 color: hsla(0.0, 0.0, 1.0, 1.0),
                 element_bounds: bounds,
                 element_corner_radii: ala::Corners::all(px(radius).scale(1.0)),

@@ -39,6 +39,142 @@ pub struct WindowCornerMask {
     pub corner_smoothing: f32,
 }
 
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[repr(C)]
+pub struct ClipMask<P: Clone + Debug + Default + PartialEq> {
+    pub bounds: Bounds<P>,
+    pub rounded_bounds: Bounds<P>,
+    pub corner_radii: Corners<P>,
+    pub corner_smoothing: f32,
+    pub pad: u32,
+}
+
+impl<P: Clone + Debug + Default + PartialEq> From<ContentMask<P>> for ClipMask<P> {
+    fn from(mask: ContentMask<P>) -> Self {
+        Self {
+            rounded_bounds: mask.bounds.clone(),
+            bounds: mask.bounds,
+            corner_radii: Corners::default(),
+            corner_smoothing: 2.0,
+            pad: 0,
+        }
+    }
+}
+
+impl<P> ClipMask<P>
+where
+    P: Copy + Debug + Default + PartialEq + PartialOrd + Add<Output = P> + Sub<Output = P>,
+{
+    pub fn rounded(bounds: Bounds<P>, corner_radii: Corners<P>, corner_smoothing: f32) -> Self {
+        Self {
+            bounds,
+            rounded_bounds: bounds,
+            corner_radii,
+            corner_smoothing,
+            pad: 0,
+        }
+    }
+
+    pub fn content_mask(&self) -> ContentMask<P> {
+        ContentMask {
+            bounds: self.bounds,
+        }
+    }
+
+    pub fn is_rounded(&self) -> bool {
+        let zero = P::default();
+        let radii = self.corner_radii;
+        radii.top_left > zero
+            || radii.top_right > zero
+            || radii.bottom_right > zero
+            || radii.bottom_left > zero
+    }
+
+    pub fn clip(&self, bounds: &Bounds<P>) -> Self {
+        let bounds = self.bounds.intersect(bounds);
+        if self.is_rounded() {
+            Self { bounds, ..*self }
+        } else {
+            ContentMask { bounds }.into()
+        }
+    }
+
+    pub fn intersect(&self, other: &Self) -> Self {
+        match (self.is_rounded(), other.is_rounded()) {
+            (_, false) => self.clip(&other.bounds),
+            (false, true) => other.clip(&self.bounds),
+            (true, true) => self.merge(other),
+        }
+    }
+
+    fn merge(&self, other: &Self) -> Self {
+        let rounded_bounds = self.rounded_bounds.intersect(&other.rounded_bounds);
+        let mine = self.remaining_radii(&rounded_bounds);
+        let theirs = other.remaining_radii(&rounded_bounds);
+        let zero = P::default();
+        let pick = |a: P, b: P| larger(larger(a, b), zero);
+        let reach = |radii: Corners<P>| {
+            larger(
+                larger(radii.top_left, radii.top_right),
+                larger(radii.bottom_right, radii.bottom_left),
+            )
+        };
+        let corner_smoothing = if reach(theirs) > reach(mine) {
+            other.corner_smoothing
+        } else {
+            self.corner_smoothing
+        };
+        Self {
+            bounds: self
+                .bounds
+                .intersect(&other.bounds)
+                .intersect(&rounded_bounds),
+            rounded_bounds,
+            corner_radii: Corners {
+                top_left: pick(mine.top_left, theirs.top_left),
+                top_right: pick(mine.top_right, theirs.top_right),
+                bottom_right: pick(mine.bottom_right, theirs.bottom_right),
+                bottom_left: pick(mine.bottom_left, theirs.bottom_left),
+            },
+            corner_smoothing,
+            pad: 0,
+        }
+    }
+
+    fn remaining_radii(&self, within: &Bounds<P>) -> Corners<P> {
+        let own = &self.rounded_bounds;
+        let (left, top) = (
+            within.origin.x - own.origin.x,
+            within.origin.y - own.origin.y,
+        );
+        let right = (own.origin.x + own.size.width) - (within.origin.x + within.size.width);
+        let bottom = (own.origin.y + own.size.height) - (within.origin.y + within.size.height);
+        let radii = self.corner_radii;
+        Corners {
+            top_left: radii.top_left - larger(left, top),
+            top_right: radii.top_right - larger(right, top),
+            bottom_right: radii.bottom_right - larger(right, bottom),
+            bottom_left: radii.bottom_left - larger(left, bottom),
+        }
+    }
+}
+
+impl ClipMask<Pixels> {
+    pub fn scale(&self, factor: f32) -> ClipMask<ScaledPixels> {
+        ClipMask {
+            bounds: self.bounds.scale(factor),
+            rounded_bounds: self.rounded_bounds.scale(factor),
+            corner_radii: self.corner_radii.scale(factor),
+            corner_smoothing: self.corner_smoothing,
+            pad: 0,
+        }
+    }
+}
+
+fn larger<P: PartialOrd>(a: P, b: P) -> P {
+    if b > a { b } else { a }
+}
+
 #[derive(Default)]
 pub struct Scene {
     pub(crate) paint_operations: Vec<PaintOperation>,
@@ -63,7 +199,7 @@ pub struct Scene {
 pub(crate) struct SceneTransform {
     pub(crate) scale: f32,
     pub(crate) offset: Point<ScaledPixels>,
-    pub(crate) clip: Bounds<ScaledPixels>,
+    pub(crate) clip: ClipMask<ScaledPixels>,
 }
 
 impl SceneTransform {
@@ -71,7 +207,7 @@ impl SceneTransform {
         SceneTransform {
             scale: self.scale * outer.scale,
             offset: outer.point(self.offset),
-            clip: outer.bounds(self.clip).intersect(&outer.clip),
+            clip: outer.mask(self.clip),
         }
     }
 
@@ -96,10 +232,14 @@ impl SceneTransform {
         }
     }
 
-    fn mask(&self, mask: ContentMask<ScaledPixels>) -> ContentMask<ScaledPixels> {
-        ContentMask {
-            bounds: self.bounds(mask.bounds).intersect(&self.clip),
+    fn mask(&self, mask: ClipMask<ScaledPixels>) -> ClipMask<ScaledPixels> {
+        ClipMask {
+            bounds: self.bounds(mask.bounds),
+            rounded_bounds: self.bounds(mask.rounded_bounds),
+            corner_radii: self.corners(mask.corner_radii),
+            ..mask
         }
+        .intersect(&self.clip)
     }
 
     fn corners(&self, corners: Corners<ScaledPixels>) -> Corners<ScaledPixels> {
@@ -538,7 +678,7 @@ impl Primitive {
         }
     }
 
-    pub fn content_mask(&self) -> &ContentMask<ScaledPixels> {
+    pub fn content_mask(&self) -> &ClipMask<ScaledPixels> {
         match self {
             Primitive::Shadow(shadow) => &shadow.content_mask,
             Primitive::Quad(quad) => &quad.content_mask,
@@ -872,13 +1012,13 @@ pub struct Quad {
     pub order: DrawOrder,
     pub border_style: BorderStyle,
     pub bounds: Bounds<ScaledPixels>,
-    pub content_mask: ContentMask<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
     pub background: Background,
     pub border_color: Hsla,
     pub corner_radii: Corners<ScaledPixels>,
     pub border_widths: Edges<ScaledPixels>,
     pub corner_smoothing: f32,
-    pub pad: [u32; 3],
+    pub pad: [u32; 1],
 }
 
 const _: () = assert!(size_of::<Quad>().is_multiple_of(8));
@@ -897,7 +1037,7 @@ pub struct Underline {
     pub order: DrawOrder,
     pub pad: u32,
     pub bounds: Bounds<ScaledPixels>,
-    pub content_mask: ContentMask<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
     pub color: Hsla,
     pub thickness: ScaledPixels,
     pub wavy: PaddedBool32,
@@ -916,7 +1056,7 @@ pub struct Shadow {
     pub blur_radius: ScaledPixels,
     pub bounds: Bounds<ScaledPixels>,
     pub corner_radii: Corners<ScaledPixels>,
-    pub content_mask: ContentMask<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
     pub color: Hsla,
     pub element_bounds: Bounds<ScaledPixels>,
     pub element_corner_radii: Corners<ScaledPixels>,
@@ -1044,7 +1184,7 @@ pub struct MonochromeSprite {
     pub order: DrawOrder,
     pub pad: u32,
     pub bounds: Bounds<ScaledPixels>,
-    pub content_mask: ContentMask<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
     pub color: Hsla,
     pub tile: AtlasTile,
     pub transformation: TransformationMatrix,
@@ -1062,7 +1202,7 @@ pub struct SubpixelSprite {
     pub order: DrawOrder,
     pub pad: u32,
     pub bounds: Bounds<ScaledPixels>,
-    pub content_mask: ContentMask<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
     pub color: Hsla,
     pub tile: AtlasTile,
     pub transformation: TransformationMatrix,
@@ -1082,7 +1222,7 @@ pub struct PolychromeSprite {
     pub grayscale: PaddedBool32,
     pub opacity: f32,
     pub bounds: Bounds<ScaledPixels>,
-    pub content_mask: ContentMask<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
     pub corner_radii: Corners<ScaledPixels>,
     pub corner_smoothing: f32,
     pub pad2: u32,
@@ -1101,7 +1241,7 @@ impl From<PolychromeSprite> for Primitive {
 pub struct PaintSurface {
     pub order: DrawOrder,
     pub bounds: Bounds<ScaledPixels>,
-    pub content_mask: ContentMask<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
     pub corner_radii: Corners<ScaledPixels>,
     pub corner_smoothing: f32,
     #[cfg(target_os = "macos")]
@@ -1128,7 +1268,7 @@ pub struct Path<P: Clone + Debug + Default + PartialEq> {
     pub id: PathId,
     pub order: DrawOrder,
     pub bounds: Bounds<P>,
-    pub content_mask: ContentMask<P>,
+    pub content_mask: ClipMask<P>,
     pub vertices: Vec<PathVertex<P>>,
     pub color: Background,
     start: Point<P>,
@@ -1264,7 +1404,7 @@ impl From<Path<ScaledPixels>> for Primitive {
 pub struct PathVertex<P: Clone + Debug + Default + PartialEq> {
     pub xy_position: Point<P>,
     pub st_position: Point<f32>,
-    pub content_mask: ContentMask<P>,
+    pub content_mask: ClipMask<P>,
 }
 
 impl PathVertex<Pixels> {
@@ -1316,7 +1456,7 @@ impl Debug for CustomShader {
 #[derive(Clone, Debug)]
 pub(crate) struct ShaderLayerDescriptor {
     pub(crate) bounds: Bounds<ScaledPixels>,
-    pub(crate) content_mask: ContentMask<ScaledPixels>,
+    pub(crate) content_mask: ClipMask<ScaledPixels>,
     pub(crate) shader: CustomShader,
     pub(crate) uniforms: Arc<[u8]>,
 }
@@ -1325,7 +1465,7 @@ pub(crate) struct ShaderLayerDescriptor {
 pub struct ShaderLayer {
     pub order: DrawOrder,
     pub bounds: Bounds<ScaledPixels>,
-    pub content_mask: ContentMask<ScaledPixels>,
+    pub content_mask: ClipMask<ScaledPixels>,
     pub shader: CustomShader,
     pub uniforms: Arc<[u8]>,
     pub scene: Rc<Scene>,
@@ -1362,16 +1502,98 @@ mod tests {
         let bounds = Bounds::new(point(px(x), px(0.)), size(px(4.), px(4.))).scale(1.0);
         Quad {
             bounds,
-            content_mask: ContentMask { bounds },
+            content_mask: ContentMask { bounds }.into(),
             ..Default::default()
         }
+    }
+
+    fn mask(x: f32, y: f32, width: f32, height: f32, radius: f32) -> ClipMask<Pixels> {
+        ClipMask::rounded(
+            Bounds::new(point(px(x), px(y)), size(px(width), px(height))),
+            Corners::all(px(radius)),
+            2.0,
+        )
+    }
+
+    fn radii(mask: ClipMask<Pixels>) -> [f32; 4] {
+        let radii = mask.corner_radii;
+        [
+            radii.top_left.0,
+            radii.top_right.0,
+            radii.bottom_right.0,
+            radii.bottom_left.0,
+        ]
+    }
+
+    #[test]
+    fn a_rectangle_inside_a_rounded_mask_keeps_its_corners() {
+        let outer = mask(0., 0., 100., 100., 20.);
+        let band = ClipMask::from(ContentMask {
+            bounds: Bounds::new(point(px(0.), px(10.)), size(px(100.), px(90.))),
+        });
+        let clipped = outer.intersect(&band);
+        assert_eq!(clipped.bounds, band.bounds);
+        assert_eq!(clipped.rounded_bounds, outer.rounded_bounds);
+        assert_eq!(radii(clipped), [20.; 4]);
+        assert_eq!(band.intersect(&outer), clipped);
+    }
+
+    #[test]
+    fn nested_rounded_masks_keep_the_larger_remaining_radius() {
+        let outer = mask(0., 0., 100., 100., 20.);
+        assert_eq!(
+            radii(outer.intersect(&mask(8., 8., 84., 84., 12.))),
+            [12.; 4]
+        );
+        assert_eq!(
+            radii(outer.intersect(&mask(8., 8., 84., 84., 4.))),
+            [12.; 4]
+        );
+        assert_eq!(
+            radii(outer.intersect(&mask(8., 8., 84., 84., 16.))),
+            [16.; 4]
+        );
+
+        let outer = mask(0., 0., 100., 100., 30.);
+        let mut inner = mask(0., 10., 50., 90., 10.);
+        inner.corner_smoothing = 4.0;
+        let merged = outer.intersect(&inner);
+        assert_eq!(merged.rounded_bounds, inner.rounded_bounds);
+        assert_eq!(merged.bounds, inner.bounds);
+        assert_eq!(radii(merged), [20., 10., 10., 30.]);
+        assert_eq!(merged.corner_smoothing, 2.0);
+        assert_eq!(radii(inner.intersect(&outer)), [20., 10., 10., 30.]);
+    }
+
+    #[test]
+    fn a_transformed_rounded_mask_scales_its_corners() {
+        let transform = SceneTransform {
+            scale: 2.0,
+            offset: point(ScaledPixels(10.), ScaledPixels(0.)),
+            clip: ContentMask {
+                bounds: Bounds::new(point(px(0.), px(0.)), size(px(500.), px(500.))).scale(1.0),
+            }
+            .into(),
+        };
+        let placed = transform.mask(mask(0., 0., 100., 50., 8.).scale(1.0));
+        assert_eq!(
+            placed.rounded_bounds,
+            Bounds::new(point(px(10.), px(0.)), size(px(200.), px(100.))).scale(1.0)
+        );
+        assert_eq!(placed.corner_radii, Corners::all(ScaledPixels(16.)));
+    }
+
+    #[test]
+    fn rounded_clip_mask_matches_the_gpu_layout() {
+        assert_eq!(std::mem::size_of::<ClipMask<ScaledPixels>>(), 56);
+        assert_eq!(std::mem::size_of::<Quad>(), 208);
     }
 
     fn layer_descriptor() -> ShaderLayerDescriptor {
         let bounds = Bounds::new(point(px(0.), px(0.)), size(px(32.), px(32.))).scale(1.0);
         ShaderLayerDescriptor {
             bounds,
-            content_mask: ContentMask { bounds },
+            content_mask: ContentMask { bounds }.into(),
             shader: CustomShader::new("@fragment fn main() {}"),
             uniforms: Arc::from([1u8, 2, 3]),
         }
@@ -1386,7 +1608,7 @@ mod tests {
         let underlay = |x: f32| PaintSurface {
             order: 0,
             bounds: rect(x),
-            content_mask: ContentMask { bounds: rect(x) },
+            content_mask: ContentMask { bounds: rect(x) }.into(),
             corner_radii: Corners::default(),
             corner_smoothing: 2.,
             image_buffer: Some(buffer.clone()),
@@ -1396,7 +1618,7 @@ mod tests {
             order: 0,
             bounds: rect(x),
             backdrop_bounds: rect(x).dilate(ScaledPixels(40.)),
-            content_mask: ContentMask { bounds: rect(x) },
+            content_mask: ContentMask { bounds: rect(x) }.into(),
             shapes: Default::default(),
             shape_count: 1,
             corner_smoothing: 2.,
@@ -1423,9 +1645,10 @@ mod tests {
     #[test]
     fn a_blurred_shadow_draws_over_what_its_blur_reaches() {
         let bounds = |y: f32| Bounds::new(point(px(0.), px(y)), size(px(40.), px(40.))).scale(1.0);
-        let window = ContentMask {
+        let window: ClipMask<ScaledPixels> = ContentMask {
             bounds: Bounds::new(point(px(0.), px(0.)), size(px(200.), px(200.))).scale(1.0),
-        };
+        }
+        .into();
         let mut scene = Scene::default();
         scene.insert_primitive(Quad {
             bounds: bounds(0.),

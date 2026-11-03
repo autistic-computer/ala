@@ -1286,9 +1286,10 @@ mod tests {
             let glyph_x = aligned_origin_x(origin, px(200.), px(0.), &align, &line.layout, None);
             let glyph_bounds =
                 Bounds::new(point(glyph_x, origin.y), size(px(10.), px(16.))).scale(1.);
-            let content_mask = crate::ContentMask {
+            let content_mask: crate::ClipMask<_> = crate::ContentMask {
                 bounds: Bounds::new(point(px(0.), px(0.)), size(px(400.), px(100.))).scale(1.),
-            };
+            }
+            .into();
             let mut scene = crate::Scene::default();
             scene.push_layer(layer_bounds.scale(1.));
             scene.insert_primitive(crate::MonochromeSprite {

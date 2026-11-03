@@ -565,7 +565,7 @@ impl DirectXRenderer {
                 .iter()
                 .map(|surface| Surface {
                     bounds: surface.bounds,
-                    content_mask: surface.content_mask.bounds,
+                    content_mask: surface.content_mask,
                 })
                 .collect::<Vec<_>>();
             self.pipelines.surfaces.update_buffer(
@@ -636,6 +636,7 @@ impl DirectXRenderer {
                 st_position: v.st_position,
                 color: path.color,
                 bounds: path.clipped_bounds(),
+                content_mask: path.content_mask,
             }));
         }
 
@@ -1310,6 +1311,7 @@ struct PathRasterizationSprite {
     st_position: Point<f32>,
     color: Background,
     bounds: Bounds<ScaledPixels>,
+    content_mask: ClipMask<ScaledPixels>,
 }
 
 #[derive(Clone, Copy)]
@@ -1322,7 +1324,7 @@ struct PathSprite {
 #[repr(C)]
 struct Surface {
     bounds: Bounds<ScaledPixels>,
-    content_mask: Bounds<ScaledPixels>,
+    content_mask: ClipMask<ScaledPixels>,
 }
 
 const _: () = assert!(size_of::<Surface>().is_multiple_of(8));

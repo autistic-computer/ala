@@ -1,5 +1,5 @@
 use crate::collections::HashMap;
-use crate::{FontId, Pixels, SharedString, TextRun, TextSystem, px};
+use crate::{FontId, LineLayout, Pixels, ShapedLine, SharedString, TextRun, TextSystem, px};
 use std::{borrow::Cow, iter, sync::Arc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -74,7 +74,10 @@ impl LineWrapper {
                 index += candidate.len_utf8();
                 let mut new_prev_c = prev_c;
                 let item_width = match candidate {
-                    WrapBoundaryCandidate::Char { character: c } => {
+                    WrapBoundaryCandidate::Char {
+                        character: c,
+                        width: char_width,
+                    } => {
                         if c == '\n' {
                             continue;
                         }
@@ -97,7 +100,7 @@ impl LineWrapper {
 
                         new_prev_c = c;
 
-                        self.width_for_char(c)
+                        char_width.unwrap_or_else(|| self.width_for_char(c))
                     }
                     WrapBoundaryCandidate::Element {
                         width: element_width,
@@ -117,8 +120,10 @@ impl LineWrapper {
                 };
 
                 width += item_width;
-                let hangs = matches!(candidate, WrapBoundaryCandidate::Char { character: ' ' })
-                    && first_non_whitespace_ix.is_some();
+                let hangs = matches!(
+                    candidate,
+                    WrapBoundaryCandidate::Char { character: ' ', .. }
+                ) && first_non_whitespace_ix.is_some();
                 if width > wrap_width && ix > last_wrap_ix && !hangs {
                     if let (None, Some(first_non_whitespace_ix)) = (indent, first_non_whitespace_ix)
                     {
@@ -587,6 +592,7 @@ fn update_runs_after_middle_truncation(
 
 pub enum LineFragment<'a> {
     Text { text: &'a str },
+    Shaped { line: &'a ShapedLine },
     Element { width: Pixels, len_utf8: usize },
 }
 
@@ -599,11 +605,17 @@ impl<'a> LineFragment<'a> {
         LineFragment::Element { width, len_utf8 }
     }
 
+    pub fn shaped(line: &'a ShapedLine) -> Self {
+        LineFragment::Shaped { line }
+    }
+
     fn wrap_boundary_candidates(&self) -> impl Iterator<Item = WrapBoundaryCandidate> {
-        let text = match self {
-            LineFragment::Text { text } => text,
-            LineFragment::Element { .. } => "\0",
+        let (text, advances) = match self {
+            LineFragment::Text { text } => (*text, Vec::new()),
+            LineFragment::Shaped { line } => (line.text.as_ref(), char_advances(line, &line.text)),
+            LineFragment::Element { .. } => ("\0", Vec::new()),
         };
+        let mut advances = advances.into_iter();
         text.chars().map(move |character| {
             if let LineFragment::Element { width, len_utf8 } = self {
                 WrapBoundaryCandidate::Element {
@@ -611,21 +623,47 @@ impl<'a> LineFragment<'a> {
                     len_utf8: *len_utf8,
                 }
             } else {
-                WrapBoundaryCandidate::Char { character }
+                WrapBoundaryCandidate::Char {
+                    character,
+                    width: advances.next(),
+                }
             }
         })
     }
 }
 
+fn char_advances(layout: &LineLayout, text: &str) -> Vec<Pixels> {
+    let mut glyphs = layout.runs.iter().flat_map(|run| &run.glyphs).peekable();
+    let mut x_at = move |ix: usize| {
+        while glyphs.next_if(|glyph| glyph.index < ix).is_some() {}
+        glyphs.peek().map_or(layout.width, |glyph| glyph.position.x)
+    };
+    let mut x = x_at(0);
+    text.char_indices()
+        .map(|(ix, character)| {
+            let next_x = x_at(ix + character.len_utf8());
+            let advance = next_x - x;
+            x = next_x;
+            advance
+        })
+        .collect()
+}
+
 enum WrapBoundaryCandidate {
-    Char { character: char },
-    Element { width: Pixels, len_utf8: usize },
+    Char {
+        character: char,
+        width: Option<Pixels>,
+    },
+    Element {
+        width: Pixels,
+        len_utf8: usize,
+    },
 }
 
 impl WrapBoundaryCandidate {
     pub fn len_utf8(&self) -> usize {
         match self {
-            WrapBoundaryCandidate::Char { character } => character.len_utf8(),
+            WrapBoundaryCandidate::Char { character, .. } => character.len_utf8(),
             WrapBoundaryCandidate::Element { len_utf8: len, .. } => *len,
         }
     }
@@ -646,7 +684,10 @@ impl Boundary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Font, FontFeatures, FontStyle, FontWeight, TestAppContext, TestDispatcher, font};
+    use crate::{
+        Font, FontFeatures, FontStyle, FontWeight, GlyphId, ShapedGlyph, ShapedRun, TestAppContext,
+        TestDispatcher, font, point,
+    };
     #[cfg(target_os = "macos")]
     use crate::{TextRun, WindowTextSystem, WrapBoundary};
 
@@ -823,6 +864,63 @@ mod tests {
                 )
                 .collect::<Vec<_>>(),
             &[Boundary::new(13, 0),],
+        );
+    }
+
+    #[test]
+    fn shaped_fragments_wrap_on_their_shaped_advances() {
+        let mut wrapper = build_wrapper();
+        let glyph = |index: usize, x: f32| ShapedGlyph {
+            id: GlyphId(1),
+            position: point(px(x), px(0.)),
+            index,
+            is_emoji: false,
+        };
+        let line = ShapedLine {
+            layout: Arc::new(LineLayout {
+                font_size: px(16.),
+                width: px(110.),
+                runs: vec![ShapedRun {
+                    font_id: FontId(0),
+                    glyphs: vec![
+                        glyph(0, 0.),
+                        glyph(1, 20.),
+                        glyph(2, 40.),
+                        glyph(3, 45.),
+                        glyph(4, 65.),
+                        glyph(5, 85.),
+                        glyph(6, 90.),
+                    ],
+                }],
+                len: 8,
+                ..Default::default()
+            }),
+            text: "ab cd fi".into(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            wrapper
+                .wrap_line(&[LineFragment::text("ab cd fi")], px(50.))
+                .collect::<Vec<_>>(),
+            &[Boundary::new(6, 0)],
+        );
+        assert_eq!(
+            wrapper
+                .wrap_line(
+                    &[
+                        LineFragment::shaped(&line),
+                        LineFragment::text(" "),
+                        LineFragment::element(px(30.), 1),
+                    ],
+                    px(50.),
+                )
+                .collect::<Vec<_>>(),
+            &[
+                Boundary::new(3, 0),
+                Boundary::new(6, 0),
+                Boundary::new(9, 0)
+            ],
         );
     }
 

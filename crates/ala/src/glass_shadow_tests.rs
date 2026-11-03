@@ -43,7 +43,8 @@ fn body(bounds: &[Bounds<ScaledPixels>], radius: f32, smoothing: f32, merge: f32
         backdrop_bounds: union.dilate(ScaledPixels(material.backdrop_reach().as_f32())),
         content_mask: ContentMask {
             bounds: rect(0., 0., 64., 64.),
-        },
+        }
+        .into(),
         shapes,
         shape_count: bounds.len() as u32,
         corner_smoothing: smoothing,
@@ -127,7 +128,7 @@ fn scene(case: &ShadowCase, shadow_alpha: Option<f32>, face: bool, layer: bool) 
             };
             scene.insert_primitive(Quad {
                 bounds,
-                content_mask: ContentMask { bounds },
+                content_mask: ContentMask { bounds }.into(),
                 background: color.into(),
                 ..Default::default()
             });
