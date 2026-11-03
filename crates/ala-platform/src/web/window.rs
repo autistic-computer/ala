@@ -205,7 +205,12 @@ impl WebWindow {
             .ok()
             .flatten()
             .is_some_and(|query| query.matches());
-        let ime_mirror = ImeMirror::new(&document, &body, touch_input, mount.is_none())?;
+        let ime_mirror = ImeMirror::new(
+            &document,
+            &body,
+            touch_input,
+            mount.is_none() || params.focus,
+        )?;
         let id = automation::next_window_id();
         let a11y = WebA11y::new(&document, &canvas, id)?;
         let mount_selector = mount
@@ -230,7 +235,7 @@ impl WebWindow {
             title: String::new(),
             input_handler: None,
             is_fullscreen: false,
-            is_active: mount.is_none(),
+            is_active: mount.is_none() || ime_mirror.is_focused(),
             visibility: document_visibility(&browser_window),
             is_hovered: false,
             mouse_position: Point::default(),

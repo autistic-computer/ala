@@ -419,6 +419,7 @@ impl Platform for WebPlatform {
         }
         let canvas_for_cleanup = canvas.clone();
 
+        let focus = params.focus;
         let window = WebWindow::new(
             handle,
             params,
@@ -433,7 +434,7 @@ impl Platform for WebPlatform {
         match window {
             Ok(window) => {
                 self.open_windows.set(self.open_windows.get() + 1);
-                if self.active_window.borrow().is_none() {
+                if focus || self.active_window.borrow().is_none() {
                     *self.active_window.borrow_mut() = Some(handle);
                 }
                 Ok(Box::new(window))
