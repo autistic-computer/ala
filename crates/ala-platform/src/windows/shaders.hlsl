@@ -972,7 +972,7 @@ float4 path_rasterization_fragment(PathFragmentInput input): SV_Target {
     Bounds bounds = sprite.bounds;
 
     float alpha;
-    if (length(float2(dx.x, dy.x))) {
+    if (length(float2(dx.x, dy.x)) < 0.001) {
         alpha = 1.0;
     } else {
         float2 gradient = 2.0 * input.st_position.xx * float2(dx.x, dy.x) - float2(dx.y, dy.y);
