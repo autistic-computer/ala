@@ -22,6 +22,8 @@ mod elements;
 mod executor;
 mod platform_scheduler;
 pub(crate) use platform_scheduler::PlatformScheduler;
+#[cfg(any(test, feature = "test-support"))]
+mod clip_mask_tests;
 mod frame_stats;
 mod geometry;
 mod gestures;
@@ -97,6 +99,8 @@ pub use app::*;
 pub(crate) use arena::*;
 pub use asset_cache::*;
 pub use assets::*;
+#[cfg(any(test, feature = "test-support"))]
+pub use clip_mask_tests::check_rounded_clip_rendering;
 pub use color::*;
 pub use ctor::ctor;
 #[cfg(feature = "profiler")]

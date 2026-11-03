@@ -24,6 +24,9 @@ struct Glass {
     shadow_radii: vec4<f32>,
     shadow_color: vec4<f32>,
     shadow: vec4<f32>,
+    clip_rect: vec4<f32>,
+    clip_radii: vec4<f32>,
+    clip: vec4<f32>,
 }
 
 struct Blur {
@@ -111,6 +114,33 @@ fn shadow_ring_vertex(vertex_id: u32) -> vec2<f32> {
         return glass.quad.xy + 0.5 * glass.quad.zw;
     }
     return mix(low, high, unit);
+}
+
+fn clip_corner_distance(outset: vec2<f32>, radius: f32, smoothing: f32) -> f32 {
+    if (radius <= 0.0 || outset.x <= 0.0 || outset.y <= 0.0) {
+        return -1.0;
+    }
+    if (smoothing <= 2.001) {
+        return length(outset) - radius;
+    }
+    return pow(pow(outset.x, smoothing) + pow(outset.y, smoothing), 1.0 / smoothing) - radius;
+}
+
+fn content_clip(position: vec2<f32>) -> f32 {
+    if (glass.clip.y < 0.5) {
+        return 1.0;
+    }
+    let r = glass.clip_radii;
+    let near = position - glass.clip_rect.xy;
+    let far = glass.clip_rect.xy + glass.clip_rect.zw - position;
+    let pill = min(glass.clip_rect.z, glass.clip_rect.w) * 0.5 - 0.01;
+    let exponent = select(vec4<f32>(glass.clip.x), vec4<f32>(2.0), r >= vec4<f32>(pill));
+    let distance = max(
+        max(clip_corner_distance(r.x - near, r.x, exponent.x),
+            clip_corner_distance(vec2<f32>(r.y - far.x, r.y - near.y), r.y, exponent.y)),
+        max(clip_corner_distance(r.z - far, r.z, exponent.z),
+            clip_corner_distance(vec2<f32>(r.w - near.x, r.w - far.y), r.w, exponent.w)));
+    return saturate(0.5 - distance);
 }
 
 fn rounded_rect(point: vec2<f32>, shape: GlassShape, smoothing: f32, bezel: f32) -> vec3<f32> {
@@ -254,6 +284,7 @@ fn glass_shadow(position: vec2<f32>) -> vec4<f32> {
         let window = GlassShape(glass.mask_rect, glass.mask_radii);
         alpha *= saturate(0.5 - rounded_rect(position, window, glass.mask.x, 0.0).x);
     }
+    alpha *= content_clip(position);
     return vec4<f32>(glass.shadow_color.rgb * alpha, alpha);
 }
 
@@ -308,6 +339,9 @@ fn on_face(point: vec2<f32>) -> bool {
         return false;
     }
     if (glass.mask.y > 0.5 && !deep_inside(point, GlassShape(glass.mask_rect, glass.mask_radii), 1.5)) {
+        return false;
+    }
+    if (glass.clip.y > 0.5 && !deep_inside(point, GlassShape(glass.clip_rect, glass.clip_radii), 1.5)) {
         return false;
     }
     if (deep_inside(point, glass.shapes[0], depth)) {
@@ -395,6 +429,7 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         let window = GlassShape(glass.mask_rect, glass.mask_radii);
         clip = saturate(0.5 - rounded_rect(position, window, glass.mask.x, 0.0).x);
     }
+    clip *= content_clip(position);
     contour = contour * clip;
     let coverage = saturate(0.5 - distance) * clip;
     if (coverage <= 0.0) {

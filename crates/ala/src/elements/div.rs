@@ -1972,23 +1972,19 @@ impl Interactivity {
                 }
 
                 window.with_text_style(style.text_style().cloned(), |window| {
-                    window.with_content_mask(
-                        style.overflow_mask(bounds, window.rem_size()),
-                        |window| {
-                            let hitbox = if self.should_insert_hitbox(&style, window, cx) {
-                                Some(window.insert_hitbox(bounds, self.hitbox_behavior))
-                            } else {
-                                None
-                            };
+                    window.with_clip_mask(style.overflow_clip_mask(bounds, window), |window| {
+                        let hitbox = if self.should_insert_hitbox(&style, window, cx) {
+                            Some(window.insert_hitbox(bounds, self.hitbox_behavior))
+                        } else {
+                            None
+                        };
 
-                            let scroll_offset =
-                                self.clamp_scroll_position(bounds, &style, window, cx);
-                            let result = window.with_element_opacity(style.opacity, |window| {
-                                f(&style, scroll_offset, hitbox, window, cx)
-                            });
-                            (result, element_state)
-                        },
-                    )
+                        let scroll_offset = self.clamp_scroll_position(bounds, &style, window, cx);
+                        let result = window.with_element_opacity(style.opacity, |window| {
+                            f(&style, scroll_offset, hitbox, window, cx)
+                        });
+                        (result, element_state)
+                    })
                 })
             },
         )
@@ -2126,8 +2122,8 @@ impl Interactivity {
                 window.with_element_opacity(style.opacity, |window| {
                     style.paint(bounds, window, cx, |window: &mut Window, cx: &mut App| {
                         window.with_text_style(style.text_style().cloned(), |window| {
-                            window.with_content_mask(
-                                style.overflow_mask(bounds, window.rem_size()),
+                            window.with_clip_mask(
+                                style.overflow_clip_mask(bounds, window),
                                 |window| {
                                     window.with_tab_group(tab_group, |window| {
                                         if let Some(focus_handle) = &self.tracked_focus_handle {

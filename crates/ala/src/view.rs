@@ -1,10 +1,10 @@
 use crate::collections::FxHashSet;
 use crate::refineable::Refineable;
 use crate::{
-    AnyElement, AnyEntity, AnyWeakEntity, App, AvailableSpace, Bounds, ContentMask, Context,
-    Element, ElementId, Entity, EntityId, GlobalElementId, InspectorElementId, IntoElement,
-    LayoutId, PaintIndex, Pixels, PrepaintStateIndex, Render, RenderOnce, ScaledPixels, Size,
-    Style, StyleRefinement, TextStyle, WeakEntity,
+    AnyElement, AnyEntity, AnyWeakEntity, App, AvailableSpace, Bounds, ClipMask, Context, Element,
+    ElementId, Entity, EntityId, GlobalElementId, InspectorElementId, IntoElement, LayoutId,
+    PaintIndex, Pixels, PrepaintStateIndex, Render, RenderOnce, ScaledPixels, Size, Style,
+    StyleRefinement, TextStyle, WeakEntity,
 };
 use crate::{Empty, Window};
 use anyhow::Result;
@@ -246,7 +246,7 @@ struct ViewElementState {
 #[derive(PartialEq)]
 struct ViewElementCacheKey {
     bounds: Bounds<Pixels>,
-    content_mask: ContentMask<Pixels>,
+    content_mask: ClipMask<Pixels>,
     text_style: TextStyle,
     rem_size: Pixels,
     opacity: f32,
@@ -257,7 +257,7 @@ impl ViewElementCacheKey {
     fn new(bounds: Bounds<Pixels>, window: &Window) -> Self {
         Self {
             bounds,
-            content_mask: window.content_mask(),
+            content_mask: window.clip_mask(),
             text_style: window.text_style(),
             rem_size: window.rem_size(),
             opacity: window.element_opacity(),
