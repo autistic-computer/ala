@@ -63,6 +63,7 @@ impl LineWrapper {
         let mut last_candidate_width = px(0.);
         let mut last_wrap_ix = 0;
         let mut prev_c = '\0';
+        let mut before_prev_c = '\0';
         let mut index = 0;
         let mut candidates = fragments
             .iter()
@@ -83,7 +84,10 @@ impl LineWrapper {
                         }
 
                         if Self::is_word_char(c) {
-                            if prev_c == ' ' && c != ' ' && first_non_whitespace_ix.is_some() {
+                            if Self::opens_word(before_prev_c, prev_c, c)
+                                && c != ' '
+                                && first_non_whitespace_ix.is_some()
+                            {
                                 last_candidate_ix = ix;
                                 last_candidate_width = width;
                             }
@@ -148,6 +152,7 @@ impl LineWrapper {
                     return Some(Boundary::new(last_wrap_ix, indent.unwrap_or(0)));
                 }
 
+                before_prev_c = prev_c;
                 prev_c = new_prev_c;
             }
 
@@ -348,6 +353,7 @@ impl LineWrapper {
         let mut last_candidate_width = px(0.);
         let mut last_wrap_ix = 0usize;
         let mut prev_c = '\0';
+        let mut before_prev_c = '\0';
         let mut indent: Option<u32> = None;
         let mut truncate_ix = 0usize;
 
@@ -374,6 +380,7 @@ impl LineWrapper {
                 last_candidate_width = px(0.);
                 last_wrap_ix = ix + 1;
                 prev_c = '\0';
+                before_prev_c = '\0';
                 indent = None;
                 truncate_ix = ix + 1;
                 continue;
@@ -382,7 +389,7 @@ impl LineWrapper {
             let char_width = self.width_for_char(c);
 
             if Self::is_word_char(c) {
-                if prev_c == ' ' && first_non_whitespace_ix.is_some() {
+                if Self::opens_word(before_prev_c, prev_c, c) && first_non_whitespace_ix.is_some() {
                     last_candidate_ix = ix;
                     last_candidate_width = width;
                 }
@@ -439,10 +446,15 @@ impl LineWrapper {
                 }
             }
 
+            before_prev_c = prev_c;
             prev_c = c;
         }
 
         (text, Cow::Borrowed(runs))
+    }
+
+    pub(crate) fn opens_word(before_prev: char, prev: char, c: char) -> bool {
+        prev == ' ' || (prev == '-' && c.is_alphabetic() && before_prev.is_alphanumeric())
     }
 
     pub(crate) fn is_word_char(c: char) -> bool {
@@ -864,6 +876,24 @@ mod tests {
                 )
                 .collect::<Vec<_>>(),
             &[Boundary::new(13, 0),],
+        );
+    }
+
+    #[test]
+    fn wraps_after_a_hyphen_between_letters() {
+        let mut wrapper = build_wrapper();
+
+        assert_eq!(
+            wrapper
+                .wrap_line(&[LineFragment::text("data-tone class")], px(72.))
+                .collect::<Vec<_>>(),
+            &[Boundary::new(5, 0), Boundary::new(10, 0)],
+        );
+        assert_eq!(
+            wrapper
+                .wrap_line(&[LineFragment::text("aaaa-12345")], px(72.))
+                .collect::<Vec<_>>(),
+            &[Boundary::new(7, 0)],
         );
     }
 

@@ -178,6 +178,7 @@ impl LineLayout {
         };
         let mut last_boundary_x = px(0.);
         let mut prev_ch = '\0';
+        let mut before_prev_ch = '\0';
         let mut glyphs = self
             .runs
             .iter()
@@ -200,7 +201,10 @@ impl LineLayout {
             }
 
             if LineWrapper::is_word_char(ch) {
-                if prev_ch == ' ' && ch != ' ' && first_non_whitespace_ix.is_some() {
+                if LineWrapper::opens_word(before_prev_ch, prev_ch, ch)
+                    && ch != ' '
+                    && first_non_whitespace_ix.is_some()
+                {
                     last_candidate_ix = Some(boundary);
                     last_candidate_x = x;
                 }
@@ -235,6 +239,7 @@ impl LineLayout {
                 }
                 boundaries.push(last_boundary);
             }
+            before_prev_ch = prev_ch;
             prev_ch = ch;
         }
 
@@ -1068,6 +1073,27 @@ mod tests {
             let line = cache.layout_wrapped_line(text, px(16.0), &runs, Some(px(30.0)), Some(1));
             assert!(line.wrap_boundaries.is_empty());
         }
+    }
+
+    #[test]
+    fn shaped_lines_wrap_after_a_hyphen_between_letters() {
+        let text = "data-tone class";
+        let runs = [FontRun {
+            len: text.len(),
+            font_id: FontId(1),
+        }];
+        let cache = LineLayoutCache::new(Arc::new(crate::NoopTextSystem), Arc::default());
+        let line = cache.layout_line(text, px(16.0), &runs, None);
+        let glyph = line.width / text.len() as f32;
+        let at = |glyph_ix| WrapBoundary {
+            run_ix: 0,
+            glyph_ix,
+        };
+        assert_eq!(
+            line.compute_wrap_boundaries(text, glyph * 7.5, None)
+                .into_vec(),
+            vec![at(5), at(10)]
+        );
     }
 
     fn held_line_cache() -> (LineLayoutCache, Arc<AtomicUsize>, [FontRun; 1]) {
