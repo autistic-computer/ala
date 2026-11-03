@@ -11,7 +11,7 @@ use crate::profiler;
 use crate::{
     Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Arena, Asset,
     AsyncWindowContext, AtlasTile, AvailableSpace, Background, BorderStyle, Bounds, BoxShadow,
-    Capslock, Context, Corners, CursorHideMode, CursorStyle, CustomShader, Decorations,
+    Capslock, ClipMask, Context, Corners, CursorHideMode, CursorStyle, CustomShader, Decorations,
     DevicePixels, DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Edges, Effect,
     Entity, EntityId, EventEmitter, FileDropEvent, FontId, Glass, GlassMaterial, GlassShadow,
     GlassShape, Global, GlobalElementId, GlyphId, GlyphRenderOptions, GpuSpecs, Hsla, InputHandler,
@@ -848,7 +848,7 @@ pub(crate) struct DeferredDraw {
     parent_node: DispatchNodeId,
     element_id_stack: SmallVec<[ElementId; 32]>,
     text_style_stack: Vec<TextStyleRefinement>,
-    content_mask: Option<ContentMask<Pixels>>,
+    content_mask: Option<ClipMask<Pixels>>,
     rem_size: Pixels,
     element: Option<AnyElement>,
     absolute_offset: Point<Pixels>,
@@ -1110,7 +1110,7 @@ pub struct Window {
     pub(crate) element_opacity: f32,
     pub(crate) text_fade: Option<(ScaledPixels, ScaledPixels)>,
     pub(crate) glass_groups: Vec<crate::GlassGroupShapes>,
-    pub(crate) content_mask_stack: Vec<ContentMask<Pixels>>,
+    pub(crate) content_mask_stack: Vec<ClipMask<Pixels>>,
     pub(crate) draw_number: u64,
     pub(crate) requested_autoscroll: Option<Bounds<Pixels>>,
     last_text_input_configuration: Option<TextInputConfiguration>,
@@ -2954,12 +2954,10 @@ impl Window {
 
         let mut paint_span = |start, end| {
             self.next_frame.scene.insert_primitive(Underline {
-                content_mask: ContentMask {
-                    bounds: Bounds::from_corners(
-                        point(start, bounds.top()),
-                        point(end, bounds.bottom()),
-                    ),
-                },
+                content_mask: underline.content_mask.clip(&Bounds::from_corners(
+                    point(start, bounds.top()),
+                    point(end, bounds.bottom()),
+                )),
                 ..underline
             });
         };
@@ -3027,9 +3025,19 @@ impl Window {
     }
 
     #[inline]
-    pub(crate) fn snapped_content_mask(&self) -> ContentMask<ScaledPixels> {
-        ContentMask {
-            bounds: self.cover_bounds(self.content_mask().bounds),
+    pub(crate) fn snapped_content_mask(&self) -> ClipMask<ScaledPixels> {
+        let mask = self.clip_mask();
+        let bounds = self.cover_bounds(mask.bounds);
+        if !mask.is_rounded() {
+            return ContentMask { bounds }.into();
+        }
+        let rounded_bounds = self.snap_bounds(mask.rounded_bounds);
+        ClipMask {
+            bounds: bounds.intersect(&rounded_bounds),
+            rounded_bounds,
+            corner_radii: mask.corner_radii.scale(self.scale_factor()),
+            corner_smoothing: mask.corner_smoothing,
+            pad: 0,
         }
     }
 
@@ -3681,7 +3689,7 @@ impl Window {
             if let Some(element) = deferred_draw.element.as_mut() {
                 let ((), accessed_entities) = cx.detect_accessed_entities(|cx| {
                     self.with_rendered_view(deferred_draw.current_view, |window| {
-                        window.with_content_mask(content_mask, |window| {
+                        window.with_clip_mask(content_mask, |window| {
                             window.with_rem_size(Some(deferred_draw.rem_size), |window| {
                                 element.paint(window, cx);
                             });
@@ -3752,14 +3760,14 @@ impl Window {
         f: impl FnOnce(&mut Self) -> R,
     ) -> R {
         self.invalidator.debug_assert_prepaint();
-        let clip = self.content_mask();
+        let clip = self.clip_mask();
         let hitboxes_start = self.next_frame.hitboxes.len();
         let deferred_start = self.next_frame.deferred_draws.len();
-        self.content_mask_stack.push(ContentMask { bounds });
+        self.content_mask_stack.push(ContentMask { bounds }.into());
         let result = f(self);
         self.content_mask_stack.pop();
         for hitbox in &mut self.next_frame.hitboxes[hitboxes_start..] {
-            hitbox.content_mask = hitbox.content_mask.intersect(&clip);
+            hitbox.content_mask = hitbox.content_mask.intersect(&clip.content_mask());
         }
         for deferred in &mut self.next_frame.deferred_draws[deferred_start..] {
             deferred.content_mask = Some(
@@ -3782,9 +3790,9 @@ impl Window {
         let transform = crate::scene::SceneTransform {
             scale: 1.0,
             offset: offset.scale(scale_factor),
-            clip: self.content_mask().bounds.scale(scale_factor),
+            clip: self.clip_mask().scale(scale_factor),
         };
-        self.content_mask_stack.push(ContentMask { bounds });
+        self.content_mask_stack.push(ContentMask { bounds }.into());
         self.next_frame.scene.push_transform(transform);
         let result = f(self);
         self.next_frame.scene.pop_transform();
@@ -3968,8 +3976,20 @@ impl Window {
         f: impl FnOnce(&mut Self) -> R,
     ) -> R {
         self.invalidator.debug_assert_paint_or_prepaint();
+        match mask {
+            Some(mask) => self.with_clip_mask(Some(mask.into()), f),
+            None => f(self),
+        }
+    }
+
+    pub fn with_clip_mask<R>(
+        &mut self,
+        mask: Option<ClipMask<Pixels>>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.invalidator.debug_assert_paint_or_prepaint();
         if let Some(mask) = mask {
-            let mask = mask.intersect(&self.content_mask());
+            let mask = self.clip_mask().intersect(&mask);
             self.content_mask_stack.push(mask);
             let result = f(self);
             self.content_mask_stack.pop();
@@ -4026,7 +4046,7 @@ impl Window {
                 ScaledPixels(origin.x.0 * (1.0 - scale) + offset.x.0),
                 ScaledPixels(origin.y.0 * (1.0 - scale) + offset.y.0),
             ),
-            clip: self.content_mask().bounds.scale(scale_factor),
+            clip: self.clip_mask().scale(scale_factor),
         };
         self.next_frame.scene.push_transform(transform);
         let result = f(self);
@@ -4077,8 +4097,8 @@ impl Window {
     fn insert_glyph_sprite<P: Into<crate::Primitive>>(
         &mut self,
         bounds: Bounds<ScaledPixels>,
-        content_mask: ContentMask<ScaledPixels>,
-        sprite: impl Fn(ContentMask<ScaledPixels>, f32) -> P,
+        content_mask: ClipMask<ScaledPixels>,
+        sprite: impl Fn(ClipMask<ScaledPixels>, f32) -> P,
     ) {
         let Some((opaque, gone)) = self.text_fade else {
             self.next_frame
@@ -4099,8 +4119,11 @@ impl Window {
             }
             return;
         }
-        let column = |from, to| ContentMask {
-            bounds: Bounds::from_corners(point(from, clip.top()), point(to, clip.bottom())),
+        let column = |from, to| {
+            content_mask.clip(&Bounds::from_corners(
+                point(from, clip.top()),
+                point(to, clip.bottom()),
+            ))
         };
         if fades_out && left < ramp_start {
             self.next_frame
@@ -4180,16 +4203,20 @@ impl Window {
     }
 
     pub fn content_mask(&self) -> ContentMask<Pixels> {
+        self.clip_mask().content_mask()
+    }
+
+    pub fn clip_mask(&self) -> ClipMask<Pixels> {
         self.invalidator.debug_assert_paint_or_prepaint();
-        self.content_mask_stack
-            .last()
-            .cloned()
-            .unwrap_or_else(|| ContentMask {
+        self.content_mask_stack.last().copied().unwrap_or_else(|| {
+            ContentMask {
                 bounds: Bounds {
                     origin: Point::default(),
                     size: self.viewport_size,
                 },
-            })
+            }
+            .into()
+        })
     }
 
     pub fn with_element_namespace<R>(
@@ -4352,6 +4379,7 @@ impl Window {
         content_mask: Option<ContentMask<Pixels>>,
     ) {
         self.invalidator.debug_assert_prepaint();
+        let content_mask = content_mask.map(ClipMask::from);
         let parent_node = self.next_frame.dispatch_tree.active_node_id().unwrap();
         self.next_frame.deferred_draws.push(DeferredDraw {
             current_view: self.current_view(),
@@ -4640,7 +4668,7 @@ impl Window {
         &self,
         bounds: Bounds<Pixels>,
         corner_radii: Corners<Pixels>,
-        content_mask: ContentMask<ScaledPixels>,
+        content_mask: ClipMask<ScaledPixels>,
     ) -> Option<Bounds<ScaledPixels>> {
         let scale_factor = self.scale_factor();
         let rounded_interior = |bounds, corner_radii| {
@@ -4775,7 +4803,7 @@ impl Window {
             corner_smoothing: quad
                 .corner_smoothing
                 .unwrap_or(self.default_corner_smoothing),
-            pad: [0; 3],
+            pad: [0; 1],
         };
 
         if !quad.background.is_transparent() {
@@ -4805,9 +4833,9 @@ impl Window {
     fn insert_around<P: Into<crate::Primitive>>(
         &mut self,
         outer_bounds: Bounds<ScaledPixels>,
-        content_mask: ContentMask<ScaledPixels>,
+        content_mask: ClipMask<ScaledPixels>,
         inner_bounds: Bounds<ScaledPixels>,
-        primitive: impl Fn(ContentMask<ScaledPixels>) -> P,
+        primitive: impl Fn(ClipMask<ScaledPixels>) -> P,
     ) {
         let strips = [
             Bounds::from_corners(
@@ -4833,7 +4861,7 @@ impl Window {
             if !bounds.is_empty() {
                 self.next_frame
                     .scene
-                    .insert_primitive(primitive(ContentMask { bounds }));
+                    .insert_primitive(primitive(content_mask.clip(&bounds)));
             }
         }
     }
@@ -4842,7 +4870,7 @@ impl Window {
         self.invalidator.debug_assert_paint();
 
         let scale_factor = self.scale_factor();
-        let content_mask = self.content_mask();
+        let content_mask = self.clip_mask();
         let opacity = self.element_opacity();
         path.content_mask = content_mask;
         let color: Background = color.into();
@@ -5040,7 +5068,7 @@ impl Window {
     pub(crate) fn paint_cached_monochrome_glyph(
         &mut self,
         bounds: Bounds<ScaledPixels>,
-        content_mask: ContentMask<ScaledPixels>,
+        content_mask: ClipMask<ScaledPixels>,
         color: Hsla,
         tile: AtlasTile,
     ) {
@@ -5060,7 +5088,7 @@ impl Window {
     pub(crate) fn paint_cached_subpixel_glyph(
         &mut self,
         bounds: Bounds<ScaledPixels>,
-        content_mask: ContentMask<ScaledPixels>,
+        content_mask: ClipMask<ScaledPixels>,
         color: Hsla,
         tile: AtlasTile,
     ) {
@@ -5080,7 +5108,7 @@ impl Window {
     pub(crate) fn paint_cached_polychrome_glyph(
         &mut self,
         bounds: Bounds<ScaledPixels>,
-        content_mask: ContentMask<ScaledPixels>,
+        content_mask: ClipMask<ScaledPixels>,
         opacity: f32,
         tile: AtlasTile,
     ) {
@@ -8048,9 +8076,10 @@ mod tests {
                 padding: 0,
                 bounds: Bounds::default(),
             };
-            let mask = ContentMask {
+            let mask: crate::ClipMask<ScaledPixels> = ContentMask {
                 bounds: scaled(0.0, 100.0),
-            };
+            }
+            .into();
             window.next_frame.scene.monochrome_sprites.clear();
             window.text_fade = Some((ScaledPixels(10.0), ScaledPixels(14.0)));
             window.paint_cached_monochrome_glyph(
@@ -10156,12 +10185,15 @@ mod tests {
             canvas(
                 |_, _, _| {},
                 move |_, _, window, _| {
-                    window.content_mask_stack.push(ContentMask {
-                        bounds: Bounds::from_corners(
-                            point(px(-1000.), px(-1000.)),
-                            point(px(1000.), px(1000.)),
-                        ),
-                    });
+                    window.content_mask_stack.push(
+                        ContentMask {
+                            bounds: Bounds::from_corners(
+                                point(px(-1000.), px(-1000.)),
+                                point(px(1000.), px(1000.)),
+                            ),
+                        }
+                        .into(),
+                    );
                     paint(window);
                     window.content_mask_stack.pop();
                 },

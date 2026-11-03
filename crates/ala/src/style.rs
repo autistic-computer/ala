@@ -7,11 +7,11 @@ use std::{
 use crate::collections::HashSet;
 use crate::refineable::Refineable;
 use crate::{
-    AbsoluteLength, App, Background, BackgroundTag, BorderStyle, Bounds, ContentMask, Corners,
-    CornersRefinement, CursorStyle, DefiniteLength, DevicePixels, Edges, EdgesRefinement, Font,
-    FontFallbacks, FontFeatures, FontStyle, FontWeight, GlassMaterial, GridLocation, Hsla, Length,
-    Pixels, Point, PointRefinement, Rgba, SharedString, Size, SizeRefinement, Styled, TextRun,
-    Window, black, phi, point, px, quad, rems, size,
+    AbsoluteLength, App, Background, BackgroundTag, BorderStyle, Bounds, ClipMask, ContentMask,
+    Corners, CornersRefinement, CursorStyle, DefiniteLength, DevicePixels, Edges, EdgesRefinement,
+    Font, FontFallbacks, FontFeatures, FontStyle, FontWeight, GlassMaterial, GridLocation, Hsla,
+    Length, Pixels, Point, PointRefinement, Rgba, SharedString, Size, SizeRefinement, Styled,
+    TextRun, Window, black, phi, point, px, quad, rems, size,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -550,6 +550,50 @@ impl Style {
         }
     }
 
+    pub fn overflow_clip_mask(
+        &self,
+        bounds: Bounds<Pixels>,
+        window: &Window,
+    ) -> Option<ClipMask<Pixels>> {
+        let rem_size = window.rem_size();
+        let mask = self.overflow_mask(bounds, rem_size)?;
+        if self.overflow.x == Overflow::Visible || self.overflow.y == Overflow::Visible {
+            return Some(mask.into());
+        }
+        let radii = self.resolved_corner_radii(bounds, window);
+        let border = if self
+            .border_color
+            .is_some_and(|color| !color.is_transparent())
+        {
+            self.border_widths.to_pixels(rem_size)
+        } else {
+            Edges::default()
+        };
+        let inner = |radius: Pixels, a: Pixels, b: Pixels| (radius - a.max(b)).max(Pixels::ZERO);
+        let corner_radii = Corners {
+            top_left: inner(radii.top_left, border.top, border.left),
+            top_right: inner(radii.top_right, border.top, border.right),
+            bottom_right: inner(radii.bottom_right, border.bottom, border.right),
+            bottom_left: inner(radii.bottom_left, border.bottom, border.left),
+        };
+        let corner_smoothing = self
+            .corner_smoothing
+            .unwrap_or(window.default_corner_smoothing());
+        Some(ClipMask::rounded(
+            mask.bounds,
+            corner_radii,
+            corner_smoothing,
+        ))
+    }
+
+    fn resolved_corner_radii(&self, bounds: Bounds<Pixels>, window: &Window) -> Corners<Pixels> {
+        let requested_radii = self.corner_radii.to_pixels(window.rem_size());
+        match self.corner_radius_mode {
+            CornerRadiusMode::Inherit => window.resolve_corner_radii(requested_radii, bounds.size),
+            CornerRadiusMode::Fixed => requested_radii.clamp_radii_for_quad_size(bounds.size),
+        }
+    }
+
     pub fn paint(
         &self,
         bounds: Bounds<Pixels>,
@@ -568,11 +612,7 @@ impl Style {
         }
 
         let rem_size = window.rem_size();
-        let requested_radii = self.corner_radii.to_pixels(rem_size);
-        let corner_radii = match self.corner_radius_mode {
-            CornerRadiusMode::Inherit => window.resolve_corner_radii(requested_radii, bounds.size),
-            CornerRadiusMode::Fixed => requested_radii.clamp_radii_for_quad_size(bounds.size),
-        };
+        let corner_radii = self.resolved_corner_radii(bounds, window);
 
         if let Some(material) = &self.glass {
             window.paint_glass_with_shadows(

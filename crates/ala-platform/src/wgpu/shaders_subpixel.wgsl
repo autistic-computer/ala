@@ -2,7 +2,7 @@ struct SubpixelSprite {
     order: u32,
     pad: u32,
     bounds: Bounds,
-    content_mask: Bounds,
+    content_mask: ClipMask,
     color: Hsla,
     tile: AtlasTile,
     transformation: TransformationMatrix,
@@ -14,6 +14,9 @@ struct SubpixelSpriteOutput {
     @location(0) tile_position: vec2<f32>,
     @location(1) @interpolate(flat) color: vec4<f32>,
     @location(3) clip_distances: vec4<f32>,
+    @location(4) @interpolate(flat) clip_rect: vec4<f32>,
+    @location(5) @interpolate(flat) clip_radii: vec4<f32>,
+    @location(6) @interpolate(flat) clip_smoothing: f32,
 }
 
 struct SubpixelSpriteFragmentOutput {
@@ -26,13 +29,16 @@ fn vs_subpixel_sprite(@builtin(vertex_index) vertex_id: u32, @builtin(instance_i
     let unit_vertex = vec2<f32>(f32(vertex_id & 1u), 0.5 * f32(vertex_id & 2u));
     let sprite = b_subpixel_sprites[instance_id];
 
-    let unit = clip_sprite_to_mask(unit_vertex, sprite.bounds, sprite.content_mask, sprite.transformation);
+    let unit = clip_sprite_to_mask(unit_vertex, sprite.bounds, sprite.content_mask.bounds, sprite.transformation);
 
     var out = SubpixelSpriteOutput();
     out.position = to_device_position_transformed(unit, sprite.bounds, sprite.transformation);
     out.tile_position = to_tile_position(unit, sprite.tile);
     out.color = hsla_to_rgba(sprite.color);
-    out.clip_distances = distance_from_clip_rect_transformed(unit, sprite.bounds, sprite.content_mask, sprite.transformation);
+    out.clip_distances = distance_from_clip_rect_transformed(unit, sprite.bounds, sprite.content_mask.bounds, sprite.transformation);
+    out.clip_rect = clip_mask_rect(sprite.content_mask);
+    out.clip_radii = clip_mask_radii(sprite.content_mask);
+    out.clip_smoothing = sprite.content_mask.corner_smoothing;
     return out;
 }
 
@@ -51,6 +57,8 @@ fn fs_subpixel_sprite(input: SubpixelSpriteOutput) -> SubpixelSpriteFragmentOutp
     var out = SubpixelSpriteFragmentOutput();
     out.foreground = vec4<f32>(input.color.rgb, 1.0);
     out.alpha = vec4<f32>(
-        input.color.a * alpha_corrected * window_mask_alpha(input.position.xy), 1.0);
+        input.color.a * alpha_corrected * window_mask_alpha(input.position.xy) *
+        rounded_clip_alpha(input.position.xy, input.clip_rect, input.clip_radii,
+            input.clip_smoothing), 1.0);
     return out;
 }

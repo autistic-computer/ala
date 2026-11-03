@@ -29,20 +29,74 @@ const PATH_TEXTURE_GRANULARITY: u32 = 256;
 
 const STORAGE_BUFFER_SHADERS: &str = concat!(
     include_str!("shaders.wgsl"),
+    include_str!("clip_mask.wgsl"),
     include_str!("shaders_storage.wgsl"),
 );
 
 const WEBGL_SHADERS: &str = concat!(
     include_str!("shaders.wgsl"),
+    include_str!("clip_mask.wgsl"),
     include_str!("shaders_webgl.wgsl"),
 );
 
 const SUBPIXEL_SHADERS: &str = concat!(
     "enable dual_source_blending;\n",
     include_str!("shaders.wgsl"),
+    include_str!("clip_mask.wgsl"),
     include_str!("shaders_storage.wgsl"),
     include_str!("shaders_subpixel.wgsl"),
 );
+
+const SHADER_LAYER_COMPOSITE: &str = concat!(
+    include_str!("clip_mask.wgsl"),
+    r#"
+struct LayerClip {
+    rect: vec4<f32>,
+    radii: vec4<f32>,
+    smoothing: vec4<f32>,
+}
+
+@group(0) @binding(0) var layer_output: texture_2d<f32>;
+@group(0) @binding(1) var<uniform> layer_clip: LayerClip;
+
+@fragment
+fn shader_layer_composite(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
+    let color = textureLoad(layer_output, vec2<i32>(position.xy), 0);
+    return color * rounded_clip_alpha(position.xy, layer_clip.rect, layer_clip.radii,
+        layer_clip.smoothing.x);
+}
+"#
+);
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct LayerClip {
+    rect: [f32; 4],
+    radii: [f32; 4],
+    smoothing: [f32; 4],
+}
+
+impl From<ala::ClipMask<ScaledPixels>> for LayerClip {
+    fn from(mask: ala::ClipMask<ScaledPixels>) -> Self {
+        let rounded = mask.rounded_bounds;
+        let radii = mask.corner_radii;
+        Self {
+            rect: [
+                rounded.origin.x.0,
+                rounded.origin.y.0,
+                rounded.size.width.0,
+                rounded.size.height.0,
+            ],
+            radii: [
+                radii.top_left.0,
+                radii.top_right.0,
+                radii.bottom_right.0,
+                radii.bottom_left.0,
+            ],
+            smoothing: [mask.corner_smoothing, 0.0, 0.0, 0.0],
+        }
+    }
+}
 
 fn instance_part<T>(instances: &[T]) -> (&[u8], u64) {
     let bytes = unsafe {
@@ -132,10 +186,10 @@ impl From<Bounds<ScaledPixels>> for PodBounds {
 
 #[repr(C)]
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-#[derive(Clone, Copy, Pod, Zeroable)]
+#[derive(Clone, Copy)]
 struct SurfaceParams {
     bounds: PodBounds,
-    content_mask: PodBounds,
+    content_mask: ala::ClipMask<ScaledPixels>,
     corner_radii: [f32; 4],
     corner_smoothing: f32,
     pad: f32,
@@ -202,6 +256,7 @@ struct PathRasterizationVertex {
     st_position: Point<f32>,
     color: Background,
     bounds: Bounds<ScaledPixels>,
+    content_mask: ala::ClipMask<ScaledPixels>,
 }
 
 pub struct WgpuSurfaceConfig {
@@ -290,6 +345,7 @@ struct ShaderLayerResources {
     vertex_module: wgpu::ShaderModule,
     sampler: wgpu::Sampler,
     pipelines: FxHashMap<u64, Option<ShaderLayerPipeline>>,
+    composite: Option<wgpu::RenderPipeline>,
     targets: Vec<RenderTexture>,
     inputs: Vec<RenderTexture>,
     drawn: bool,
@@ -408,10 +464,54 @@ impl ShaderLayerResources {
             vertex_module,
             sampler,
             pipelines: FxHashMap::default(),
+            composite: None,
             targets: Vec::new(),
             inputs: Vec::new(),
             drawn: false,
         }
+    }
+
+    fn composite_pipeline(
+        &mut self,
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+    ) -> wgpu::RenderPipeline {
+        self.composite
+            .get_or_insert_with(|| {
+                let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("shader_layer_composite"),
+                    source: wgpu::ShaderSource::Wgsl(SHADER_LAYER_COMPOSITE.into()),
+                });
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("shader_layer_composite"),
+                    layout: Some(&self.pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &self.vertex_module,
+                        entry_point: Some("shader_layer_vertex"),
+                        buffers: &[],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &module,
+                        entry_point: Some("shader_layer_composite"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format,
+                            blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::TriangleStrip,
+                        ..Default::default()
+                    },
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                })
+            })
+            .clone()
     }
 
     fn release_textures(&mut self) {
@@ -2154,16 +2254,73 @@ impl WgpuRendererCore {
             }],
         });
 
-        let mut pass = begin_pass(encoder, frame_view, wgpu::LoadOp::Load, "shader_layer_pass");
-        pass.set_pipeline(&pipeline.pipeline);
-        pass.set_bind_group(0, &content, &[]);
-        pass.set_bind_group(1, &params, &[]);
-        pass.set_scissor_rect(
+        let rounded = layer.content_mask.is_rounded();
+        let (output_view, load) = if rounded {
+            (&target_view, wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT))
+        } else {
+            (frame_view, wgpu::LoadOp::Load)
+        };
+        let scissor = [
             scissor.origin.x.0 as u32,
             scissor.origin.y.0 as u32,
             scissor.size.width.0 as u32,
             scissor.size.height.0 as u32,
+        ];
+        {
+            let mut pass = begin_pass(encoder, output_view, load, "shader_layer_pass");
+            pass.set_pipeline(&pipeline.pipeline);
+            pass.set_bind_group(0, &content, &[]);
+            pass.set_bind_group(1, &params, &[]);
+            pass.set_scissor_rect(scissor[0], scissor[1], scissor[2], scissor[3]);
+            pass.draw(0..4, 0..1);
+        }
+        if !rounded {
+            return Ok(());
+        }
+
+        let composite = self
+            .resources
+            .shader_layers
+            .composite_pipeline(&device, format);
+        let clip = LayerClip::from(layer.content_mask);
+        let clip_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("shader_layer_clip"),
+            size: std::mem::size_of::<LayerClip>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        self.resources
+            .queue
+            .write_buffer(&clip_buffer, 0, bytemuck::bytes_of(&clip));
+        let layers = &self.resources.shader_layers;
+        let output = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("shader_layer_output"),
+            layout: &layers.content_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&target_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: clip_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&layers.sampler),
+                },
+            ],
+        });
+        let mut pass = begin_pass(
+            encoder,
+            frame_view,
+            wgpu::LoadOp::Load,
+            "shader_layer_composite_pass",
         );
+        pass.set_pipeline(&composite);
+        pass.set_bind_group(0, &output, &[]);
+        pass.set_bind_group(1, &params, &[]);
+        pass.set_scissor_rect(scissor[0], scissor[1], scissor[2], scissor[3]);
         pass.draw(0..4, 0..1);
         Ok(())
     }
@@ -2307,7 +2464,7 @@ impl WgpuRendererCore {
         for surface in surfaces {
             let params = SurfaceParams {
                 bounds: surface.bounds.into(),
-                content_mask: surface.content_mask.bounds.into(),
+                content_mask: surface.content_mask,
                 corner_radii: [
                     surface.corner_radii.top_left.0,
                     surface.corner_radii.top_right.0,
@@ -2433,6 +2590,7 @@ impl WgpuRendererCore {
                 st_position: v.st_position,
                 color: path.color,
                 bounds,
+                content_mask: path.content_mask,
             }));
         }
 
@@ -3441,13 +3599,13 @@ mod tests {
             order: 0,
             border_style: BorderStyle::Solid,
             bounds,
-            content_mask: ContentMask { bounds },
+            content_mask: ContentMask { bounds }.into(),
             background: color.into(),
             border_color: color,
             corner_radii: Corners::default(),
             border_widths: Edges::default(),
             corner_smoothing: 2.0,
-            pad: [0; 3],
+            pad: [0; 1],
         }
     }
 
@@ -3694,7 +3852,7 @@ mod tests {
             order: 0,
             pad: 0,
             bounds,
-            content_mask: ContentMask { bounds },
+            content_mask: ContentMask { bounds }.into(),
             color: ala::white(),
             tile,
             transformation: ala::TransformationMatrix::unit(),
@@ -3964,13 +4122,13 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 order: 0,
                 border_style: BorderStyle::Solid,
                 bounds,
-                content_mask: ContentMask { bounds },
+                content_mask: ContentMask { bounds }.into(),
                 background: color.into(),
                 border_color: color,
                 corner_radii: Corners::default(),
                 border_widths: Edges::default(),
                 corner_smoothing: 2.0,
-                pad: [0; 3],
+                pad: [0; 1],
             }
         }
 
@@ -4001,7 +4159,8 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 bounds: layer_bounds,
                 content_mask: ContentMask {
                     bounds: layer_bounds,
-                },
+                }
+                .into(),
                 shader: CustomShader::new(shader.to_owned()),
                 uniforms: bytemuck::cast_slice(&tint).into(),
                 scene: Rc::new(scene),
@@ -4150,6 +4309,23 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
+    fn rounded_content_masks_clip_every_primitive() -> anyhow::Result<()> {
+        use ala::PlatformHeadlessRenderer;
+        let mut renderer = WgpuHeadlessRenderer::new()?;
+        let atlas = renderer.core.atlas.clone();
+        ala::check_rounded_clip_rendering(atlas.as_ref(), |scene| {
+            renderer.render_scene_to_image(
+                scene,
+                Size {
+                    width: DevicePixels(64),
+                    height: DevicePixels(64),
+                },
+            )
+        })
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
     fn glass_hides_the_frame_under_it() -> anyhow::Result<()> {
         use ala::PlatformHeadlessRenderer;
         let mut renderer = WgpuHeadlessRenderer::new()?;
@@ -4268,16 +4444,16 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
 
     #[test]
     fn webgl_record_sizes_match_shader_word_strides() {
-        assert_eq!(std::mem::size_of::<Quad>(), 44 * 4);
-        assert_eq!(std::mem::size_of::<Shadow>(), 28 * 4);
-        assert_eq!(std::mem::size_of::<PathRasterizationVertex>(), 26 * 4);
+        assert_eq!(std::mem::size_of::<Quad>(), 52 * 4);
+        assert_eq!(std::mem::size_of::<Shadow>(), 38 * 4);
+        assert_eq!(std::mem::size_of::<PathRasterizationVertex>(), 40 * 4);
         assert_eq!(std::mem::size_of::<PathSprite>(), 4 * 4);
-        assert_eq!(std::mem::size_of::<Underline>(), 16 * 4);
-        assert_eq!(std::mem::size_of::<MonochromeSprite>(), 28 * 4);
-        assert_eq!(std::mem::size_of::<SubpixelSprite>(), 28 * 4);
-        assert_eq!(std::mem::size_of::<PolychromeSprite>(), 26 * 4);
+        assert_eq!(std::mem::size_of::<Underline>(), 26 * 4);
+        assert_eq!(std::mem::size_of::<MonochromeSprite>(), 38 * 4);
+        assert_eq!(std::mem::size_of::<SubpixelSprite>(), 38 * 4);
+        assert_eq!(std::mem::size_of::<PolychromeSprite>(), 36 * 4);
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-        assert_eq!(std::mem::size_of::<SurfaceParams>(), 14 * 4);
+        assert_eq!(std::mem::size_of::<SurfaceParams>(), 24 * 4);
     }
 
     #[test]
@@ -4295,7 +4471,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                     height: 4.0.into(),
                 },
             },
-            content_mask: ContentMask {
+            content_mask: ala::ClipMask {
                 bounds: Bounds {
                     origin: Point {
                         x: 5.0.into(),
@@ -4306,6 +4482,24 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                         height: 8.0.into(),
                     },
                 },
+                rounded_bounds: Bounds {
+                    origin: Point {
+                        x: 50.0.into(),
+                        y: 51.0.into(),
+                    },
+                    size: Size {
+                        width: 52.0.into(),
+                        height: 53.0.into(),
+                    },
+                },
+                corner_radii: Corners {
+                    top_left: 54.0.into(),
+                    top_right: 55.0.into(),
+                    bottom_right: 56.0.into(),
+                    bottom_left: 57.0.into(),
+                },
+                corner_smoothing: 58.0,
+                pad: 59,
             },
             background: linear_gradient(
                 11.0,
@@ -4348,7 +4542,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 left: 33.0.into(),
             },
             corner_smoothing: 34.0,
-            pad: [35, 36, 37],
+            pad: [35],
         };
 
         let (bytes, _) = instance_part(std::slice::from_ref(&quad));
@@ -4366,6 +4560,16 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 6.0_f32.to_bits(),
                 7.0_f32.to_bits(),
                 8.0_f32.to_bits(),
+                50.0_f32.to_bits(),
+                51.0_f32.to_bits(),
+                52.0_f32.to_bits(),
+                53.0_f32.to_bits(),
+                54.0_f32.to_bits(),
+                55.0_f32.to_bits(),
+                56.0_f32.to_bits(),
+                57.0_f32.to_bits(),
+                58.0_f32.to_bits(),
+                59,
                 1,
                 1,
                 0,
@@ -4398,8 +4602,6 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 33.0_f32.to_bits(),
                 34.0_f32.to_bits(),
                 35,
-                36,
-                37,
             ]
         );
     }
@@ -4440,7 +4642,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             extra: usize,
         ) {
             let page = rect(left, 0.0, width, height);
-            let mask = ContentMask { bounds: page };
+            let mask: ala::ClipMask<ScaledPixels> = ContentMask { bounds: page }.into();
             let color = hsla(0.6, 0.2, 0.5, 1.0);
             scene.insert_primitive(Shadow {
                 order: 0,
@@ -4467,7 +4669,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                     corner_radii: Corners::default(),
                     border_widths: Edges::default(),
                     corner_smoothing: 2.0,
-                    pad: [0; 3],
+                    pad: [0; 1],
                 });
                 if row % 9 == 0 {
                     scene.insert_primitive(Underline {
@@ -4535,9 +4737,10 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                     renderer.core.instance_data_capacity = 16;
                 }
                 let mut scene = Scene::default();
-                let screen = ContentMask {
+                let screen: ala::ClipMask<ScaledPixels> = ContentMask {
                     bounds: rect(0.0, 0.0, 48.0, 16.0),
-                };
+                }
+                .into();
                 for ix in 0..=hidden_quads {
                     let bounds = if ix == hidden_quads {
                         rect(0.0, 0.0, 16.0, 16.0)
@@ -4548,13 +4751,13 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                         order: 0,
                         border_style: BorderStyle::Solid,
                         bounds,
-                        content_mask: ContentMask { bounds },
+                        content_mask: ContentMask { bounds }.into(),
                         background: red.into(),
                         border_color: red,
                         corner_radii: Corners::default(),
                         border_widths: Edges::default(),
                         corner_smoothing: 2.0,
-                        pad: [0; 3],
+                        pad: [0; 1],
                     });
                 }
                 scene.insert_primitive(Underline {
@@ -4675,10 +4878,11 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             }
         }
 
-        fn viewport() -> ContentMask<ScaledPixels> {
+        fn viewport() -> ala::ClipMask<ScaledPixels> {
             ContentMask {
                 bounds: rect(0.0, 0.0, WIDTH, HEIGHT),
             }
+            .into()
         }
 
         fn chrome_color() -> Hsla {
@@ -4693,7 +4897,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             bounds: Bounds<ScaledPixels>,
             radius: f32,
             color: Hsla,
-            content_mask: ContentMask<ScaledPixels>,
+            content_mask: ala::ClipMask<ScaledPixels>,
         ) -> Quad {
             Quad {
                 bounds,
@@ -4735,9 +4939,9 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
         fn around<P: Into<ala::Primitive>>(
             scene: &mut Scene,
             outer: Bounds<ScaledPixels>,
-            content_mask: ContentMask<ScaledPixels>,
+            content_mask: ala::ClipMask<ScaledPixels>,
             inner: Bounds<ScaledPixels>,
-            primitive: impl Fn(ContentMask<ScaledPixels>) -> P,
+            primitive: impl Fn(ala::ClipMask<ScaledPixels>) -> P,
         ) {
             let strips = [
                 Bounds::from_corners(outer.origin, point(outer.right(), inner.top())),
@@ -4748,7 +4952,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             for strip in strips {
                 let bounds = content_mask.bounds.intersect(&strip);
                 if !bounds.is_empty() {
-                    scene.insert_primitive(primitive(ContentMask { bounds }));
+                    scene.insert_primitive(primitive(ContentMask { bounds }.into()));
                 }
             }
         }
@@ -4759,7 +4963,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             radius: f32,
             width: f32,
             color: Hsla,
-            content_mask: ContentMask<ScaledPixels>,
+            content_mask: ala::ClipMask<ScaledPixels>,
         ) {
             let quad = Quad {
                 bounds,
@@ -4794,7 +4998,8 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 bounds,
                 content_mask: ContentMask {
                     bounds: content_mask,
-                },
+                }
+                .into(),
                 color,
                 tile,
                 transformation: TransformationMatrix::unit(),
@@ -5168,7 +5373,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             poly: AtlasTile,
         ) -> Vec<(
             &'static str,
-            Box<dyn Fn(ContentMask<ScaledPixels>) -> ala::Primitive>,
+            Box<dyn Fn(ala::ClipMask<ScaledPixels>) -> ala::Primitive>,
         )> {
             let accent = hsla(0.1, 0.9, 0.6, 0.9);
             let shadow = move |bounds, radius: f32, blur: f32, inset| {
@@ -5336,9 +5541,10 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
 
             let size = device_size(160, 120);
             let card = rect(40.0, 30.0, 80.0, 50.0);
-            let mask = ContentMask {
+            let mask: ala::ClipMask<ScaledPixels> = ContentMask {
                 bounds: rect(0.0, 0.0, 160.0, 120.0),
-            };
+            }
+            .into();
             for (offset, blur, radius) in [
                 ((0.0, 0.0), 2.0, 12.0),
                 ((0.0, 4.0), 8.0, 12.0),
@@ -5400,7 +5606,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             for (name, primitive) in clip_cases(mono, poly) {
                 let render = |renderer: &mut WgpuHeadlessRenderer, bounds| {
                     let mut scene = Scene::default();
-                    scene.insert_primitive(primitive(ContentMask { bounds }));
+                    scene.insert_primitive(primitive(ContentMask { bounds }.into()));
                     scene.finish();
                     renderer.render_scene_to_image(&scene, size)
                 };
@@ -5502,7 +5708,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             color: impl Into<Background>,
             mask: Bounds<Pixels>,
         ) {
-            path.content_mask = ContentMask { bounds: mask };
+            path.content_mask = ContentMask { bounds: mask }.into();
             path.color = color.into();
             scene.insert_primitive(path.scale(SCALE));
         }
@@ -5517,13 +5723,13 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 order: 0,
                 border_style: BorderStyle::Solid,
                 bounds,
-                content_mask: ContentMask { bounds },
+                content_mask: ContentMask { bounds }.into(),
                 background: background.into(),
                 border_color: ala::transparent_black(),
                 corner_radii: Corners::default(),
                 border_widths: Edges::default(),
                 corner_smoothing: 2.0,
-                pad: [0; 3],
+                pad: [0; 1],
             });
         }
 
