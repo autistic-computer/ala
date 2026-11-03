@@ -139,6 +139,30 @@ Each backend compiles for its own target only. From macOS:
   `RUST_FONTCONFIG_DLOPEN=1` and `FREETYPE2_NO_PKG_CONFIG=1`.
 - Windows: `cargo check -p ala-platform --all-features --target x86_64-pc-windows-msvc` with
   `RC_x86_64_pc_windows_msvc` set to Homebrew's `llvm-rc`.
+- Windows shaders: the cargo check above never compiles the HLSL. The backend compiles
+  `shaders.hlsl` and `color_text_raster.hlsl` with the legacy `fxc` at shader model 4.1 (in
+  `build.rs` for release builds, through `D3DCompileFromFile` at runtime for debug builds), and
+  `fxc` only runs on Windows. The DirectX Shader Compiler builds on macOS from its source in about
+  five minutes (`cmake -G Ninja -C cmake/caches/PredefinedParams.cmake
+  -DCMAKE_BUILD_TYPE=Release -DHLSL_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_TESTS=OFF
+  -DCLANG_INCLUDE_TESTS=OFF -DSPIRV_BUILD_TESTS=OFF -DENABLE_SPIRV_CODEGEN=OFF`, then
+  `ninja dxc`). With `dxc` on `PATH`, compile every entry point the backend loads:
+
+  ```bash
+  (cd crates/ala-platform/src/windows &&
+  for m in quad shadow path_rasterization path_sprite underline monochrome_sprite \
+      subpixel_sprite polychrome_sprite surface emoji_rasterization; do
+    f=shaders.hlsl; [ "$m" = emoji_rasterization ] && f=color_text_raster.hlsl
+    for s in vs:vertex ps:fragment; do
+      dxc -nologo -HV 2018 -WX -T "${s%:*}_6_0" -E "${m}_${s#*:}" -Fo /dev/null "$f" || exit 1
+    done
+  done)
+  ```
+
+  `dxc` has no shader model 4 targets, so this checks the same source at 6.0 with the 2018
+  language rules `fxc` follows. It catches syntax, type and missing-symbol errors; what it
+  misses is what only shader model 4 rejects, such as gradient sampling inside varying flow
+  control.
 - iOS: `cargo clippy -p ala-platform --all-features --target aarch64-apple-ios`.
 - Android: point `CC_aarch64_linux_android`, `AR_aarch64_linux_android` and
   `CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER` at the NDK's
