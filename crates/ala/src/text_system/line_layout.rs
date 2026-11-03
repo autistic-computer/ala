@@ -218,7 +218,8 @@ impl LineLayout {
             let next_x = glyphs.peek().map_or(self.width, |(_, _, x)| *x);
             let width = next_x - last_boundary_x;
 
-            if width > wrap_width && boundary > last_boundary {
+            let hangs = ch == ' ' && first_non_whitespace_ix.is_some();
+            if width > wrap_width && boundary > last_boundary && !hangs {
                 if let Some(max_lines) = max_lines
                     && boundaries.len() >= max_lines.saturating_sub(1)
                 {
