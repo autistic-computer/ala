@@ -117,7 +117,9 @@ impl LineWrapper {
                 };
 
                 width += item_width;
-                if width > wrap_width && ix > last_wrap_ix {
+                let hangs = matches!(candidate, WrapBoundaryCandidate::Char { character: ' ' })
+                    && first_non_whitespace_ix.is_some();
+                if width > wrap_width && ix > last_wrap_ix && !hangs {
                     if let (None, Some(first_non_whitespace_ix)) = (indent, first_non_whitespace_ix)
                     {
                         indent = Some(
@@ -766,11 +768,14 @@ mod tests {
                     px(72.)
                 )
                 .collect::<Vec<_>>(),
-            &[
-                Boundary::new(5, 0),
-                Boundary::new(9, 0),
-                Boundary::new(11, 0)
-            ],
+            &[Boundary::new(5, 0), Boundary::new(11, 0)],
+        );
+
+        assert_eq!(
+            wrapper
+                .wrap_line(&[LineFragment::text("aaaaaaa bb")], px(72.))
+                .collect::<Vec<_>>(),
+            &[Boundary::new(8, 0)],
         );
 
         assert_eq!(
@@ -805,7 +810,7 @@ mod tests {
             &[
                 Boundary::new(6, 0),
                 Boundary::new(11, 0),
-                Boundary::new(12, 0),
+                Boundary::new(13, 0),
                 Boundary::new(18, 0)
             ],
         );
@@ -817,7 +822,7 @@ mod tests {
                     px(72.0)
                 )
                 .collect::<Vec<_>>(),
-            &[Boundary::new(12, 0),],
+            &[Boundary::new(13, 0),],
         );
     }
 
