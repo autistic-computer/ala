@@ -181,6 +181,7 @@ pub struct Scene {
     pub(crate) paint_operations: Vec<PaintOperation>,
     sprite_log: Vec<MonochromeSprite>,
     sealed_operations: Cell<usize>,
+    replayable_depth: usize,
     primitive_bounds: BoundsTree<ScaledPixels>,
     layer_stack: Vec<DrawOrder>,
     pub window_corner_mask: Option<WindowCornerMask>,
@@ -360,6 +361,7 @@ impl Scene {
         self.paint_operations.clear();
         self.sprite_log.clear();
         self.sealed_operations.set(0);
+        self.replayable_depth = 0;
         self.primitive_bounds.clear();
         self.layer_stack.clear();
         self.window_corner_mask = None;
@@ -389,13 +391,11 @@ impl Scene {
             None => bounds,
         };
         self.target().open_layer(placed);
-        self.paint_operations
-            .push(PaintOperation::StartLayer(bounds));
+        self.log(PaintOperation::StartLayer(bounds));
     }
 
     pub(crate) fn push_transform(&mut self, transform: SceneTransform) {
-        self.paint_operations
-            .push(PaintOperation::StartTransform(transform));
+        self.log(PaintOperation::StartTransform(transform));
         let composed = match self.transforms.last() {
             Some(outer) => transform.within(*outer),
             None => transform,
@@ -404,18 +404,17 @@ impl Scene {
     }
 
     pub(crate) fn pop_transform(&mut self) {
-        self.paint_operations.push(PaintOperation::EndTransform);
+        self.log(PaintOperation::EndTransform);
         self.transforms.pop();
     }
 
     pub fn pop_layer(&mut self) {
         self.target().layer_stack.pop();
-        self.paint_operations.push(PaintOperation::EndLayer);
+        self.log(PaintOperation::EndLayer);
     }
 
     pub(crate) fn push_shader_layer(&mut self, descriptor: ShaderLayerDescriptor) {
-        self.paint_operations
-            .push(PaintOperation::StartShaderLayer(descriptor.clone()));
+        self.log(PaintOperation::StartShaderLayer(descriptor.clone()));
         let mut descriptor = descriptor;
         if let Some(transform) = self.transforms.last() {
             descriptor.bounds = transform.bounds(descriptor.bounds);
@@ -428,7 +427,7 @@ impl Scene {
     }
 
     pub(crate) fn pop_shader_layer(&mut self) {
-        self.paint_operations.push(PaintOperation::EndShaderLayer);
+        self.log(PaintOperation::EndShaderLayer);
         let Some(OpenShaderLayer {
             descriptor,
             mut scene,
@@ -465,16 +464,28 @@ impl Scene {
         let mut primitive = primitive.into();
         let Some(transform) = self.transforms.last().copied() else {
             if self.target().place_primitive(&mut primitive) {
-                self.paint_operations
-                    .push(PaintOperation::Primitive(primitive));
+                self.log(PaintOperation::Primitive(primitive));
             }
             return;
         };
         let mut placed = primitive.clone();
         transform.apply(&mut placed);
         self.target().place_primitive(&mut placed);
-        self.paint_operations
-            .push(PaintOperation::Primitive(primitive));
+        self.log(PaintOperation::Primitive(primitive));
+    }
+
+    pub(crate) fn begin_replayable(&mut self) {
+        self.replayable_depth += 1;
+    }
+
+    pub(crate) fn end_replayable(&mut self) {
+        self.replayable_depth -= 1;
+    }
+
+    fn log(&mut self, operation: PaintOperation) {
+        if self.replayable_depth > 0 {
+            self.paint_operations.push(operation);
+        }
     }
 
     pub(crate) fn insert_monochrome_sprite(&mut self, mut sprite: MonochromeSprite) {
@@ -482,7 +493,7 @@ impl Scene {
             self.insert_primitive(sprite);
             return;
         }
-        if !self.target().place_monochrome_sprite(&mut sprite) {
+        if !self.target().place_monochrome_sprite(&mut sprite) || self.replayable_depth == 0 {
             return;
         }
         let index = self.sprite_log.len();

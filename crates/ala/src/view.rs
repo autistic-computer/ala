@@ -513,6 +513,7 @@ fn paint_view(
                     let paint_start = window.paint_index();
                     let opacity = window.element_opacity();
 
+                    window.next_frame.scene.begin_replayable();
                     if let Some(element) = element {
                         let ((), accessed_entities) =
                             cx.detect_accessed_entities(|cx| element.paint(window, cx));
@@ -524,6 +525,7 @@ fn paint_view(
                             window.request_animation_frame();
                         }
                     }
+                    window.next_frame.scene.end_replayable();
 
                     let paint_end = window.paint_index();
                     element_state.paint_range = paint_start..paint_end;

@@ -3695,6 +3695,7 @@ impl Window {
 
             let paint_start = self.paint_index();
             let content_mask = deferred_draw.content_mask;
+            self.next_frame.scene.begin_replayable();
             if let Some(element) = deferred_draw.element.as_mut() {
                 let ((), accessed_entities) = cx.detect_accessed_entities(|cx| {
                     self.with_rendered_view(deferred_draw.current_view, |window| {
@@ -3709,6 +3710,7 @@ impl Window {
             } else {
                 self.reuse_paint(deferred_draw.paint_range.clone());
             }
+            self.next_frame.scene.end_replayable();
             let paint_end = self.paint_index();
             deferred_draw.paint_range = paint_start..paint_end;
         }
