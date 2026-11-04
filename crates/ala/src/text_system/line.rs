@@ -787,6 +787,9 @@ fn paint_line(
         if let Some(key) = run_key
             && let Some(run) = window.glyph_runs.take(&key)
             && run.matches(layout, window.glyph_run_generations())
+            && layout.runs.iter().all(|shaped| {
+                !window.should_use_subpixel_rendering(shaped.font_id, layout.font_size)
+            })
         {
             window.paint_glyph_run(origin, &run, layout.font_size, glyph_options)?;
             window.glyph_runs.put(key, run);
@@ -2349,6 +2352,65 @@ mod tests {
         fn recommended_rendering_mode(&self, _: FontId, _: Pixels) -> crate::TextRenderingMode {
             crate::TextRenderingMode::Grayscale
         }
+    }
+
+    #[test]
+    fn cached_line_paint_follows_a_switch_to_subpixel_rendering() {
+        let mut cx = TestAppContext::build_with_text_system(
+            crate::TestDispatcher::new(0),
+            None,
+            Arc::new(SpriteTextSystem),
+        );
+        let counts = Rc::new(std::cell::Cell::new(None));
+        let seen = counts.clone();
+        let window = cx.add_window(move |_, _| {
+            UnderlineHandlerTestView(Rc::new(move |window: &mut Window, cx: &mut App| {
+                let line = window.text_system().shape_line(
+                    "abc".into(),
+                    px(16.),
+                    &[TextRun {
+                        len: 3,
+                        ..TextRun::default()
+                    }],
+                    None,
+                );
+                let mut paint = |window: &mut Window, cx: &mut App| {
+                    window.next_frame.scene.clear();
+                    line.paint(
+                        point(px(8.), px(12.)),
+                        px(20.),
+                        TextAlign::Left,
+                        None,
+                        window,
+                        cx,
+                    )
+                    .unwrap();
+                    (
+                        window.next_frame.scene.monochrome_sprites.len(),
+                        window.next_frame.scene.subpixel_sprites.len(),
+                    )
+                };
+                let grayscale = paint(window, cx);
+                let replayed = paint(window, cx);
+                window
+                    .platform_window
+                    .as_test()
+                    .unwrap()
+                    .simulate_subpixel_rendering_support(true);
+                cx.set_text_rendering_mode(crate::TextRenderingMode::Subpixel);
+                let subpixel = paint(window, cx);
+                window
+                    .platform_window
+                    .as_test()
+                    .unwrap()
+                    .simulate_subpixel_rendering_support(false);
+                cx.set_text_rendering_mode(crate::TextRenderingMode::PlatformDefault);
+                seen.set(Some((grayscale, replayed, subpixel)));
+            }))
+        });
+        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+            .unwrap();
+        assert_eq!(counts.get(), Some(((3, 0), (3, 0), (0, 3))));
     }
 
     #[test]

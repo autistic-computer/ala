@@ -57,6 +57,7 @@ pub(crate) struct TestWindowState {
     text_input_state_changes: Vec<TextInputStateChange>,
     is_fullscreen: bool,
     scale_factor: f32,
+    subpixel_rendering_supported: bool,
     appearance: WindowAppearance,
     external_drag_files: Vec<(PathBuf, bool)>,
     start_external_drag_result: bool,
@@ -133,6 +134,7 @@ impl TestWindow {
             text_input_state_changes: Vec::new(),
             is_fullscreen: false,
             scale_factor: 2.0,
+            subpixel_rendering_supported: false,
             appearance: WindowAppearance::Light,
             external_drag_files: Vec::new(),
             start_external_drag_result: false,
@@ -239,6 +241,10 @@ impl TestWindow {
             lock.bounds.size
         };
         self.simulate_resize(size);
+    }
+
+    pub fn simulate_subpixel_rendering_support(&mut self, supported: bool) {
+        self.0.lock().subpixel_rendering_supported = supported;
     }
 
     pub fn simulate_move(&mut self, origin: Point<Pixels>, mouse_position: Point<Pixels>) {
@@ -458,7 +464,7 @@ impl PlatformWindow for TestWindow {
     }
 
     fn is_subpixel_rendering_supported(&self) -> bool {
-        false
+        self.0.lock().subpixel_rendering_supported
     }
 
     fn set_title(&mut self, title: &str) {
