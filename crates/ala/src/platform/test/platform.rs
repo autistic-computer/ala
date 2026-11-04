@@ -421,6 +421,12 @@ impl Platform for TestPlatform {
         }
     }
 
+    #[cfg(feature = "bench-support")]
+    fn run(&self, on_finish_launching: Box<dyn FnOnce()>) {
+        on_finish_launching()
+    }
+
+    #[cfg(not(feature = "bench-support"))]
     fn run(&self, _on_finish_launching: Box<dyn FnOnce()>) {
         unimplemented!()
     }
