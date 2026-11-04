@@ -8,6 +8,7 @@ use crate::{
     Pixels, Point, Radians, ScaledPixels, SharedString, Size, bounds_tree::BoundsTree, point,
 };
 use std::{
+    cell::Cell,
     fmt::Debug,
     hash::{Hash, Hasher},
     iter::Peekable,
@@ -178,6 +179,8 @@ fn larger<P: PartialOrd>(a: P, b: P) -> P {
 #[derive(Default)]
 pub struct Scene {
     pub(crate) paint_operations: Vec<PaintOperation>,
+    sprite_log: Vec<MonochromeSprite>,
+    sealed_operations: Cell<usize>,
     primitive_bounds: BoundsTree<ScaledPixels>,
     layer_stack: Vec<DrawOrder>,
     pub window_corner_mask: Option<WindowCornerMask>,
@@ -355,6 +358,8 @@ struct OpenShaderLayer {
 impl Scene {
     pub fn clear(&mut self) {
         self.paint_operations.clear();
+        self.sprite_log.clear();
+        self.sealed_operations.set(0);
         self.primitive_bounds.clear();
         self.layer_stack.clear();
         self.window_corner_mask = None;
@@ -373,7 +378,9 @@ impl Scene {
     }
 
     pub fn len(&self) -> usize {
-        self.paint_operations.len()
+        let len = self.paint_operations.len();
+        self.sealed_operations.set(len);
+        len
     }
 
     pub fn push_layer(&mut self, bounds: Bounds<ScaledPixels>) {
@@ -470,6 +477,40 @@ impl Scene {
             .push(PaintOperation::Primitive(primitive));
     }
 
+    pub(crate) fn insert_monochrome_sprite(&mut self, mut sprite: MonochromeSprite) {
+        if !self.transforms.is_empty() {
+            self.insert_primitive(sprite);
+            return;
+        }
+        if !self.target().place_monochrome_sprite(&mut sprite) {
+            return;
+        }
+        let index = self.sprite_log.len();
+        self.sprite_log.push(sprite);
+        let extendable = self.paint_operations.len() > self.sealed_operations.get();
+        match self.paint_operations.last_mut() {
+            Some(PaintOperation::MonochromeSprites(range)) if extendable && range.end == index => {
+                range.end = index + 1;
+            }
+            _ => self
+                .paint_operations
+                .push(PaintOperation::MonochromeSprites(index..index + 1)),
+        }
+    }
+
+    fn place_monochrome_sprite(&mut self, sprite: &mut MonochromeSprite) -> bool {
+        let clipped_bounds = sprite.bounds.intersect(&sprite.content_mask.bounds);
+        if clipped_bounds.is_empty() {
+            return false;
+        }
+        sprite.order = match self.layer_stack.last() {
+            Some(order) => *order,
+            None => self.primitive_bounds.insert(clipped_bounds),
+        };
+        self.monochrome_sprites.push(*sprite);
+        true
+    }
+
     fn place_primitive(&mut self, primitive: &mut Primitive) -> bool {
         let painted_bounds = match &*primitive {
             Primitive::Shadow(shadow) => shadow.painted_bounds(),
@@ -540,6 +581,11 @@ impl Scene {
         for operation in &prev_scene.paint_operations[range] {
             match operation {
                 PaintOperation::Primitive(primitive) => self.insert_primitive(primitive.clone()),
+                PaintOperation::MonochromeSprites(sprites) => {
+                    for sprite in &prev_scene.sprite_log[sprites.clone()] {
+                        self.insert_monochrome_sprite(*sprite);
+                    }
+                }
                 PaintOperation::StartLayer(bounds) => self.push_layer(*bounds),
                 PaintOperation::EndLayer => self.pop_layer(),
                 PaintOperation::StartShaderLayer(descriptor) => {
@@ -638,6 +684,7 @@ pub(crate) enum PrimitiveKind {
 
 pub(crate) enum PaintOperation {
     Primitive(Primitive),
+    MonochromeSprites(Range<usize>),
     StartLayer(Bounds<ScaledPixels>),
     EndLayer,
     StartShaderLayer(ShaderLayerDescriptor),
