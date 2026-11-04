@@ -17,6 +17,7 @@ use objc2::runtime::AnyObject;
 
 use core_foundation::base::TCFType;
 use core_video::{
+    image_buffer::TCVImageBuffer,
     metal_texture::CVMetalTextureGetTexture,
     metal_texture_cache::CVMetalTextureCache,
     pixel_buffer::{kCVPixelFormatType_32BGRA, kCVPixelFormatType_420YpCbCr8BiPlanarFullRange},
@@ -1520,7 +1521,7 @@ impl MetalRenderer {
                 y_texture = Some(
                     self.core_video_texture_cache
                         .create_texture_from_image(
-                            image_buffer.as_concrete_TypeRef(),
+                            &image_buffer.as_image_buffer(),
                             None,
                             MTLPixelFormat::R8Unorm,
                             image_buffer.get_width_of_plane(0),
@@ -1532,7 +1533,7 @@ impl MetalRenderer {
                 cb_cr_texture = Some(
                     self.core_video_texture_cache
                         .create_texture_from_image(
-                            image_buffer.as_concrete_TypeRef(),
+                            &image_buffer.as_image_buffer(),
                             None,
                             MTLPixelFormat::RG8Unorm,
                             image_buffer.get_width_of_plane(1),
@@ -1546,7 +1547,7 @@ impl MetalRenderer {
                 bgra_texture = Some(
                     self.core_video_texture_cache
                         .create_texture_from_image(
-                            image_buffer.as_concrete_TypeRef(),
+                            &image_buffer.as_image_buffer(),
                             None,
                             MTLPixelFormat::BGRA8Unorm,
                             image_buffer.get_width(),
