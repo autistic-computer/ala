@@ -5079,7 +5079,7 @@ impl Window {
                         };
                         self.paint_cached_monochrome_glyph(
                             bounds,
-                            snapped_mask.clone(),
+                            snapped_mask,
                             glyph.color.opacity(opacity),
                             tile,
                         );

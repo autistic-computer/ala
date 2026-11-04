@@ -1761,7 +1761,9 @@ mod tests {
     #[test]
     fn replayed_shader_layers_capture_the_same_primitives() {
         let mut painted = Scene::default();
+        painted.begin_replayable();
         paint(&mut painted);
+        painted.end_replayable();
         let mut replayed = Scene::default();
         replayed.replay(0..painted.len(), &painted);
         replayed.finish();
