@@ -2522,7 +2522,7 @@ impl Window {
         self.platform_window.bounds()
     }
 
-    #[cfg(any(test, feature = "test-support"))]
+    #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
     pub fn render_to_image(&self) -> anyhow::Result<image::RgbaImage> {
         self.platform_window
             .render_to_image(&self.rendered_frame.scene)
@@ -3176,6 +3176,11 @@ impl Window {
 
     pub fn capslock(&self) -> Capslock {
         self.capslock
+    }
+
+    #[cfg(feature = "bench-support")]
+    pub fn rendered_scene(&self) -> &Scene {
+        &self.rendered_frame.scene
     }
 
     #[profiling::function]
