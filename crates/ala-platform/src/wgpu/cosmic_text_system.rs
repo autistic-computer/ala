@@ -669,7 +669,9 @@ impl CosmicTextSystemState {
         self.lines_since_trim += 1;
         if self.lines_since_trim >= SHAPED_WORD_TRIM_LINES {
             self.lines_since_trim = 0;
-            self.font_system.shape_run_cache.trim(SHAPED_WORD_KEEP_TRIMS);
+            self.font_system
+                .shape_run_cache
+                .trim(SHAPED_WORD_KEEP_TRIMS);
         }
         if contains_paragraph_separator(text) {
             self.layout_line_with_separators(text, font_size, font_runs)

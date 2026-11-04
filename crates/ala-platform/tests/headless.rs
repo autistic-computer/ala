@@ -2,8 +2,8 @@
 
 use ala::{
     Entity, GlyphRasterData, GlyphRenderOptions, HeadlessAppContext, ListAlignment, ListState,
-    ShapedLine, TextAlign, TextRun, Window, blue, canvas, div, font, hsla, list, point,
-    prelude::*, px, red, size, white,
+    ShapedLine, TextAlign, TextRun, Window, blue, canvas, div, font, hsla, list, point, prelude::*,
+    px, red, size, white,
 };
 use ala_platform::{current_headless_renderer, wgpu::CosmicTextSystem};
 use std::{
@@ -123,7 +123,7 @@ fn scrolled_list_rows_replay_with_the_pixels_of_a_fresh_render() -> anyhow::Resu
             rows,
         })
     })?;
-    let mut frame = |cx: &mut HeadlessAppContext, scroll: f32, refresh: bool| {
+    let frame = |cx: &mut HeadlessAppContext, scroll: f32, refresh: bool| {
         renders.set(0);
         cx.update_window(window.into(), |root, window, cx| {
             let rows = root.downcast::<Rows>().unwrap();
@@ -151,15 +151,25 @@ fn scrolled_list_rows_replay_with_the_pixels_of_a_fresh_render() -> anyhow::Resu
         frame(&mut cx, 0., true);
         let fresh = cx.capture_screenshot(window.into())?;
         if (scroll * 2.0_f32).fract() == 0.0 {
-            assert!(renders < visible, "{renders} rows rendered scrolling {scroll}");
+            assert!(
+                renders < visible,
+                "{renders} rows rendered scrolling {scroll}"
+            );
         }
         assert_eq!(differing(&scrolled, &fresh), 0, "scrolling {scroll}");
 
         frame(&mut cx, 0., false);
         let renders = frame(&mut cx, 0., false);
         let still = cx.capture_screenshot(window.into())?;
-        assert!(renders <= 2, "{renders} rows rendered on an unchanged frame after scrolling {scroll}");
-        assert_eq!(differing(&still, &fresh), 0, "unchanged after scrolling {scroll}");
+        assert!(
+            renders <= 2,
+            "{renders} rows rendered on an unchanged frame after scrolling {scroll}"
+        );
+        assert_eq!(
+            differing(&still, &fresh),
+            0,
+            "unchanged after scrolling {scroll}"
+        );
     }
 
     let rows = cx.update_window(window.into(), |root, _, _| root.downcast::<Rows>().unwrap())?;
@@ -234,13 +244,20 @@ fn retained_layout_matches_a_fresh_window() -> anyhow::Result<()> {
     );
     let mut state = DocState {
         items: (0..9)
-            .map(|ix| (format!("item {ix} {}", "word ".repeat(ix * 2 + 1)), ix % 2 == 0))
+            .map(|ix| {
+                (
+                    format!("item {ix} {}", "word ".repeat(ix * 2 + 1)),
+                    ix % 2 == 0,
+                )
+            })
             .collect(),
         width: 200.,
         highlight: 1,
     };
     let initial = state.clone();
-    let window = cx.open_window(size(px(220.), px(400.)), move |_, cx| cx.new(|_| Doc(initial)))?;
+    let window = cx.open_window(size(px(220.), px(400.)), move |_, cx| {
+        cx.new(|_| Doc(initial))
+    })?;
     let edits: Vec<Box<dyn Fn(&mut DocState)>> = vec![
         Box::new(|_| {}),
         Box::new(|s| s.items[2].0 = "edited text that is longer than before and wraps".into()),
@@ -267,8 +284,9 @@ fn retained_layout_matches_a_fresh_window() -> anyhow::Result<()> {
         })?;
         let retained = cx.capture_screenshot(window.into())?;
         let fresh_state = state.clone();
-        let fresh_window =
-            cx.open_window(size(px(220.), px(400.)), move |_, cx| cx.new(|_| Doc(fresh_state)))?;
+        let fresh_window = cx.open_window(size(px(220.), px(400.)), move |_, cx| {
+            cx.new(|_| Doc(fresh_state))
+        })?;
         let fresh = cx.capture_screenshot(fresh_window.into())?;
         let differing = retained
             .pixels()
