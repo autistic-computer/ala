@@ -72,6 +72,7 @@ use uuid::Uuid;
 
 pub(crate) mod a11y;
 mod glyph_cache;
+pub(crate) mod glyph_runs;
 #[cfg(test)]
 mod invalidation_tests;
 mod prompts;
@@ -1095,6 +1096,7 @@ pub struct Window {
     is_minimizable: bool,
     sprite_atlas: Arc<dyn PlatformAtlas>,
     glyph_lookup_cache: RefCell<glyph_cache::GlyphLookupCache>,
+    pub(crate) glyph_runs: glyph_runs::GlyphRunCache,
     text_system: Arc<WindowTextSystem>,
     text_rendering_mode: Rc<Cell<TextRenderingMode>>,
     rem_size: Pixels,
@@ -1930,6 +1932,7 @@ impl Window {
             is_minimizable,
             sprite_atlas,
             glyph_lookup_cache: RefCell::new(glyph_cache::GlyphLookupCache::default()),
+            glyph_runs: glyph_runs::GlyphRunCache::default(),
             text_system,
             text_rendering_mode: cx.text_rendering_mode.clone(),
             rem_size: px(16.),
@@ -3206,6 +3209,7 @@ impl Window {
         self.glyph_lookup_cache
             .get_mut()
             .sync_atlas_generation(atlas_generation);
+        self.glyph_runs.begin_frame();
         self.invalidate_entities();
         cx.entities.clear_accessed();
         debug_assert!(self.rendered_entity_stack.is_empty());
@@ -4950,23 +4954,24 @@ impl Window {
         color: Hsla,
         options: GlyphRenderOptions,
     ) -> Result<()> {
+        self.paint_glyph_reported(origin, font_id, glyph_id, font_size, color, options)
+            .map(drop)
+    }
+
+    pub(crate) fn paint_glyph_reported(
+        &mut self,
+        origin: Point<Pixels>,
+        font_id: FontId,
+        glyph_id: GlyphId,
+        font_size: Pixels,
+        color: Hsla,
+        options: GlyphRenderOptions,
+    ) -> Result<Option<glyph_runs::CachedTile>> {
         self.invalidator.debug_assert_paint();
 
         let element_opacity = self.element_opacity();
         let scale_factor = self.scale_factor();
-        let glyph_origin = origin.scale(scale_factor);
-
-        let quantized_origin = Point::new(
-            round_half_toward_zero(glyph_origin.x.0 * SUBPIXEL_VARIANTS_X as f32)
-                / SUBPIXEL_VARIANTS_X as f32,
-            round_half_toward_zero(glyph_origin.y.0 * SUBPIXEL_VARIANTS_Y as f32)
-                / SUBPIXEL_VARIANTS_Y as f32,
-        );
-        let subpixel_variant = Point::new(
-            (quantized_origin.x.fract() * SUBPIXEL_VARIANTS_X as f32) as u8,
-            (quantized_origin.y.fract() * SUBPIXEL_VARIANTS_Y as f32) as u8,
-        );
-        let integer_origin = quantized_origin.map(|c| ScaledPixels(c.trunc()));
+        let (integer_origin, subpixel_variant) = quantize_glyph_origin(origin.scale(scale_factor));
         let subpixel_rendering = self.should_use_subpixel_rendering(font_id, font_size);
         let (font_smoothing, font_smoothing_strength) = match options.font_smoothing {
             crate::FontSmoothing::PlatformDefault => {
@@ -4997,28 +5002,103 @@ impl Window {
             synthetic_italic: options.synthetic_italic,
         };
 
-        if let Some((raster_bounds, tile)) = self.glyph_tile(&params)? {
-            let bounds = Bounds {
-                origin: integer_origin + raster_bounds.origin.map(Into::into),
-                size: tile.bounds.size.map(Into::into),
-            };
-            let content_mask = self.snapped_content_mask();
+        let Some((raster_bounds, tile)) = self.glyph_tile(&params)? else {
+            return Ok(
+                (!subpixel_rendering).then_some(glyph_runs::CachedTile::Empty {
+                    variant: subpixel_variant,
+                }),
+            );
+        };
+        let bounds = Bounds {
+            origin: integer_origin + raster_bounds.origin.map(Into::into),
+            size: tile.bounds.size.map(Into::into),
+        };
+        let content_mask = self.snapped_content_mask();
+        if subpixel_rendering {
+            self.paint_cached_subpixel_glyph(
+                bounds,
+                content_mask,
+                color.opacity(element_opacity),
+                tile,
+            );
+            return Ok(None);
+        }
+        self.paint_cached_monochrome_glyph(
+            bounds,
+            content_mask,
+            color.opacity(element_opacity),
+            tile,
+        );
+        Ok(Some(glyph_runs::CachedTile::Monochrome {
+            variant: subpixel_variant,
+            raster_origin: raster_bounds.origin,
+            tile,
+        }))
+    }
 
-            if subpixel_rendering {
-                self.paint_cached_subpixel_glyph(
-                    bounds,
-                    content_mask,
-                    color.opacity(element_opacity),
-                    tile,
-                );
-            } else {
-                self.paint_cached_monochrome_glyph(
-                    bounds,
-                    content_mask,
-                    color.opacity(element_opacity),
-                    tile,
-                );
+    pub(crate) fn glyph_run_generations(&self) -> (usize, u64) {
+        (
+            self.text_system().font_cache_generation(),
+            self.sprite_atlas.generation(),
+        )
+    }
+
+    pub(crate) fn paint_glyph_run(
+        &mut self,
+        origin: Point<Pixels>,
+        run: &glyph_runs::GlyphRun,
+        font_size: Pixels,
+        options: GlyphRenderOptions,
+    ) -> Result<()> {
+        let mask = self.content_mask().bounds;
+        let snapped_mask = self.snapped_content_mask();
+        let opacity = self.element_opacity();
+        let scale_factor = self.scale_factor();
+        for glyph in &run.glyphs {
+            let cull = Bounds {
+                origin: origin + glyph.cull.origin,
+                size: glyph.cull.size,
+            };
+            if !cull.intersects(&mask) {
+                continue;
             }
+            let at = origin + glyph.offset;
+            match glyph.tile {
+                glyph_runs::CachedTile::Monochrome {
+                    variant,
+                    raster_origin,
+                    tile,
+                } => {
+                    let (integer_origin, now) = quantize_glyph_origin(at.scale(scale_factor));
+                    if now == variant {
+                        let bounds = Bounds {
+                            origin: integer_origin + raster_origin.map(Into::into),
+                            size: tile.bounds.size.map(Into::into),
+                        };
+                        self.paint_cached_monochrome_glyph(
+                            bounds,
+                            snapped_mask.clone(),
+                            glyph.color.opacity(opacity),
+                            tile,
+                        );
+                        continue;
+                    }
+                }
+                glyph_runs::CachedTile::Empty { variant } => {
+                    if quantize_glyph_origin(at.scale(scale_factor)).1 == variant {
+                        continue;
+                    }
+                }
+                glyph_runs::CachedTile::Unknown => {}
+            }
+            self.paint_glyph_with_options(
+                at,
+                glyph.font_id,
+                glyph.id,
+                font_size,
+                glyph.color,
+                options,
+            )?;
         }
         Ok(())
     }
@@ -5077,6 +5157,20 @@ impl Window {
         color: Hsla,
         tile: AtlasTile,
     ) {
+        if self.text_fade.is_none() {
+            self.next_frame
+                .scene
+                .insert_monochrome_sprite(MonochromeSprite {
+                    order: 0,
+                    pad: 0,
+                    bounds,
+                    content_mask,
+                    color,
+                    tile,
+                    transformation: TransformationMatrix::unit(),
+                });
+            return;
+        }
         self.insert_glyph_sprite(bounds, content_mask, |content_mask, opacity| {
             MonochromeSprite {
                 order: 0,
@@ -10949,4 +11043,18 @@ mod inspector_tests {
         })
         .expect("closed inspector has no bookkeeping and no style overrides");
     }
+}
+
+fn quantize_glyph_origin(origin: Point<ScaledPixels>) -> (Point<ScaledPixels>, Point<u8>) {
+    let quantized = Point::new(
+        round_half_toward_zero(origin.x.0 * SUBPIXEL_VARIANTS_X as f32)
+            / SUBPIXEL_VARIANTS_X as f32,
+        round_half_toward_zero(origin.y.0 * SUBPIXEL_VARIANTS_Y as f32)
+            / SUBPIXEL_VARIANTS_Y as f32,
+    );
+    let variant = Point::new(
+        (quantized.x.fract() * SUBPIXEL_VARIANTS_X as f32) as u8,
+        (quantized.y.fract() * SUBPIXEL_VARIANTS_Y as f32) as u8,
+    );
+    (quantized.map(|c| ScaledPixels(c.trunc())), variant)
 }

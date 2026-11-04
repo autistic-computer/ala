@@ -1,4 +1,5 @@
 use crate::util::round_half_toward_zero;
+use crate::window::glyph_runs::{CachedGlyph, CachedTile, GlyphRun, GlyphRunKey};
 use crate::{
     App, AtlasTile, Bounds, GlyphRenderOptions, Half, Hsla, LineLayout, Pixels, Point,
     RenderGlyphParams, Result, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels,
@@ -767,6 +768,32 @@ fn paint_line(
         wrap_boundaries,
     );
     window.paint_layer(line_bounds, |window| {
+        let run_key = (window.text_fade.is_none()
+            && decoration_runs
+                .iter()
+                .all(|run| run.underline.is_none() && run.strikethrough.is_none()))
+        .then(|| {
+            GlyphRunKey::new(
+                layout,
+                line_height,
+                align,
+                align_width,
+                decoration_runs.iter().map(|run| (run.len, run.color)),
+                wrap_boundaries,
+                glyph_options,
+                window.scale_factor(),
+            )
+        });
+        if let Some(key) = run_key
+            && let Some(run) = window.glyph_runs.take(&key)
+            && run.matches(layout, window.glyph_run_generations())
+        {
+            window.paint_glyph_run(origin, &run, layout.font_size, glyph_options)?;
+            window.glyph_runs.put(key, run);
+            return Ok(());
+        }
+        let mut recorded: Option<Vec<CachedGlyph>> = run_key
+            .map(|_| Vec::with_capacity(layout.runs.iter().map(|run| run.glyphs.len()).sum()));
         let padding_top = (line_height - layout.ascent - layout.descent) / 2.;
         let baseline_offset = point(px(0.), padding_top + layout.ascent);
         let underline_y_offset = underline_y_offset(line_height, layout.ascent, layout.descent);
@@ -950,25 +977,41 @@ fn paint_line(
                 };
 
                 let content_mask = window.content_mask();
-                if max_glyph_bounds.intersects(&content_mask.bounds) {
-                    let vertical_offset = point(px(0.0), glyph.position.y);
-                    if glyph.is_emoji {
-                        window.paint_emoji(
-                            glyph_origin + baseline_offset + vertical_offset,
-                            run.font_id,
-                            glyph.id,
-                            layout.font_size,
-                        )?;
-                    } else {
-                        window.paint_glyph_with_options(
-                            glyph_origin + baseline_offset + vertical_offset,
-                            run.font_id,
-                            glyph.id,
-                            layout.font_size,
-                            color,
-                            glyph_options,
-                        )?;
+                let vertical_offset = point(px(0.0), glyph.position.y);
+                let glyph_at = glyph_origin + baseline_offset + vertical_offset;
+                let visible = max_glyph_bounds.intersects(&content_mask.bounds);
+                let tile = if glyph.is_emoji {
+                    if visible {
+                        window.paint_emoji(glyph_at, run.font_id, glyph.id, layout.font_size)?;
                     }
+                    None
+                } else if visible {
+                    window.paint_glyph_reported(
+                        glyph_at,
+                        run.font_id,
+                        glyph.id,
+                        layout.font_size,
+                        color,
+                        glyph_options,
+                    )?
+                } else {
+                    Some(CachedTile::Unknown)
+                };
+                match (tile, recorded.as_mut()) {
+                    (Some(tile), Some(glyphs)) => glyphs.push(CachedGlyph {
+                        id: glyph.id,
+                        font_id: run.font_id,
+                        position: point(glyph.position.x.0.to_bits(), glyph.position.y.0.to_bits()),
+                        offset: glyph_at - origin,
+                        cull: Bounds {
+                            origin: glyph_origin - origin,
+                            size: max_glyph_size,
+                        },
+                        color,
+                        tile,
+                    }),
+                    (None, Some(_)) => recorded = None,
+                    _ => {}
                 }
             }
         }
@@ -1003,6 +1046,18 @@ fn paint_line(
                 strikethrough_start,
                 last_line_end_x - strikethrough_start.x,
                 &strikethrough_style,
+            );
+        }
+
+        if let (Some(key), Some(glyphs)) = (run_key, recorded) {
+            let (font_generation, atlas_generation) = window.glyph_run_generations();
+            window.glyph_runs.put(
+                key,
+                GlyphRun {
+                    font_generation,
+                    atlas_generation,
+                    glyphs,
+                },
             );
         }
 
