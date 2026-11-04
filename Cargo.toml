@@ -8,10 +8,10 @@ edition = "2024"
 rust-version = "1.99"
 
 [workspace.dependencies]
-accesskit = { version = "0.24.0", features = ["enumn"] }
-accesskit_macos = "0.26.0"
-accesskit_unix = "0.22"
-accesskit_windows = "0.34"
+accesskit = { version = "0.25.2", features = ["enumn"] }
+accesskit_macos = "0.27.2"
+accesskit_unix = "0.24.1"
+accesskit_windows = "0.35.2"
 anyhow = "1.0.86"
 ashpd = { version = "0.13", default-features = false, features = [
     "async-io",
@@ -70,7 +70,7 @@ itertools = "0.14.0"
 js-sys = "0.3"
 libc = "0.2.189"
 log = "0.4.34"
-mach2 = "0.5"
+mach2 = "0.7"
 metal = "0.33"
 notify-rust = "4"
 objc = "0.2"
@@ -126,7 +126,7 @@ wgpu = "=30.0.1"
 which = "8"
 windows = "=0.62.2"
 windows-core = "0.62"
-windows-registry = "0.6.0"
+windows-registry = "0.100.0"
 ala = { path = "crates/ala", default-features = false }
 ala-macros = { path = "crates/ala-macros" }
 ala-platform = { path = "crates/ala-platform", default-features = false }
