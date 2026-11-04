@@ -313,7 +313,7 @@ where
 mod tests {
     use super::{BoundsTree, CELL_SIZE, MAX_CELLS_PER_AXIS};
     use crate::{Bounds, Point, Size};
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt, SeedableRng};
 
     #[test]
     fn test_insert() {

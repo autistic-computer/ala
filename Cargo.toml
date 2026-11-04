@@ -28,7 +28,7 @@ backtrace = "0.3"
 bitflags = "2.6.0"
 block2 = "0.6.2"
 bytes = "1.0"
-cbindgen = { version = "0.28.0", default-features = false }
+cbindgen = { version = "0.29.4", default-features = false }
 chrono = { version = "0.4.45", default-features = false }
 cocoa = "=0.26.1"
 console_error_panic_hook = "0.1.7"
@@ -37,7 +37,7 @@ core-foundation-sys = "0.8.6"
 core-graphics = "0.24"
 core-text = "21"
 core-video = "=0.6.1"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8.2", features = ["html_reports"] }
 ctor = "1.0.12"
 derive_more = { version = "2.1.1", features = [
     "add",
@@ -53,7 +53,7 @@ derive_more = { version = "2.1.1", features = [
 ] }
 dunce = "1.0"
 env_logger = "0.11.11"
-etagere = "0.2"
+etagere = "0.3.0"
 flume = "0.12"
 foreign-types = "0.5"
 futures = "0.3.34"
@@ -66,7 +66,7 @@ http-body = "1.0"
 image = { version = "=0.25.10", default-features = false }
 indexmap = { version = "2.7.0", features = ["serde"] }
 inventory = "0.3.19"
-itertools = "0.14.0"
+itertools = "0.15.0"
 js-sys = "0.3"
 libc = "0.2.189"
 log = "0.4.34"
@@ -87,11 +87,11 @@ proc-macro2 = "1.0.93"
 profiling = "1"
 proptest = { git = "https://github.com/proptest-rs/proptest", rev = "3dca198a8fef1b32e3a66f1e1897c955b4dc5b5b", features = ["attr-macro"] }
 quote = "1.0.9"
-rand = "0.9"
+rand = "0.10.3"
 raw-window-handle = "0.6.2"
 rayon = "1.8"
 regex = "1.13.1"
-resvg = { version = "0.48.1", default-features = false, features = [
+resvg = { version = "0.49.0", default-features = false, features = [
     "svgz",
     "text",
     "system-fonts",
@@ -110,14 +110,14 @@ smol = "=2.0.2"
 stacksafe = "1.0"
 strum = { version = "0.28", features = ["derive"] }
 swash = "0.2.6"
-syn = { version = "2.0.101", features = ["full", "extra-traits", "visit-mut"] }
+syn = { version = "3.0.9", features = ["full", "extra-traits", "visit-mut"] }
 thiserror = "2.0.20"
 unicode-bidi = { version = "0.3.18", default-features = false, features = [
     "hardcoded-data",
 ] }
 unicode-segmentation = "1.10"
 url = "=2.5.8"
-usvg = { version = "0.48.1", default-features = false }
+usvg = { version = "0.49.0", default-features = false }
 uuid = { version = "1.1.2", features = ["v4", "v5", "v7", "serde"] }
 wasm-bindgen = "0.2.130"
 wasm-bindgen-futures = "0.4"

@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, TryLockError, atomic::AtomicUsize},
 };
 
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use crate::Priority;
 

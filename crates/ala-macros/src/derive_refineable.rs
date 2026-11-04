@@ -69,6 +69,7 @@ pub(crate) fn derive_refineable(input: TokenStream) -> TokenStream {
         .iter()
         .map(|ty| {
             WherePredicate::Type(PredicateType {
+                attrs: Vec::new(),
                 lifetimes: None,
                 bounded_ty: ty.clone(),
                 colon_token: Default::default(),
@@ -76,8 +77,9 @@ pub(crate) fn derive_refineable(input: TokenStream) -> TokenStream {
                     let mut punctuated = syn::punctuated::Punctuated::new();
                     punctuated.push_value(TypeParamBound::Trait(TraitBound {
                         paren_token: None,
-                        modifier: syn::TraitBoundModifier::None,
                         lifetimes: None,
+                        modifiers: syn::TraitBoundModifiers::default(),
+                        maybe: None,
                         path: parse_quote!(Clone),
                     }));
 

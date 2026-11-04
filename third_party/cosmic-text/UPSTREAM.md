@@ -28,6 +28,12 @@ identical shaped output and no consistent CPU penalty in 15 alternating pairs.
 Ordinary one-face text saved only 704 bytes. See the RAM follow-up in
 `knowledge/research/2026-10-16-linux-performance.md` for workloads and limits.
 
+The manifest follows upstream's later dependency updates (commits `59089955`,
+`02fb7cf9` and `8195b116`): fontdb 0.24, harfrust 0.12, skrifa 0.44 and swash
+0.2.10, with harfrust's `shape` taking the cached plan through `ShapeOptions`.
+skrifa stays at 0.44 because swash accepts no newer one, and harfrust at 0.12
+because it shares read-fonts 0.41 with that skrifa and with usvg.
+
 The shaped-run cache key also carries the span direction, so a word shaped in a
 right-to-left span (mirrored brackets) is not reused in a left-to-right one.
 

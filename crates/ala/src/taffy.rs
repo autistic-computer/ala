@@ -370,6 +370,23 @@ impl TaffyLayoutEngine {
             transform(available_space.height),
         );
 
+        let out_of_flow_root_style = match (available_space.width, available_space.height) {
+            (AvailableSpace::Definite(_), AvailableSpace::Definite(_)) => {
+                let style = self.taffy.style(id.0).expect(EXPECT_MESSAGE);
+                (style.position == taffy::style::Position::Absolute).then(|| style.clone())
+            }
+            _ => None,
+        };
+        if let Some(style) = &out_of_flow_root_style {
+            let in_flow_style = taffy::style::Style {
+                position: taffy::style::Position::Relative,
+                ..style.clone()
+            };
+            self.taffy
+                .set_style(id.0, in_flow_style)
+                .expect(EXPECT_MESSAGE);
+        }
+
         self.taffy
             .compute_layout_with_measure(
                 id.into(),
@@ -414,6 +431,10 @@ impl TaffyLayoutEngine {
                 },
             )
             .expect(EXPECT_MESSAGE);
+
+        if let Some(style) = out_of_flow_root_style {
+            self.taffy.set_style(id.0, style).expect(EXPECT_MESSAGE);
+        }
     }
 
     pub fn layout_bounds(&mut self, id: LayoutId, scale_factor: f32) -> Bounds<Pixels> {
@@ -436,7 +457,7 @@ impl TaffyLayoutEngine {
                     .expect("parent absolute outer origin should be cached");
                 parent_origin + Point::from(layout_location)
             }
-            None => Point::from(layout_location),
+            None => Point::default(),
         };
         self.absolute_outer_origins
             .insert(id, absolute_outer_origin);
@@ -560,10 +581,16 @@ impl ToTaffy<taffy::style::Style> for Style {
             margin: self.margin.to_taffy(rem_size, scale_factor),
             padding: self.padding.to_taffy(rem_size, scale_factor),
             border: border_widths_to_taffy(&self.border_widths, rem_size, scale_factor),
-            align_items: self.align_items.map(|x| x.into()),
+            align_items: self
+                .align_items
+                .map_or(taffy::style::AlignItems::NORMAL, |x| x.into()),
             align_self: self.align_self.map(|x| x.into()),
-            align_content: self.align_content.map(|x| x.into()),
-            justify_content: self.justify_content.map(|x| x.into()),
+            align_content: self
+                .align_content
+                .map_or(taffy::style::AlignContent::NORMAL, |x| x.into()),
+            justify_content: self
+                .justify_content
+                .map_or(taffy::style::JustifyContent::NORMAL, |x| x.into()),
             gap: self.gap.to_taffy(rem_size, scale_factor),
             flex_direction: self.flex_direction.into(),
             flex_wrap: self.flex_wrap.into(),
@@ -827,6 +854,50 @@ mod tests {
         assert_eq!(
             taffy_border.left,
             taffy::style::LengthPercentage::length(2.0)
+        );
+    }
+
+    #[crate::test]
+    fn root_layout_ignores_its_own_margin_and_position(cx: &mut crate::TestAppContext) {
+        use crate::{
+            Bounds, IntoElement as _, ParentElement as _, Styled as _, canvas, div, point, px, size,
+        };
+        use std::{cell::Cell, rc::Rc};
+
+        let cx = cx.add_empty_window();
+        let roots: [fn() -> crate::Div; 4] = [
+            || div().m(px(3.)).size(px(20.)),
+            || div().m(px(3.)).w_full(),
+            || div().absolute().left(px(5.)).top(px(7.)).right(px(5.)),
+            || div().absolute().inset_0().p(px(2.)),
+        ];
+        let mut laid_out = Vec::new();
+        for root in roots {
+            let bounds = Rc::new(Cell::new(Bounds::default()));
+            let sink = bounds.clone();
+            cx.draw(
+                point(px(0.), px(0.)),
+                size(px(100.), px(50.)),
+                move |_, _| {
+                    root()
+                        .child(
+                            canvas(move |bounds, _, _| sink.set(bounds), |_, _, _, _| {})
+                                .w_full()
+                                .h(px(10.)),
+                        )
+                        .into_any_element()
+                },
+            );
+            laid_out.push(bounds.get());
+        }
+        assert_eq!(
+            laid_out,
+            [
+                Bounds::new(point(px(0.), px(0.)), size(px(20.), px(10.))),
+                Bounds::new(point(px(0.), px(0.)), size(px(100.), px(10.))),
+                Bounds::new(point(px(0.), px(0.)), size(px(100.), px(10.))),
+                Bounds::new(point(px(2.), px(2.)), size(px(96.), px(10.))),
+            ]
         );
     }
 }

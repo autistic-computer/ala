@@ -43,7 +43,7 @@ pub struct Quote {
 
 impl Quote {
     pub fn random() -> Self {
-        use rand::Rng;
+        use rand::RngExt;
         let mut rng = rand::rng();
         let prev_close = rng.random_range(100.0..200.0);
         let change = rng.random_range(-5.0..5.0);
