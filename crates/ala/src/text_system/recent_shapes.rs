@@ -9,6 +9,8 @@ use std::{
 
 const GLYPHS_PER_GENERATION: usize = 16 * 1024;
 const BYTES_PER_GENERATION: usize = 1024 * 1024;
+const WORD_GLYPHS_PER_GENERATION: usize = 128 * 1024;
+const WORD_BYTES_PER_GENERATION: usize = 8 * 1024 * 1024;
 
 struct RecentShape {
     text: Box<str>,
@@ -17,16 +19,39 @@ struct RecentShape {
     layout: LineLayout,
 }
 
-#[derive(Default)]
 pub(super) struct RecentShapes {
     current: FxHashMap<u64, SmallVec<[RecentShape; 1]>>,
     current_glyphs: usize,
     current_bytes: usize,
     old: FxHashMap<u64, SmallVec<[RecentShape; 1]>>,
     font_generation: usize,
+    glyph_budget: usize,
+    byte_budget: usize,
+}
+
+impl Default for RecentShapes {
+    fn default() -> Self {
+        Self::with_budget(GLYPHS_PER_GENERATION, BYTES_PER_GENERATION)
+    }
 }
 
 impl RecentShapes {
+    pub(super) fn words() -> Self {
+        Self::with_budget(WORD_GLYPHS_PER_GENERATION, WORD_BYTES_PER_GENERATION)
+    }
+
+    fn with_budget(glyph_budget: usize, byte_budget: usize) -> Self {
+        Self {
+            current: FxHashMap::default(),
+            current_glyphs: 0,
+            current_bytes: 0,
+            old: FxHashMap::default(),
+            font_generation: 0,
+            glyph_budget,
+            byte_budget,
+        }
+    }
+
     pub(super) fn hash(text: &str, font_size: Pixels, runs: &[FontRun]) -> u64 {
         let mut hasher = FxHasher::default();
         text.hash(&mut hasher);
@@ -43,10 +68,22 @@ impl RecentShapes {
         font_size: Pixels,
         runs: &[FontRun],
     ) -> Option<LineLayout> {
+        self.find(font_generation, hash, text, font_size, runs)
+            .map(copy_layout)
+    }
+
+    pub(super) fn find(
+        &mut self,
+        font_generation: usize,
+        hash: u64,
+        text: &str,
+        font_size: Pixels,
+        runs: &[FontRun],
+    ) -> Option<&LineLayout> {
         if font_generation != self.font_generation {
             *self = Self {
                 font_generation,
-                ..Self::default()
+                ..Self::with_budget(self.glyph_budget, self.byte_budget)
             };
             return None;
         }
@@ -55,22 +92,24 @@ impl RecentShapes {
                 && shape.font_size.0.to_bits() == font_size.0.to_bits()
                 && shape.runs.as_slice() == runs
         };
-        if let Some(shape) = self
+        let in_current = self
             .current
             .get(&hash)
-            .and_then(|shapes| shapes.iter().find(|shape| matches(shape)))
-        {
-            return Some(copy_layout(&shape.layout));
+            .is_some_and(|shapes| shapes.iter().any(matches));
+        if !in_current {
+            let shapes = self.old.get_mut(&hash)?;
+            let ix = shapes.iter().position(matches)?;
+            let shape = shapes.swap_remove(ix);
+            if shapes.is_empty() {
+                self.old.remove(&hash);
+            }
+            self.push(hash, shape);
         }
-        let shapes = self.old.get_mut(&hash)?;
-        let ix = shapes.iter().position(matches)?;
-        let shape = shapes.swap_remove(ix);
-        if shapes.is_empty() {
-            self.old.remove(&hash);
-        }
-        let layout = copy_layout(&shape.layout);
-        self.push(hash, shape);
-        Some(layout)
+        self.current
+            .get(&hash)?
+            .iter()
+            .find(|shape| matches(shape))
+            .map(|shape| &shape.layout)
     }
 
     pub(super) fn insert(
@@ -86,7 +125,7 @@ impl RecentShapes {
             return;
         }
         let (glyphs, bytes) = shape_weight(text.len(), runs.len(), layout);
-        if glyphs > GLYPHS_PER_GENERATION || bytes > BYTES_PER_GENERATION {
+        if glyphs > self.glyph_budget || bytes > self.byte_budget {
             return;
         }
         self.push(
@@ -102,8 +141,8 @@ impl RecentShapes {
 
     fn push(&mut self, hash: u64, shape: RecentShape) {
         let (glyphs, bytes) = shape_weight(shape.text.len(), shape.runs.len(), &shape.layout);
-        if self.current_glyphs + glyphs > GLYPHS_PER_GENERATION
-            || self.current_bytes + bytes > BYTES_PER_GENERATION
+        if self.current_glyphs + glyphs > self.glyph_budget
+            || self.current_bytes + bytes > self.byte_budget
         {
             self.old = mem::take(&mut self.current);
             self.current_glyphs = 0;

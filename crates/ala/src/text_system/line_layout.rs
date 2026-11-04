@@ -421,6 +421,7 @@ pub(crate) struct LineLayoutCache {
     font_generation: Arc<AtomicUsize>,
     cached_font_generation: AtomicUsize,
     recent_shapes: Mutex<RecentShapes>,
+    word_shapes: Mutex<RecentShapes>,
 }
 
 #[derive(Default)]
@@ -458,6 +459,7 @@ impl LineLayoutCache {
             font_generation,
             cached_font_generation: AtomicUsize::new(cached_font_generation),
             recent_shapes: Mutex::default(),
+            word_shapes: Mutex::new(RecentShapes::words()),
         }
     }
 
@@ -830,6 +832,9 @@ impl LineLayoutCache {
         runs: &[FontRun],
         font_generation: usize,
     ) -> LineLayout {
+        if shapes_by_word(text) {
+            return self.shape_words(text, font_size, runs, font_generation);
+        }
         let hash = RecentShapes::hash(text, font_size, runs);
         if let Some(layout) =
             self.recent_shapes
@@ -843,6 +848,46 @@ impl LineLayoutCache {
             self.recent_shapes
                 .lock()
                 .insert(font_generation, hash, text, font_size, runs, &layout);
+        }
+        layout
+    }
+
+    fn shape_words(
+        &self,
+        text: &str,
+        font_size: Pixels,
+        runs: &[FontRun],
+        font_generation: usize,
+    ) -> LineLayout {
+        let mut layout = LineLayout {
+            font_size,
+            len: text.len(),
+            ..LineLayout::default()
+        };
+        for range in word_ranges(text) {
+            let word = &text[range.clone()];
+            let word_runs = clip_runs(runs, range.clone());
+            let hash = RecentShapes::hash(word, font_size, &word_runs);
+            let mut words = self.word_shapes.lock();
+            if let Some(shape) = words.find(font_generation, hash, word, font_size, &word_runs) {
+                append_word(&mut layout, shape, range.start);
+                continue;
+            }
+            drop(words);
+            let shape = self
+                .platform_text_system
+                .layout_line(word, font_size, &word_runs);
+            append_word(&mut layout, &shape, range.start);
+            if self.font_generation.load(Ordering::Acquire) == font_generation {
+                self.word_shapes.lock().insert(
+                    font_generation,
+                    hash,
+                    word,
+                    font_size,
+                    &word_runs,
+                    &shape,
+                );
+            }
         }
         layout
     }
@@ -861,10 +906,89 @@ impl LineLayoutCache {
         *current_frame = FrameCache::default();
         *self.previous_frame.lock() = FrameCache::default();
         *self.recent_shapes.lock() = RecentShapes::default();
+        *self.word_shapes.lock() = RecentShapes::words();
         self.cached_font_generation
             .store(font_generation, Ordering::Release);
         font_generation
     }
+}
+
+fn shapes_by_word(text: &str) -> bool {
+    !text.is_empty()
+        && text.chars().all(|c| {
+            matches!(
+                c as u32,
+                0x20..=0x7E
+                    | 0xA0..=0x058F
+                    | 0x1D00..=0x1FFF
+                    | 0x2010..=0x2027
+                    | 0x2030..=0x205E
+                    | 0x2070..=0x2BFF
+            )
+        })
+}
+
+fn word_ranges(text: &str) -> impl Iterator<Item = Range<usize>> + '_ {
+    let bytes = text.as_bytes();
+    let mut start = 0;
+    std::iter::from_fn(move || {
+        if start >= bytes.len() {
+            return None;
+        }
+        let mut end = start;
+        while end < bytes.len() && bytes[end] != b' ' {
+            end += 1;
+        }
+        while end < bytes.len() && bytes[end] == b' ' {
+            end += 1;
+        }
+        let range = start..end;
+        start = end;
+        Some(range)
+    })
+}
+
+fn clip_runs(runs: &[FontRun], range: Range<usize>) -> SmallVec<[FontRun; 2]> {
+    let mut clipped = SmallVec::new();
+    let mut offset = 0;
+    for run in runs {
+        let run_range = offset..offset + run.len;
+        offset = run_range.end;
+        let start = run_range.start.max(range.start);
+        let end = run_range.end.min(range.end);
+        if start < end {
+            clipped.push(FontRun {
+                len: end - start,
+                font_id: run.font_id,
+            });
+        }
+        if offset >= range.end {
+            break;
+        }
+    }
+    clipped
+}
+
+fn append_word(layout: &mut LineLayout, word: &LineLayout, byte_offset: usize) {
+    let x = layout.width;
+    for run in &word.runs {
+        let glyphs = run.glyphs.iter().map(|glyph| ShapedGlyph {
+            id: glyph.id,
+            position: point(glyph.position.x + x, glyph.position.y),
+            index: glyph.index + byte_offset,
+            is_emoji: glyph.is_emoji,
+        });
+        match layout.runs.last_mut() {
+            Some(last) if last.font_id == run.font_id => last.glyphs.extend(glyphs),
+            _ => layout.runs.push(ShapedRun {
+                font_id: run.font_id,
+                glyphs: glyphs.collect(),
+            }),
+        }
+    }
+    layout.width += word.width;
+    layout.ascent = layout.ascent.max(word.ascent);
+    layout.descent = layout.descent.max(word.descent);
 }
 
 fn apply_force_width_to_layout(layout: &mut LineLayout, force_width: Pixels) {
