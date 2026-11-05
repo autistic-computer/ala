@@ -377,14 +377,31 @@ impl A11yNodeBuilder {
     }
 
     #[must_use]
-    fn can_push(&mut self, id: NodeId) -> bool {
+    fn can_push(&mut self, id: NodeId, node: &accesskit::Node) -> bool {
         debug_assert!(!self.ids_stack.is_empty(), "node pushed before push_root");
 
         if !self.seen_ids.insert(id) {
-            debug_assert!(
-                false,
-                "Duplicate a11y node id: {id:?}. In a release build, this node would be silently discarded from the a11y tree."
-            );
+            #[cfg(debug_assertions)]
+            {
+                let first = self.node_info.get(&id).map_or_else(String::new, |info| {
+                    format!(
+                        ", first pushed by {} {} at {}",
+                        info.view.unwrap_or("?"),
+                        info.element_id.as_deref().unwrap_or("?"),
+                        info.source_location
+                            .map_or_else(|| "?".to_owned(), ToString::to_string)
+                    )
+                });
+                debug_assert!(
+                    false,
+                    "Duplicate a11y node id: {id:?} ({:?} {:?} {:?}){first}. In a release build, this node would be silently discarded from the a11y tree.",
+                    node.role(),
+                    node.author_id(),
+                    node.label()
+                );
+            }
+            #[cfg(not(debug_assertions))]
+            let _ = node;
             return false;
         }
 
@@ -392,7 +409,7 @@ impl A11yNodeBuilder {
     }
 
     pub(crate) fn push(&mut self, id: NodeId, node: accesskit::Node) -> bool {
-        if !self.can_push(id) {
+        if !self.can_push(id, &node) {
             return false;
         }
 
@@ -405,7 +422,7 @@ impl A11yNodeBuilder {
     }
 
     pub(crate) fn push_leaf(&mut self, id: NodeId, node: accesskit::Node) -> bool {
-        if !self.can_push(id) {
+        if !self.can_push(id, &node) {
             return false;
         }
 
