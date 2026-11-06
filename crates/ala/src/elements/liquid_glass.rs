@@ -204,6 +204,7 @@ pub struct LiquidGlassFrame {
     shape: GlassShape,
     material: GlassMaterial,
     shadows: Vec<BoxShadow>,
+    corner_smoothing: Option<f32>,
     presence: f32,
     grouped: bool,
 }
@@ -417,6 +418,12 @@ impl Element for LiquidGlass {
                 bottom_left: radii.bottom_left * scale,
             },
         };
+        let (corner_radii, corner_smoothing) =
+            window.drawn_corners(shape.corner_radii, shape.bounds.size, self.corner_smoothing);
+        let shape = GlassShape {
+            corner_radii,
+            ..shape
+        };
 
         let shadows: Vec<BoxShadow> = self
             .shadows
@@ -433,7 +440,7 @@ impl Element for LiquidGlass {
                     press,
                     touch,
                     shadows: shadows.clone(),
-                    corner_smoothing: self.corner_smoothing,
+                    corner_smoothing,
                 });
                 true
             });
@@ -444,6 +451,7 @@ impl Element for LiquidGlass {
             shape,
             material,
             shadows,
+            corner_smoothing,
             presence,
             grouped,
         }
@@ -464,7 +472,7 @@ impl Element for LiquidGlass {
             window.paint_glass_with_shadows(
                 frame.shape,
                 &frame.material,
-                self.corner_smoothing,
+                frame.corner_smoothing,
                 &frame.shadows,
             );
         }
