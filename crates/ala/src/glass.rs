@@ -733,6 +733,7 @@ impl Glass {
                 ],
             ];
         }
+        let lit = if material.bezel > px(0.) { 1. } else { 0. };
         let bezel = material.bezel.as_f32().max(0.5);
         let refraction = material.refraction.as_f32();
         let tint = material.tint.to_rgb();
@@ -768,7 +769,7 @@ impl Glass {
             light: [
                 cos,
                 sin,
-                material.specular.max(0.),
+                lit * material.specular.max(0.),
                 material.glint_width.as_f32().max(0.),
             ],
             tone: [
@@ -778,7 +779,7 @@ impl Glass {
                 material.noise.max(0.),
             ],
             rim: [
-                material.fresnel.max(0.),
+                lit * material.fresnel.max(0.),
                 material.edge_shadow.clamp(0., 1.) * edge.a.clamp(0., 1.),
                 material.edge_width.as_f32().max(0.),
                 material.opacity.clamp(0., 1.),
