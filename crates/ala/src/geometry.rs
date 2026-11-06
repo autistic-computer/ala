@@ -1268,7 +1268,9 @@ impl Corners<Pixels> {
         let shorter_side = cmp::min(size.width, size.height);
         let corner = shorter_side * share.clamp(0.0, 0.5);
         self.map(|radius| {
-            if *radius > Pixels::ZERO {
+            if *radius >= FULL_CORNER_RADIUS {
+                shorter_side / 2.
+            } else if *radius > Pixels::ZERO {
                 corner
             } else {
                 Pixels::ZERO
@@ -2622,6 +2624,8 @@ mod tests {
         );
         let pill = Corners::all(px(1.0)).share_of_quad_size(size(px(120.0), px(32.0)), 0.9);
         assert_eq!(pill.top_left, px(16.0));
+        let full = Corners::all(FULL_CORNER_RADIUS).share_of_quad_size(size(px(120.0), px(32.0)), 0.3);
+        assert_eq!(full.top_left, px(16.0));
     }
 
     #[test]
