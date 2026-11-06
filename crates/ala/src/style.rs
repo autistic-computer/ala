@@ -223,6 +223,8 @@ pub struct Style {
     #[doc = "Override the window's corner smoothing for this element's fill, border and shadows."]
     pub corner_smoothing: Option<f32>,
 
+    pub corner_share: Option<f32>,
+
     pub box_shadow: Vec<BoxShadow>,
 
     pub glass: Option<GlassMaterial>,
@@ -560,7 +562,11 @@ impl Style {
         if self.overflow.x == Overflow::Visible || self.overflow.y == Overflow::Visible {
             return Some(mask.into());
         }
-        let radii = self.resolved_corner_radii(bounds, window);
+        let (radii, corner_smoothing) = window.drawn_corners(
+            self.resolved_corner_radii(bounds, window),
+            bounds.size,
+            self.corner_smoothing,
+        );
         let border = if self
             .border_color
             .is_some_and(|color| !color.is_transparent())
@@ -576,9 +582,7 @@ impl Style {
             bottom_right: inner(radii.bottom_right, border.bottom, border.right),
             bottom_left: inner(radii.bottom_left, border.bottom, border.left),
         };
-        let corner_smoothing = self
-            .corner_smoothing
-            .unwrap_or(window.default_corner_smoothing());
+        let corner_smoothing = corner_smoothing.unwrap_or(window.default_corner_smoothing());
         Some(ClipMask::rounded(
             mask.bounds,
             corner_radii,
@@ -588,6 +592,9 @@ impl Style {
 
     fn resolved_corner_radii(&self, bounds: Bounds<Pixels>, window: &Window) -> Corners<Pixels> {
         let requested_radii = self.corner_radii.to_pixels(window.rem_size());
+        if let Some(share) = self.corner_share {
+            return requested_radii.share_of_quad_size(bounds.size, share);
+        }
         match self.corner_radius_mode {
             CornerRadiusMode::Inherit => window.resolve_corner_radii(requested_radii, bounds.size),
             CornerRadiusMode::Fixed => requested_radii.clamp_radii_for_quad_size(bounds.size),
@@ -612,7 +619,11 @@ impl Style {
         }
 
         let rem_size = window.rem_size();
-        let corner_radii = self.resolved_corner_radii(bounds, window);
+        let (corner_radii, corner_smoothing) = window.drawn_corners(
+            self.resolved_corner_radii(bounds, window),
+            bounds.size,
+            self.corner_smoothing,
+        );
 
         if let Some(material) = &self.glass {
             window.paint_glass_with_shadows(
@@ -621,7 +632,7 @@ impl Style {
                     corner_radii,
                 },
                 material,
-                self.corner_smoothing,
+                corner_smoothing,
                 &self.box_shadow,
             );
         } else {
@@ -629,7 +640,7 @@ impl Style {
                 bounds,
                 corner_radii,
                 &self.box_shadow,
-                self.corner_smoothing,
+                corner_smoothing,
                 self.background
                     .as_ref()
                     .and_then(Fill::color)
@@ -662,7 +673,7 @@ impl Style {
                 border_color,
                 self.border_style,
             );
-            background_quad.corner_smoothing = self.corner_smoothing;
+            background_quad.corner_smoothing = corner_smoothing;
             window.paint_quad(background_quad);
         }
 
@@ -670,7 +681,7 @@ impl Style {
             bounds,
             corner_radii,
             &self.box_shadow,
-            self.corner_smoothing,
+            corner_smoothing,
         );
 
         if let Some(mark) = self.edge_mark {
@@ -696,7 +707,7 @@ impl Style {
                 self.border_color.unwrap_or_default(),
                 self.border_style,
             );
-            border_quad.corner_smoothing = self.corner_smoothing;
+            border_quad.corner_smoothing = corner_smoothing;
             window.paint_quad(border_quad);
         }
 
@@ -750,6 +761,7 @@ impl Default for Style {
             corner_radii: Corners::default(),
             corner_radius_mode: CornerRadiusMode::default(),
             corner_smoothing: None,
+            corner_share: None,
             box_shadow: Default::default(),
             glass: None,
             edge_mark: None,

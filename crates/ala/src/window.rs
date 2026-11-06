@@ -1168,6 +1168,7 @@ pub struct Window {
     window_corner_mask: Option<(Bounds<Pixels>, Corners<Pixels>)>,
     default_corner_smoothing: f32,
     adaptive_corner_fraction: Option<f32>,
+    apparent_corners: bool,
     captured_hitbox: Option<HitboxId>,
     #[cfg(any(feature = "inspector", debug_assertions))]
     inspector: Option<Entity<Inspector>>,
@@ -2006,6 +2007,7 @@ impl Window {
             window_corner_mask: None,
             default_corner_smoothing: 2.0,
             adaptive_corner_fraction: None,
+            apparent_corners: false,
             image_cache_stack: Vec::new(),
             captured_hitbox: None,
             #[cfg(any(feature = "inspector", debug_assertions))]
@@ -2708,6 +2710,31 @@ impl Window {
 
     pub fn adaptive_corner_fraction(&self) -> Option<f32> {
         self.adaptive_corner_fraction
+    }
+
+    pub fn set_apparent_corners(&mut self, apparent: bool) {
+        if self.apparent_corners != apparent {
+            self.apparent_corners = apparent;
+            self.refresh();
+        }
+    }
+
+    pub fn apparent_corners(&self) -> bool {
+        self.apparent_corners
+    }
+
+    pub fn drawn_corners(
+        &self,
+        radii: Corners<Pixels>,
+        size: Size<Pixels>,
+        smoothing: Option<f32>,
+    ) -> (Corners<Pixels>, Option<f32>) {
+        if !self.apparent_corners {
+            return (radii, smoothing);
+        }
+        let (radii, exponent) =
+            radii.apparent(size, smoothing.unwrap_or(self.default_corner_smoothing));
+        (radii, Some(exponent))
     }
 
     pub fn resolve_corner_radii(
