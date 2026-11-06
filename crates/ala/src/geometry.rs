@@ -2603,7 +2603,10 @@ mod tests {
         );
         assert!((depth(4.0, f32::from(grown.top_left)) - depth(2.0, 6.0)).abs() < 1e-3);
         let (capped, eased) = Corners::all(px(12.6)).apparent(bar, 4.0);
-        assert!((f32::from(capped.top_left) - 13.95).abs() < 1e-4, "{capped:?}");
+        assert!(
+            (f32::from(capped.top_left) - 13.95).abs() < 1e-4,
+            "{capped:?}"
+        );
         assert!(eased > 2.0 && eased < 4.0, "{eased}");
         assert!((depth(eased, 13.95) - depth(2.0, 12.6)).abs() < 1e-3);
         let (pill, circle) = Corners::all(px(14.0)).apparent(bar, 4.0);
@@ -2625,7 +2628,8 @@ mod tests {
         );
         let pill = Corners::all(px(1.0)).share_of_quad_size(size(px(120.0), px(32.0)), 0.9);
         assert_eq!(pill.top_left, px(16.0));
-        let full = Corners::all(FULL_CORNER_RADIUS).share_of_quad_size(size(px(120.0), px(32.0)), 0.3);
+        let full =
+            Corners::all(FULL_CORNER_RADIUS).share_of_quad_size(size(px(120.0), px(32.0)), 0.3);
         assert_eq!(full.top_left, px(16.0));
     }
 
