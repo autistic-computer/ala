@@ -1287,10 +1287,11 @@ impl Corners<Pixels> {
         }
         let reach = |exponent: f32| 1.0 - 2f32.powf(-1.0 / exponent);
         let circle = reach(2.0);
+        let limit = half - px(0.05);
         let mut grow = circle / reach(smoothing);
         let mut exponent = smoothing;
-        if largest * grow > half {
-            grow = (half / largest).max(1.0);
+        if largest * grow > limit {
+            grow = (limit / largest).max(1.0);
             exponent = -1.0 / (1.0 - circle / grow).log2();
         }
         (self.map(|radius| (*radius * grow).min(half)), exponent)
@@ -2602,9 +2603,9 @@ mod tests {
         );
         assert!((depth(4.0, f32::from(grown.top_left)) - depth(2.0, 6.0)).abs() < 1e-3);
         let (capped, eased) = Corners::all(px(12.6)).apparent(bar, 4.0);
-        assert_eq!(capped.top_left, px(14.0));
+        assert!((f32::from(capped.top_left) - 13.95).abs() < 1e-4, "{capped:?}");
         assert!(eased > 2.0 && eased < 4.0, "{eased}");
-        assert!((depth(eased, 14.0) - depth(2.0, 12.6)).abs() < 1e-3);
+        assert!((depth(eased, 13.95) - depth(2.0, 12.6)).abs() < 1e-3);
         let (pill, circle) = Corners::all(px(14.0)).apparent(bar, 4.0);
         assert_eq!((pill.top_left, circle), (px(14.0), 2.0));
     }
