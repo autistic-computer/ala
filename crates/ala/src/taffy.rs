@@ -47,6 +47,15 @@ pub struct TaffyLayoutEngine {
     retained: RetainedNodes,
 }
 
+#[cfg(feature = "test-support")]
+#[derive(Clone, Copy, Debug)]
+pub struct LayoutDiagnostic {
+    pub id: u64,
+    pub parent: Option<u64>,
+    pub position: Point<f32>,
+    pub size: Size<f32>,
+}
+
 #[derive(Default)]
 struct RetainedNodes {
     candidates: FxHashMap<u64, SmallVec<[NodeId; 1]>>,
@@ -471,6 +480,30 @@ impl TaffyLayoutEngine {
         let bounds = (snapped_bounds / scale_factor).map(Pixels);
         self.absolute_layout_bounds.insert(id, bounds);
         bounds
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn layout_diagnostics(&self, limit: usize) -> Option<Vec<LayoutDiagnostic>> {
+        let frame = if self.retained.frame.is_empty() {
+            &self.retained.last_frame
+        } else {
+            &self.retained.frame
+        };
+        if frame.len() > limit {
+            return None;
+        }
+        frame
+            .iter()
+            .map(|&node| {
+                let layout = self.taffy.layout(node).ok()?;
+                Some(LayoutDiagnostic {
+                    id: node.into(),
+                    parent: self.taffy.parent(node).map(Into::into),
+                    position: layout.location.into(),
+                    size: layout.size.into(),
+                })
+            })
+            .collect()
     }
 }
 

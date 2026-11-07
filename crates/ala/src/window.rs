@@ -5701,6 +5701,11 @@ impl Window {
         bounds
     }
 
+    #[cfg(feature = "test-support")]
+    pub fn layout_diagnostics(&self, limit: usize) -> Option<Vec<crate::LayoutDiagnostic>> {
+        self.layout_engine.as_ref()?.layout_diagnostics(limit)
+    }
+
     pub fn insert_hitbox(&mut self, bounds: Bounds<Pixels>, behavior: HitboxBehavior) -> Hitbox {
         self.invalidator.debug_assert_prepaint();
 
