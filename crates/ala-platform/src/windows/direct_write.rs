@@ -230,6 +230,10 @@ impl PlatformTextSystem for DirectWriteTextSystem {
         self.state.read().all_font_names(&self.components)
     }
 
+    fn monospaced_font_names(&self) -> Vec<String> {
+        self.state.read().monospaced_font_names(&self.components)
+    }
+
     fn font_id(&self, font: &Font) -> Result<FontId> {
         let lock = self.state.upgradable_read();
         if let Some(font_id) = lock.font_to_font_id.get(font) {
@@ -1324,10 +1328,22 @@ impl DirectWriteState {
 
     fn all_font_names(&self, components: &DirectWriteComponents) -> Vec<String> {
         let mut result =
-            get_font_names_from_collection(&self.system_font_collection, &components.locale);
+            get_font_names_from_collection(&self.system_font_collection, &components.locale, false);
         result.extend(get_font_names_from_collection(
             &self.custom_font_collection,
             &components.locale,
+            false,
+        ));
+        result
+    }
+
+    fn monospaced_font_names(&self, components: &DirectWriteComponents) -> Vec<String> {
+        let mut result =
+            get_font_names_from_collection(&self.system_font_collection, &components.locale, true);
+        result.extend(get_font_names_from_collection(
+            &self.custom_font_collection,
+            &components.locale,
+            true,
         ));
         result
     }
@@ -1782,6 +1798,7 @@ fn font_weight_from_dwrite(value: DWRITE_FONT_WEIGHT) -> FontWeight {
 fn get_font_names_from_collection(
     collection: &IDWriteFontCollection1,
     locale: &HSTRING,
+    monospaced_only: bool,
 ) -> Vec<String> {
     unsafe {
         let mut result = Vec::new();
@@ -1790,6 +1807,9 @@ fn get_font_names_from_collection(
             let Some(font_family) = collection.GetFontFamily(index).log_err() else {
                 continue;
             };
+            if monospaced_only && !family_is_monospaced(&font_family) {
+                continue;
+            }
             let Some(localized_family_name) = font_family.GetFamilyNames().log_err() else {
                 continue;
             };
@@ -1800,6 +1820,20 @@ fn get_font_names_from_collection(
         }
 
         result
+    }
+}
+
+fn family_is_monospaced(family: &IDWriteFontFamily1) -> bool {
+    unsafe {
+        family
+            .GetFirstMatchingFont(
+                DWRITE_FONT_WEIGHT_NORMAL,
+                DWRITE_FONT_STRETCH_NORMAL,
+                DWRITE_FONT_STYLE_NORMAL,
+            )
+            .ok()
+            .and_then(|font| font.cast::<IDWriteFont1>().ok())
+            .is_some_and(|font| font.IsMonospacedFont().as_bool())
     }
 }
 

@@ -257,6 +257,10 @@ impl PlatformTextSystem for WebTextSystem {
         self.native.all_font_names()
     }
 
+    fn monospaced_font_names(&self) -> Vec<String> {
+        self.native.monospaced_font_names()
+    }
+
     fn system_font_family(&self) -> Option<String> {
         self.native.system_font_family()
     }

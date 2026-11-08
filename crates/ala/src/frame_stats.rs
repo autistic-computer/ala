@@ -425,6 +425,10 @@ impl PlatformTextSystem for RecordingTextSystem {
         self.inner.all_font_names()
     }
 
+    fn monospaced_font_names(&self) -> Vec<String> {
+        self.inner.monospaced_font_names()
+    }
+
     fn font_id(&self, descriptor: &Font) -> Result<FontId> {
         self.inner.font_id(descriptor)
     }

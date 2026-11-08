@@ -930,6 +930,9 @@ pub trait PlatformTextSystem: Send + Sync {
     fn add_fonts(&self, fonts: Vec<Cow<'static, [u8]>>) -> Result<()>;
     fn set_missing_glyph_sink(&self, _sink: Option<Arc<dyn MissingGlyphSink>>) {}
     fn all_font_names(&self) -> Vec<String>;
+    fn monospaced_font_names(&self) -> Vec<String> {
+        Vec::new()
+    }
     fn font_id(&self, descriptor: &Font) -> Result<FontId>;
     fn prewarm_fonts(&self, _font_ids: &[FontId]) {}
     fn font_generation(&self) -> u64 {

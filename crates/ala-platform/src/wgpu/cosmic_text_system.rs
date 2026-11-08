@@ -237,6 +237,21 @@ impl PlatformTextSystem for CosmicTextSystem {
         result
     }
 
+    fn monospaced_font_names(&self) -> Vec<String> {
+        let mut result = self
+            .0
+            .read()
+            .font_system
+            .db()
+            .faces()
+            .filter(|face| face.monospaced)
+            .filter_map(|face| face.families.first().map(|family| family.0.clone()))
+            .collect_vec();
+        result.sort_unstable();
+        result.dedup();
+        result
+    }
+
     fn font_id(&self, font: &Font) -> Result<FontId> {
         let mut state = self.0.write();
         let key = FontKey::new(
@@ -1296,6 +1311,7 @@ mod tests {
             )),
         ])?;
         assert_eq!(text_system.all_font_names(), ["IBM Plex Sans", "Lilex"]);
+        assert_eq!(text_system.monospaced_font_names(), ["Lilex"]);
         Ok(())
     }
 
