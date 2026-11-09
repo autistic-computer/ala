@@ -105,30 +105,38 @@ impl PlatformTextSystem for MacTextSystem {
     }
 
     fn all_font_names(&self) -> Vec<String> {
-        let mut names = Vec::new();
-        let collection = core_text::font_collection::create_for_all_families();
-        unsafe extern "C" {
-            fn CTFontCollectionCreateMatchingFontDescriptors(
-                collection: CTFontCollectionRef,
-            ) -> CFArrayRef;
-        }
-        let descriptors: Option<CFArray<CTFontDescriptor>> = unsafe {
-            let array_ref =
-                CTFontCollectionCreateMatchingFontDescriptors(collection.as_concrete_TypeRef());
-            if array_ref.is_null() {
-                None
-            } else {
-                Some(CFArray::wrap_under_create_rule(array_ref))
-            }
-        };
-        let Some(descriptors) = descriptors else {
-            return names;
-        };
-        for descriptor in descriptors.into_iter() {
-            names.extend(lenient_font_attributes::family_name(&descriptor));
-        }
+        let mut names = system_font_descriptors()
+            .map(|descriptors| {
+                descriptors
+                    .iter()
+                    .filter_map(|descriptor| lenient_font_attributes::family_name(&descriptor))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         if let Ok(fonts_in_memory) = self.0.read().memory_source.all_families() {
             names.extend(fonts_in_memory);
+        }
+        names
+    }
+
+    fn monospaced_font_names(&self) -> Vec<String> {
+        let mut names = system_font_descriptors()
+            .map(|descriptors| {
+                descriptors
+                    .iter()
+                    .filter(|descriptor| lenient_font_attributes::is_monospaced(descriptor))
+                    .filter_map(|descriptor| lenient_font_attributes::family_name(&descriptor))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        if let Ok(handles) = self.0.read().memory_source.all_fonts() {
+            names.extend(
+                handles
+                    .iter()
+                    .filter_map(|handle| handle.load().ok())
+                    .filter(font_kit::font::Font::is_monospace)
+                    .map(|font| font.family_name()),
+            );
         }
         names
     }
@@ -717,17 +725,57 @@ fn fontkit_style(style: FontStyle) -> FontkitStyle {
     }
 }
 
+fn system_font_descriptors() -> Option<CFArray<CTFontDescriptor>> {
+    unsafe extern "C" {
+        fn CTFontCollectionCreateMatchingFontDescriptors(
+            collection: CTFontCollectionRef,
+        ) -> CFArrayRef;
+    }
+    let collection = core_text::font_collection::create_for_all_families();
+    unsafe {
+        let array_ref =
+            CTFontCollectionCreateMatchingFontDescriptors(collection.as_concrete_TypeRef());
+        (!array_ref.is_null()).then(|| CFArray::wrap_under_create_rule(array_ref))
+    }
+}
+
 mod lenient_font_attributes {
     use core_foundation::{
         base::{CFRetain, CFType, TCFType},
+        dictionary::{CFDictionary, CFDictionaryRef},
+        number::CFNumber,
         string::{CFString, CFStringRef},
     };
     use core_text::font_descriptor::{
         CTFontDescriptor, CTFontDescriptorCopyAttribute, kCTFontFamilyNameAttribute,
+        kCTFontMonoSpaceTrait, kCTFontSymbolicTrait, kCTFontTraitsAttribute,
     };
 
     pub fn family_name(descriptor: &CTFontDescriptor) -> Option<String> {
         unsafe { get_string_attribute(descriptor, kCTFontFamilyNameAttribute) }
+    }
+
+    pub fn is_monospaced(descriptor: &CTFontDescriptor) -> bool {
+        unsafe {
+            let value = CTFontDescriptorCopyAttribute(
+                descriptor.as_concrete_TypeRef(),
+                kCTFontTraitsAttribute,
+            );
+            if value.is_null() {
+                return false;
+            }
+            let value = CFType::wrap_under_create_rule(value);
+            if !value.instance_of::<CFDictionary>() {
+                return false;
+            }
+            let traits: CFDictionary<CFString, CFType> =
+                CFDictionary::wrap_under_get_rule(value.as_CFTypeRef() as CFDictionaryRef);
+            traits
+                .find(CFString::wrap_under_get_rule(kCTFontSymbolicTrait))
+                .and_then(|symbolic| symbolic.downcast::<CFNumber>())
+                .and_then(|symbolic| symbolic.to_i64())
+                .is_some_and(|symbolic| symbolic as u32 & kCTFontMonoSpaceTrait != 0)
+        }
     }
 
     fn get_string_attribute(
@@ -775,6 +823,26 @@ mod tests {
             .filter(|x| bytes.chunks_exact(4 * width).any(|row| row[4 * x + 3] > 32))
             .collect::<Vec<_>>();
         (inked.last().unwrap() - inked.first().unwrap() + 1) as f32 / scale
+    }
+
+    #[test]
+    fn monospaced_fonts_include_menlo_and_bundled_lilex_but_not_helvetica() {
+        let text_system = ala::TextSystem::new(Arc::new(MacTextSystem::new()));
+        text_system
+            .add_fonts(vec![std::borrow::Cow::Borrowed(include_bytes!(
+                "../../../ala/assets/fonts/lilex/Lilex-Regular.ttf"
+            ))])
+            .unwrap();
+        let monospaced = text_system.monospaced_font_names();
+        assert!(monospaced.iter().any(|name| name == "Menlo"));
+        assert!(monospaced.iter().any(|name| name == "Lilex"));
+        assert!(!monospaced.iter().any(|name| name == "Helvetica"));
+        assert!(
+            text_system
+                .all_font_names()
+                .iter()
+                .any(|name| name == "Helvetica")
+        );
     }
 
     #[test]

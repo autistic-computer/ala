@@ -265,6 +265,13 @@ impl TextSystem {
         names
     }
 
+    pub fn monospaced_font_names(&self) -> Vec<String> {
+        let mut names = self.platform_text_system.monospaced_font_names();
+        names.sort_unstable();
+        names.dedup();
+        names
+    }
+
     pub fn add_fonts(&self, fonts: Vec<Cow<'static, [u8]>>) -> Result<()> {
         let sources = SvgFonts::sources(&fonts);
         self.platform_text_system.add_fonts(fonts)?;

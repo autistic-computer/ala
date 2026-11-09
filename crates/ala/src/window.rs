@@ -1168,6 +1168,7 @@ pub struct Window {
     window_corner_mask: Option<(Bounds<Pixels>, Corners<Pixels>)>,
     default_corner_smoothing: f32,
     adaptive_corner_fraction: Option<f32>,
+    apparent_corners: bool,
     captured_hitbox: Option<HitboxId>,
     #[cfg(any(feature = "inspector", debug_assertions))]
     inspector: Option<Entity<Inspector>>,
@@ -2006,6 +2007,7 @@ impl Window {
             window_corner_mask: None,
             default_corner_smoothing: 2.0,
             adaptive_corner_fraction: None,
+            apparent_corners: false,
             image_cache_stack: Vec::new(),
             captured_hitbox: None,
             #[cfg(any(feature = "inspector", debug_assertions))]
@@ -2710,6 +2712,44 @@ impl Window {
         self.adaptive_corner_fraction
     }
 
+    pub fn set_apparent_corners(&mut self, apparent: bool) {
+        if self.apparent_corners != apparent {
+            self.apparent_corners = apparent;
+            self.refresh();
+        }
+    }
+
+    pub fn apparent_corners(&self) -> bool {
+        self.apparent_corners
+    }
+
+    pub fn drawn_corners(
+        &self,
+        radii: Corners<Pixels>,
+        size: Size<Pixels>,
+        smoothing: Option<f32>,
+    ) -> (Corners<Pixels>, Option<f32>) {
+        if !self.apparent_corners {
+            return (radii, smoothing);
+        }
+        let (radii, exponent) =
+            radii.apparent(size, smoothing.unwrap_or(self.default_corner_smoothing));
+        (radii, Some(exponent))
+    }
+
+    fn drawn_window_corner_mask(&self) -> Option<WindowCornerMask> {
+        self.window_corner_mask.map(|(bounds, radii)| {
+            let (radii, smoothing) = self.drawn_corners(radii, bounds.size, None);
+            window_corner_mask_for_viewport(
+                (bounds, radii),
+                self.platform_window.content_size(),
+                self.viewport_size(),
+                self.scale_factor(),
+                smoothing.unwrap_or(self.default_corner_smoothing),
+            )
+        })
+    }
+
     pub fn resolve_corner_radii(
         &self,
         radii: Corners<Pixels>,
@@ -3287,16 +3327,7 @@ impl Window {
         let previous_window_active = self.rendered_frame.window_active;
         mem::swap(&mut self.rendered_frame, &mut self.next_frame);
         self.next_frame.clear();
-        let scale_factor = self.scale_factor();
-        self.rendered_frame.scene.window_corner_mask = self.window_corner_mask.map(|mask| {
-            window_corner_mask_for_viewport(
-                mask,
-                self.platform_window.content_size(),
-                self.viewport_size(),
-                scale_factor,
-                self.default_corner_smoothing,
-            )
-        });
+        self.rendered_frame.scene.window_corner_mask = self.drawn_window_corner_mask();
         let current_focus_path = self.rendered_frame.focus_path();
         let current_window_active = self.rendered_frame.window_active;
         let mut focus_before_listeners = self.focus;
@@ -4493,6 +4524,26 @@ impl Window {
         corner_smoothing: Option<f32>,
     ) {
         self.invalidator.debug_assert_paint();
+        let drawn: Vec<GlassShape>;
+        let (shapes, corner_smoothing) = match corner_smoothing {
+            Some(_) => (shapes, corner_smoothing),
+            None => {
+                let mut smoothing = None;
+                drawn = shapes
+                    .iter()
+                    .map(|shape| {
+                        let (corner_radii, exponent) =
+                            self.drawn_corners(shape.corner_radii, shape.bounds.size, None);
+                        smoothing = smoothing.or(exponent);
+                        GlassShape {
+                            corner_radii,
+                            ..*shape
+                        }
+                    })
+                    .collect();
+                (&drawn[..], smoothing)
+            }
+        };
         let material = material.for_window(cfg!(target_family = "wasm") || self.is_window_active());
         if shapes.is_empty()
             || material.draws_nothing()
@@ -4613,7 +4664,8 @@ impl Window {
         corner_radii: Corners<Pixels>,
         shadows: &[BoxShadow],
     ) {
-        self.paint_drop_shadows_with_smoothing(bounds, corner_radii, shadows, None, false);
+        let (corner_radii, smoothing) = self.drawn_corners(corner_radii, bounds.size, None);
+        self.paint_drop_shadows_with_smoothing(bounds, corner_radii, shadows, smoothing, false);
     }
 
     pub(crate) fn paint_drop_shadows_with_smoothing(
@@ -4692,14 +4744,7 @@ impl Window {
         let mut interior =
             rounded_interior(self.snap_bounds(bounds), corner_radii.scale(scale_factor))
                 .intersect(&content_mask.bounds);
-        if let Some(mask) = self.window_corner_mask {
-            let mask = window_corner_mask_for_viewport(
-                mask,
-                self.platform_window.content_size(),
-                self.viewport_size(),
-                scale_factor,
-                self.default_corner_smoothing,
-            );
+        if let Some(mask) = self.drawn_window_corner_mask() {
             interior = interior.intersect(&rounded_interior(mask.bounds, mask.corner_radii));
         }
         let interior = Bounds::from_corners(
@@ -4715,7 +4760,8 @@ impl Window {
         corner_radii: Corners<Pixels>,
         shadows: &[BoxShadow],
     ) {
-        self.paint_inset_shadows_with_smoothing(bounds, corner_radii, shadows, None);
+        let (corner_radii, smoothing) = self.drawn_corners(corner_radii, bounds.size, None);
+        self.paint_inset_shadows_with_smoothing(bounds, corner_radii, shadows, smoothing);
     }
 
     pub(crate) fn paint_inset_shadows_with_smoothing(
@@ -4802,18 +4848,20 @@ impl Window {
         let opacity = self.element_opacity();
         let snapped_bounds = self.snap_bounds(quad.bounds);
         let snapped_border_widths = self.snap_border_widths(quad.border_widths);
+        let (corner_radii, corner_smoothing) = match quad.corner_smoothing {
+            Some(smoothing) => (quad.corner_radii, Some(smoothing)),
+            None => self.drawn_corners(quad.corner_radii, quad.bounds.size, None),
+        };
         let quad = Quad {
             order: 0,
             bounds: snapped_bounds,
             content_mask: self.snapped_content_mask(),
             background: quad.background.opacity(opacity),
             border_color: quad.border_color.opacity(opacity),
-            corner_radii: quad.corner_radii.scale(self.scale_factor()),
+            corner_radii: corner_radii.scale(self.scale_factor()),
             border_widths: snapped_border_widths,
             border_style: quad.border_style,
-            corner_smoothing: quad
-                .corner_smoothing
-                .unwrap_or(self.default_corner_smoothing),
+            corner_smoothing: corner_smoothing.unwrap_or(self.default_corner_smoothing),
             pad: [0; 1],
         };
 

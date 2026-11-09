@@ -1,8 +1,8 @@
 use crate::apple::metal_atlas::MetalAtlas;
 use crate::apple::metal_glass::{MetalGlass, scene_has_glass};
 use ala::{
-    AtlasTextureId, Background, Bounds, ClipMask, CustomShader, DevicePixels, PaintSurface, Path,
-    Point, PrimitiveBatch, ScaledPixels, Scene, ShaderLayer, Size, point, size,
+    AtlasTextureId, Background, Bounds, ClipMask, Corners, CustomShader, DevicePixels,
+    PaintSurface, Path, Point, PrimitiveBatch, ScaledPixels, Scene, ShaderLayer, Size, point, size,
 };
 use anyhow::{Context as _, Result};
 use block2::RcBlock;
@@ -116,6 +116,12 @@ pub struct MetalRenderer {
     is_apple_gpu: bool,
     is_unified_memory: bool,
     presents_with_transaction: bool,
+    layer_presents_with_transaction: bool,
+    presented_underlays: Vec<(
+        Bounds<ScaledPixels>,
+        Bounds<ScaledPixels>,
+        Corners<ScaledPixels>,
+    )>,
     underlay_active: bool,
     opaque: bool,
     command_queue: CommandQueue,
@@ -358,6 +364,8 @@ impl MetalRenderer {
             device,
             layer,
             presents_with_transaction: false,
+            layer_presents_with_transaction: false,
+            presented_underlays: Vec::new(),
             underlay_active: false,
             is_apple_gpu,
             is_unified_memory,
@@ -410,9 +418,6 @@ impl MetalRenderer {
 
     pub fn set_presents_with_transaction(&mut self, presents_with_transaction: bool) {
         self.presents_with_transaction = presents_with_transaction;
-        if let Some(layer) = &self.layer {
-            layer.set_presents_with_transaction(self.transactional_present());
-        }
     }
 
     pub fn set_underlay_active(&mut self, active: bool) {
@@ -422,12 +427,18 @@ impl MetalRenderer {
         self.underlay_active = active;
         if let Some(layer) = &self.layer {
             layer.set_opaque(self.layer_opaque());
-            layer.set_presents_with_transaction(self.transactional_present());
         }
     }
 
-    fn transactional_present(&self) -> bool {
-        self.presents_with_transaction || self.underlay_active
+    fn set_layer_presents_with_transaction(
+        &mut self,
+        layer: &metal::MetalLayerRef,
+        transactional: bool,
+    ) {
+        if self.layer_presents_with_transaction != transactional {
+            layer.set_presents_with_transaction(transactional);
+            self.layer_presents_with_transaction = transactional;
+        }
     }
 
     pub fn supports_glass(&mut self) -> bool {
@@ -516,6 +527,20 @@ impl MetalRenderer {
             (viewport_size.width.ceil() as i32).into(),
             (viewport_size.height.ceil() as i32).into(),
         );
+        let underlays = scene
+            .surfaces
+            .iter()
+            .filter(|surface| surface.underlay)
+            .map(|surface| {
+                (
+                    surface.bounds,
+                    surface.content_mask.bounds,
+                    surface.corner_radii,
+                )
+            })
+            .collect::<Vec<_>>();
+        let transactional = self.presents_with_transaction || underlays != self.presented_underlays;
+        self.set_layer_presents_with_transaction(&layer, transactional);
         let drawable = if let Some(drawable) = layer.next_drawable() {
             drawable
         } else {
@@ -534,7 +559,7 @@ impl MetalRenderer {
             }
         };
 
-        if self.transactional_present() {
+        if transactional {
             command_buffer.commit();
             command_buffer.wait_until_scheduled();
             drawable.present();
@@ -542,6 +567,7 @@ impl MetalRenderer {
             command_buffer.present_drawable(drawable);
             command_buffer.commit();
         }
+        self.presented_underlays = underlays;
     }
 
     fn render_frame(

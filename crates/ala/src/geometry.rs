@@ -1262,6 +1262,40 @@ impl Corners<Pixels> {
             .max(self.bottom_right)
             .max(self.bottom_left)
     }
+
+    #[must_use]
+    pub fn share_of_quad_size(self, size: Size<Pixels>, share: f32) -> Corners<Pixels> {
+        let shorter_side = cmp::min(size.width, size.height);
+        let corner = shorter_side * share.clamp(0.0, 0.5);
+        self.map(|radius| {
+            if *radius >= FULL_CORNER_RADIUS {
+                shorter_side / 2.
+            } else if *radius > Pixels::ZERO {
+                corner
+            } else {
+                Pixels::ZERO
+            }
+        })
+    }
+
+    #[must_use]
+    pub fn apparent(self, size: Size<Pixels>, smoothing: f32) -> (Corners<Pixels>, f32) {
+        let half = cmp::min(size.width, size.height) / 2.;
+        let largest = self.max();
+        if smoothing <= 2.0 || largest <= Pixels::ZERO || half <= Pixels::ZERO {
+            return (self, smoothing);
+        }
+        let reach = |exponent: f32| 1.0 - 2f32.powf(-1.0 / exponent);
+        let circle = reach(2.0);
+        let limit = half - px(0.05);
+        let mut grow = circle / reach(smoothing);
+        let mut exponent = smoothing;
+        if largest * grow > limit {
+            grow = (limit / largest).max(1.0);
+            exponent = -1.0 / (1.0 - circle / grow).log2();
+        }
+        (self.map(|radius| (*radius * grow).min(half)), exponent)
+    }
 }
 
 impl<T: Div<f32, Output = T> + Ord + Clone + Debug + Default + PartialEq> Corners<T> {
@@ -2554,6 +2588,50 @@ mod adaptive_corner_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_apparent_corner_meets_a_circular_arc_at_its_midpoint() {
+        let depth = |exponent: f32, radius: f32| radius * (1.0 - 2f32.powf(-1.0 / exponent));
+        let bar = size(px(200.0), px(28.0));
+        let six = Corners::all(px(6.0));
+        assert_eq!(six.apparent(bar, 2.0), (six, 2.0));
+        let (grown, exponent) = six.apparent(bar, 4.0);
+        assert_eq!(exponent, 4.0);
+        assert!(
+            (f32::from(grown.top_left) - 11.045).abs() < 0.01,
+            "{grown:?}"
+        );
+        assert!((depth(4.0, f32::from(grown.top_left)) - depth(2.0, 6.0)).abs() < 1e-3);
+        let (capped, eased) = Corners::all(px(12.6)).apparent(bar, 4.0);
+        assert!(
+            (f32::from(capped.top_left) - 13.95).abs() < 1e-4,
+            "{capped:?}"
+        );
+        assert!(eased > 2.0 && eased < 4.0, "{eased}");
+        assert!((depth(eased, 13.95) - depth(2.0, 12.6)).abs() < 1e-3);
+        let (pill, circle) = Corners::all(px(14.0)).apparent(bar, 4.0);
+        assert_eq!((pill.top_left, circle), (px(14.0), 2.0));
+    }
+
+    #[test]
+    fn a_shared_corner_is_that_share_of_the_shorter_side() {
+        let tab = Corners {
+            top_left: px(4.0),
+            top_right: px(4.0),
+            bottom_right: px(0.0),
+            bottom_left: px(0.0),
+        };
+        let shared = tab.share_of_quad_size(size(px(120.0), px(32.0)), 0.3);
+        assert_eq!(
+            (shared.top_left, shared.top_right, shared.bottom_right),
+            (px(9.6), px(9.6), px(0.0))
+        );
+        let pill = Corners::all(px(1.0)).share_of_quad_size(size(px(120.0), px(32.0)), 0.9);
+        assert_eq!(pill.top_left, px(16.0));
+        let full =
+            Corners::all(FULL_CORNER_RADIUS).share_of_quad_size(size(px(120.0), px(32.0)), 0.3);
+        assert_eq!(full.top_left, px(16.0));
+    }
 
     #[test]
     fn test_bounds_intersects() {

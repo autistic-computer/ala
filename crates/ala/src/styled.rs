@@ -41,6 +41,11 @@ pub trait Styled: Sized {
         self
     }
 
+    fn corner_share(mut self, share: f32) -> Self {
+        self.style().corner_share = Some(share);
+        self
+    }
+
     fn block(mut self) -> Self {
         self.style().display = Some(Display::Block);
         self
