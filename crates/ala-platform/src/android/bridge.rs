@@ -57,6 +57,7 @@ pub(crate) fn configuration() -> Configuration {
 #[derive(Clone, Copy, Debug)]
 pub struct Accessibility {
     pub reduce_motion: bool,
+    pub reduce_transparency: bool,
     pub increase_contrast: bool,
     pub text_scale: f32,
 }
@@ -65,6 +66,7 @@ pub fn accessibility() -> Accessibility {
     let configuration = configuration();
     Accessibility {
         reduce_motion: configuration.reduce_motion,
+        reduce_transparency: false,
         increase_contrast: configuration.high_contrast,
         text_scale: configuration.font_scale,
     }

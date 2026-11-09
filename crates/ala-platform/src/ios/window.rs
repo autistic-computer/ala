@@ -244,6 +244,13 @@ impl IosWindow {
                 name: UIAccessibilityReduceMotionStatusDidChangeNotification
                 object: nil
             ];
+            let _: () = msg_send![
+                center,
+                addObserver: native_view
+                selector: sel!(alaAccessibilityChanged:)
+                name: UIAccessibilityReduceTransparencyStatusDidChangeNotification
+                object: nil
+            ];
 
             state.borrow_mut().pointer_interaction = install_pointer_input(native_view);
             install_back_gesture(native_view);
@@ -1963,13 +1970,16 @@ unsafe extern "C" {
 #[link(name = "UIKit", kind = "framework")]
 unsafe extern "C" {
     static UIAccessibilityReduceMotionStatusDidChangeNotification: id;
+    static UIAccessibilityReduceTransparencyStatusDidChangeNotification: id;
     fn UIAccessibilityIsReduceMotionEnabled() -> BOOL;
+    fn UIAccessibilityIsReduceTransparencyEnabled() -> BOOL;
     fn UIAccessibilityDarkerSystemColorsEnabled() -> BOOL;
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Accessibility {
     pub reduce_motion: bool,
+    pub reduce_transparency: bool,
     pub increase_contrast: bool,
     pub text_scale: f32,
 }
@@ -1981,6 +1991,7 @@ pub fn accessibility() -> Accessibility {
         let category = crate::ios::nsstring_to_string(category).unwrap_or_default();
         Accessibility {
             reduce_motion: UIAccessibilityIsReduceMotionEnabled() == YES,
+            reduce_transparency: UIAccessibilityIsReduceTransparencyEnabled() == YES,
             increase_contrast: UIAccessibilityDarkerSystemColorsEnabled() == YES,
             text_scale: match category.trim_start_matches("UICTContentSizeCategory") {
                 "XS" => 0.82,
