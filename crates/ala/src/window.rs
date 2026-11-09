@@ -71,6 +71,7 @@ use std::{
 use uuid::Uuid;
 
 pub(crate) mod a11y;
+pub mod flat;
 mod glyph_cache;
 pub(crate) mod glyph_runs;
 #[cfg(test)]
