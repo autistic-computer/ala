@@ -3222,7 +3222,7 @@ impl Window {
         self.capslock
     }
 
-    #[cfg(feature = "bench-support")]
+    #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
     pub fn rendered_scene(&self) -> &Scene {
         &self.rendered_frame.scene
     }

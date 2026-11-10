@@ -81,10 +81,13 @@ pub struct BoxStyle {
     pub padding: Insets,
     pub gap: Pixels,
     pub align: Align,
+    pub justify: Align,
     pub fill: Option<Hsla>,
     pub border: Pixels,
     pub border_color: Hsla,
     pub radius: Pixels,
+    pub corner_share: Option<f32>,
+    pub corner_smoothing: Option<f32>,
     pub clip: Clip,
 }
 
@@ -601,30 +604,43 @@ impl Ui {
             let grows = |child: &Node| {
                 child.kind == Kind::Box && box_styles[child.style as usize].height == Extent::Grow
             };
-            let offset = |free: f32| match style.align {
+            let place = |align: Align, free: f32| match align {
                 Align::Start => 0.,
                 Align::Center => (free / 2. * scale).round() / scale,
                 Align::End => free,
             };
-            let mut grow_share = 0.;
-            if style.flow == Flow::Column {
-                let mut taken = style.gap.0 * node.children.saturating_sub(1) as f32;
-                let mut growing = 0;
-                let mut child = index + 1;
-                while child < node.end as usize {
-                    if grows(&nodes[child]) {
-                        growing += 1;
-                    } else {
-                        taken += nodes[child].h;
-                    }
-                    child = nodes[child].end as usize;
+            let mut used = style.gap.0 * node.children.saturating_sub(1) as f32;
+            let mut growing = 0;
+            let mut child = index + 1;
+            while child < node.end as usize {
+                match style.flow {
+                    Flow::Column if grows(&nodes[child]) => growing += 1,
+                    Flow::Column => used += nodes[child].h,
+                    Flow::Row => used += nodes[child].w,
                 }
-                if growing > 0 {
-                    grow_share = ((inner_height - taken) / growing as f32).max(0.);
-                }
+                child = nodes[child].end as usize;
             }
+            let free = match style.flow {
+                Flow::Column => inner_height - used,
+                Flow::Row => inner_width - used,
+            }
+            .max(0.);
+            let grow_share = if growing > 0 {
+                free / growing as f32
+            } else {
+                0.
+            };
+            let lead = if growing > 0 {
+                0.
+            } else {
+                place(style.justify, free)
+            };
             let mut x = node.x + style.padding.left.0;
             let mut y = node.y + style.padding.top.0 + node.shift;
+            match style.flow {
+                Flow::Column => y += lead,
+                Flow::Row => x += lead,
+            }
             let mut child = index + 1;
             while child < node.end as usize {
                 if grows(&nodes[child]) {
@@ -635,13 +651,13 @@ impl Ui {
                 }
                 match style.flow {
                     Flow::Column => {
-                        nodes[child].x = x + offset(inner_width - nodes[child].w);
+                        nodes[child].x = x + place(style.align, inner_width - nodes[child].w);
                         nodes[child].y = y;
                         y += nodes[child].h + style.gap.0;
                     }
                     Flow::Row => {
                         nodes[child].x = x;
-                        nodes[child].y = y + offset(inner_height - nodes[child].h);
+                        nodes[child].y = y + place(style.align, inner_height - nodes[child].h);
                         x += nodes[child].w + style.gap.0;
                     }
                 }
@@ -723,10 +739,14 @@ impl Ui {
                     let bordered = style.border > Pixels::ZERO && style.border_color.a > 0.;
                     if style.fill.is_some() || bordered {
                         window.with_content_mask(mask, |window| {
-                            let radii = window
-                                .resolve_corner_radii(Corners::all(style.radius), bounds.size);
-                            let (radii, smoothing) = window.drawn_corners(radii, bounds.size, None);
-                            if let Some(fill) = style.fill {
+                            let radii = Corners::all(style.radius);
+                            let radii = match style.corner_share {
+                                Some(share) => radii.share_of_quad_size(bounds.size, share),
+                                None => window.resolve_corner_radii(radii, bounds.size),
+                            };
+                            let (radii, smoothing) =
+                                window.drawn_corners(radii, bounds.size, style.corner_smoothing);
+                            if let Some(fill) = style.fill.filter(|fill| fill.a > 0.) {
                                 let mut background = quad(
                                     bounds,
                                     radii,
@@ -857,6 +877,8 @@ impl Ui {
                 pointer.pressed = Some((rect.key, event.button));
                 pointer.focused = Some(rect.key);
                 cx.notify(view);
+                window.prevent_default();
+                cx.stop_propagation();
             }
         });
 
@@ -933,6 +955,8 @@ pub trait Flat: 'static + Sized {
     fn ui(&mut self) -> &mut Ui;
 
     fn build(&mut self, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut Context<Self>);
+
+    fn clicked(&mut self, _click: Click, _window: &mut Window, _cx: &mut Context<Self>) {}
 }
 
 pub struct Surface<V> {
@@ -940,6 +964,7 @@ pub struct Surface<V> {
     view: Entity<V>,
     style: StyleRefinement,
     fit: bool,
+    behavior: HitboxBehavior,
 }
 
 pub fn surface<V: Flat>(id: impl Into<ElementId>, view: &Entity<V>) -> Surface<V> {
@@ -948,12 +973,18 @@ pub fn surface<V: Flat>(id: impl Into<ElementId>, view: &Entity<V>) -> Surface<V
         view: view.clone(),
         style: StyleRefinement::default(),
         fit: false,
+        behavior: HitboxBehavior::Normal,
     }
 }
 
 impl<V: Flat> Surface<V> {
     pub fn fit_content(mut self) -> Self {
         self.fit = true;
+        self
+    }
+
+    pub fn occlude(mut self) -> Self {
+        self.behavior = HitboxBehavior::BlockMouse;
         self
     }
 }
@@ -1030,7 +1061,7 @@ impl<V: Flat> Element for Surface<V> {
         window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
-        let hitbox = window.insert_hitbox(bounds, HitboxBehavior::Normal);
+        let hitbox = window.insert_hitbox(bounds, self.behavior);
         let described = self.view.update(cx, |view, cx| {
             view.build(bounds, window, cx);
             if window.a11y.is_active() {
@@ -1056,6 +1087,17 @@ impl<V: Flat> Element for Surface<V> {
         window: &mut Window,
         cx: &mut App,
     ) {
+        let view = self.view.clone();
+        window.on_mouse_event(move |_: &MouseUpEvent, phase, window, cx| {
+            if phase != DispatchPhase::Bubble {
+                return;
+            }
+            view.update(cx, |view, cx| {
+                for click in view.ui().clicks() {
+                    view.clicked(click, window, cx);
+                }
+            });
+        });
         self.view.update(cx, |view, cx| {
             let ui = view.ui();
             if let Err(error) = ui.paint(bounds.origin, window, cx) {
