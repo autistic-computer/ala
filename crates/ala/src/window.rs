@@ -72,6 +72,7 @@ use std::{
 use uuid::Uuid;
 
 pub(crate) mod a11y;
+pub mod flat;
 mod glyph_cache;
 pub(crate) mod glyph_runs;
 #[cfg(test)]
@@ -3229,7 +3230,7 @@ impl Window {
         self.capslock
     }
 
-    #[cfg(feature = "bench-support")]
+    #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
     pub fn rendered_scene(&self) -> &Scene {
         &self.rendered_frame.scene
     }
