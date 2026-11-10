@@ -3,8 +3,8 @@ use crate::refineable::Refineable;
 use crate::{
     AnyElement, AnyEntity, AnyWeakEntity, App, AvailableSpace, Bounds, ClipMask, Context, Element,
     ElementId, Entity, EntityId, GlobalElementId, InspectorElementId, IntoElement, LayoutId,
-    PaintIndex, Pixels, PrepaintStateIndex, Render, RenderOnce, ScaledPixels, Size, Style,
-    StyleRefinement, TextStyle, WeakEntity,
+    PaintIndex, Pixels, PrepaintStateIndex, Render, RenderOnce, Size, Style, StyleRefinement,
+    TextStyle, WeakEntity,
 };
 use crate::{Empty, Window};
 use anyhow::Result;
@@ -250,7 +250,7 @@ struct ViewElementCacheKey {
     text_style: TextStyle,
     rem_size: Pixels,
     opacity: f32,
-    text_fade: Option<(ScaledPixels, ScaledPixels)>,
+    text_fade: Option<crate::window::TextFade>,
 }
 
 impl ViewElementCacheKey {

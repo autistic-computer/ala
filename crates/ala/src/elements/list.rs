@@ -4,9 +4,9 @@ use crate::sum_tree::{Bias, Dimensions, SumTree};
 use crate::{
     AnyElement, App, AvailableSpace, Bounds, ContentMask, DispatchPhase, Edges, Element, EntityId,
     FocusHandle, GlobalElementId, Hitbox, HitboxBehavior, InspectorElementId, IntoElement,
-    Overflow, Overscroll, PaintIndex, Pixels, Point, PrepaintStateIndex, RubberBand, ScaledPixels,
-    ScrollDelta, ScrollKey, ScrollWheelEvent, Size, Style, StyleRefinement, Styled, TextStyle,
-    TouchPhase, Window, WindowId, point, px, size,
+    Overflow, Overscroll, PaintIndex, Pixels, Point, PrepaintStateIndex, RubberBand, ScrollDelta,
+    ScrollKey, ScrollWheelEvent, Size, Style, StyleRefinement, Styled, TextStyle, TouchPhase,
+    Window, WindowId, point, px, size,
 };
 use std::{cell::RefCell, mem, ops::Range, rc::Rc};
 
@@ -97,7 +97,7 @@ struct ReplayKey {
     rem_size: Pixels,
     scale_factor: f32,
     opacity: f32,
-    text_fade: Option<(ScaledPixels, ScaledPixels)>,
+    text_fade: Option<crate::window::TextFade>,
     raster: u64,
     fonts: usize,
 }

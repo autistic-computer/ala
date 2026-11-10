@@ -10,24 +10,25 @@ use crate::WgpuDeviceContext;
 use crate::profiler;
 use crate::{
     Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Arena, Asset,
-    AsyncWindowContext, AtlasTile, AvailableSpace, Background, BorderStyle, Bounds, BoxShadow,
-    Capslock, ClipMask, Context, Corners, CursorHideMode, CursorStyle, CustomShader, Decorations,
-    DevicePixels, DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Edges, Effect,
-    Entity, EntityId, EventEmitter, FileDropEvent, FontId, Glass, GlassMaterial, GlassShadow,
-    GlassShape, Global, GlobalElementId, GlyphId, GlyphRenderOptions, GpuSpecs, Hsla, InputHandler,
-    IsZero, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId,
-    LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent,
-    MouseMoveEvent, MouseUpEvent, Path, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
-    PlatformInputHandler, PlatformWindow, Point, PolychromeSprite, Priority, PromptButton,
-    PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams,
-    Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y,
-    ScaledPixels, Scene, ScrollDelta, ShaderLayerDescriptor, Shadow, SharedString, Size,
-    StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab,
-    SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TextInputConfiguration,
-    TextInputStateChange, TextRenderingMode, TextStyle, TextStyleRefinement, ThermalState,
-    TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance,
-    WindowBounds, WindowControls, WindowCornerMask, WindowDecorations, WindowOptions, WindowParams,
-    WindowTextSystem, WindowVisibility, point, prelude::*, px, rems, size, transparent_black,
+    AsyncWindowContext, AtlasTile, AvailableSpace, Axis, Background, BorderStyle, Bounds,
+    BoxShadow, Capslock, ClipMask, Context, Corners, CursorHideMode, CursorStyle, CustomShader,
+    Decorations, DevicePixels, DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId,
+    Edges, Effect, Entity, EntityId, EventEmitter, FileDropEvent, FontId, Glass, GlassMaterial,
+    GlassShadow, GlassShape, Global, GlobalElementId, GlyphId, GlyphRenderOptions, GpuSpecs, Hsla,
+    InputHandler, IsZero, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke,
+    KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite,
+    MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, Pixels, PlatformAtlas,
+    PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, Point, PolychromeSprite,
+    Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage,
+    RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR,
+    SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, ScrollDelta,
+    ShaderLayerDescriptor, Shadow, SharedString, Size, StrikethroughStyle, Style, SubpixelSprite,
+    SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap,
+    TaffyLayoutEngine, Task, TextInputConfiguration, TextInputStateChange, TextRenderingMode,
+    TextStyle, TextStyleRefinement, ThermalState, TransformationMatrix, Underline, UnderlineStyle,
+    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls, WindowCornerMask,
+    WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, WindowVisibility, point,
+    prelude::*, px, rems, size, transparent_black,
 };
 
 use crate::collections::{FxHashMap, FxHashSet};
@@ -1086,6 +1087,13 @@ enum InputModality {
     Touch,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct TextFade {
+    pub(crate) axis: Axis,
+    pub(crate) opaque: ScaledPixels,
+    pub(crate) gone: ScaledPixels,
+}
+
 pub struct Window {
     pub(crate) handle: AnyWindowHandle,
     pub(crate) invalidator: WindowInvalidator,
@@ -1110,7 +1118,7 @@ pub struct Window {
     pub(crate) rendered_entity_stack: Vec<EntityId>,
     pub(crate) element_offset_stack: Vec<Point<Pixels>>,
     pub(crate) element_opacity: f32,
-    pub(crate) text_fade: Option<(ScaledPixels, ScaledPixels)>,
+    pub(crate) text_fade: Option<TextFade>,
     pub(crate) glass_groups: Vec<crate::GlassGroupShapes>,
     pub(crate) content_mask_stack: Vec<ClipMask<Pixels>>,
     pub(crate) draw_number: u64,
@@ -4123,14 +4131,24 @@ impl Window {
         fade: Option<(Pixels, Pixels)>,
         f: impl FnOnce(&mut Self) -> R,
     ) -> R {
+        self.with_text_fade_along(Axis::Horizontal, fade, f)
+    }
+
+    pub fn with_text_fade_along<R>(
+        &mut self,
+        axis: Axis,
+        fade: Option<(Pixels, Pixels)>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
         let Some((opaque, gone)) = fade.filter(|(opaque, gone)| opaque != gone) else {
             return f(self);
         };
         let scale_factor = self.scale_factor();
-        let previous = self.text_fade.replace((
-            opaque.scale(scale_factor).round(),
-            gone.scale(scale_factor).round(),
-        ));
+        let previous = self.text_fade.replace(TextFade {
+            axis,
+            opaque: opaque.scale(scale_factor).round(),
+            gone: gone.scale(scale_factor).round(),
+        });
         let result = f(self);
         self.text_fade = previous;
         result
@@ -4142,50 +4160,62 @@ impl Window {
         content_mask: ClipMask<ScaledPixels>,
         sprite: impl Fn(ClipMask<ScaledPixels>, f32) -> P,
     ) {
-        let Some((opaque, gone)) = self.text_fade else {
+        let Some(TextFade { axis, opaque, gone }) = self.text_fade else {
             self.next_frame
                 .scene
                 .insert_primitive(sprite(content_mask, 1.0));
             return;
         };
         let clip = content_mask.bounds;
-        let left = bounds.left().max(clip.left());
-        let right = bounds.right().min(clip.right());
+        let (start, end) = match axis {
+            Axis::Horizontal => (
+                bounds.left().max(clip.left()),
+                bounds.right().min(clip.right()),
+            ),
+            Axis::Vertical => (
+                bounds.top().max(clip.top()),
+                bounds.bottom().min(clip.bottom()),
+            ),
+        };
         let (ramp_start, ramp_end) = (opaque.min(gone), opaque.max(gone));
         let fades_out = opaque < gone;
-        if right <= ramp_start || left >= ramp_end {
-            if (right <= ramp_start) == fades_out {
+        if end <= ramp_start || start >= ramp_end {
+            if (end <= ramp_start) == fades_out {
                 self.next_frame
                     .scene
                     .insert_primitive(sprite(content_mask, 1.0));
             }
             return;
         }
-        let column = |from, to| {
-            content_mask.clip(&Bounds::from_corners(
-                point(from, clip.top()),
-                point(to, clip.bottom()),
-            ))
+        let band = |from, to| {
+            content_mask.clip(&match axis {
+                Axis::Horizontal => {
+                    Bounds::from_corners(point(from, clip.top()), point(to, clip.bottom()))
+                }
+                Axis::Vertical => {
+                    Bounds::from_corners(point(clip.left(), from), point(clip.right(), to))
+                }
+            })
         };
-        if fades_out && left < ramp_start {
+        if fades_out && start < ramp_start {
             self.next_frame
                 .scene
-                .insert_primitive(sprite(column(left, ramp_start), 1.0));
+                .insert_primitive(sprite(band(start, ramp_start), 1.0));
         }
-        let stop = right.min(ramp_end);
-        let mut x = left.max(ramp_start).floor();
-        while x < stop {
-            let next = x + ScaledPixels(1.0);
-            let opacity = (x + ScaledPixels(0.5) - gone) / (opaque - gone);
+        let stop = end.min(ramp_end);
+        let mut at = start.max(ramp_start).floor();
+        while at < stop {
+            let next = at + ScaledPixels(1.0);
+            let opacity = (at + ScaledPixels(0.5) - gone) / (opaque - gone);
             self.next_frame
                 .scene
-                .insert_primitive(sprite(column(x.max(left), next.min(stop)), opacity));
-            x = next;
+                .insert_primitive(sprite(band(at.max(start), next.min(stop)), opacity));
+            at = next;
         }
-        if !fades_out && right > ramp_end {
+        if !fades_out && end > ramp_end {
             self.next_frame
                 .scene
-                .insert_primitive(sprite(column(ramp_end, right), 1.0));
+                .insert_primitive(sprite(band(ramp_end, end), 1.0));
         }
     }
 
@@ -8207,7 +8237,7 @@ mod tests {
     }
 
     #[ala::test]
-    fn text_fade_paints_glyphs_in_columns_fading_either_way(cx: &mut TestAppContext) {
+    fn text_fade_paints_glyphs_in_columns_or_rows_fading_either_way(cx: &mut TestAppContext) {
         let window = cx.add_window(|_, _| Empty);
         cx.update_window(window.into(), |_, window, _| {
             let scaled = |left, right| {
@@ -8230,7 +8260,11 @@ mod tests {
             }
             .into();
             window.next_frame.scene.monochrome_sprites.clear();
-            window.text_fade = Some((ScaledPixels(10.0), ScaledPixels(14.0)));
+            window.text_fade = Some(super::TextFade {
+                axis: crate::Axis::Horizontal,
+                opaque: ScaledPixels(10.0),
+                gone: ScaledPixels(14.0),
+            });
             window.paint_cached_monochrome_glyph(
                 scaled(6.0, 18.0),
                 mask,
@@ -8249,7 +8283,11 @@ mod tests {
                 hsla(0., 0., 1., 1.),
                 tile,
             );
-            window.text_fade = Some((ScaledPixels(14.0), ScaledPixels(10.0)));
+            window.text_fade = Some(super::TextFade {
+                axis: crate::Axis::Horizontal,
+                opaque: ScaledPixels(14.0),
+                gone: ScaledPixels(10.0),
+            });
             window.paint_cached_monochrome_glyph(
                 scaled(6.0, 18.0),
                 mask,
@@ -8287,6 +8325,42 @@ mod tests {
                     (12.0, 13.0, 0.625),
                     (13.0, 14.0, 0.875),
                     (14.0, 18.0, 1.0),
+                ]
+            );
+            window.next_frame.scene.monochrome_sprites.clear();
+            window.text_fade = Some(super::TextFade {
+                axis: crate::Axis::Vertical,
+                opaque: ScaledPixels(10.0),
+                gone: ScaledPixels(14.0),
+            });
+            window.paint_cached_monochrome_glyph(
+                Bounds::from_corners(
+                    point(ScaledPixels(0.0), ScaledPixels(6.0)),
+                    point(ScaledPixels(20.0), ScaledPixels(18.0)),
+                ),
+                mask,
+                hsla(0., 0., 1., 1.),
+                tile,
+            );
+            window.text_fade = None;
+            let rows: Vec<_> = window
+                .next_frame
+                .scene
+                .monochrome_sprites
+                .iter()
+                .map(|sprite| {
+                    let mask = sprite.content_mask.bounds;
+                    (mask.top().0, mask.bottom().0, sprite.color.a)
+                })
+                .collect();
+            assert_eq!(
+                rows,
+                [
+                    (6.0, 10.0, 1.0),
+                    (10.0, 11.0, 0.875),
+                    (11.0, 12.0, 0.625),
+                    (12.0, 13.0, 0.375),
+                    (13.0, 14.0, 0.125),
                 ]
             );
         })
