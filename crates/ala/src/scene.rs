@@ -474,6 +474,34 @@ impl Scene {
         self.log(PaintOperation::Primitive(primitive));
     }
 
+    pub(crate) fn take_layer_sprites(&mut self) -> Option<(DrawOrder, Vec<MonochromeSprite>)> {
+        if !self.transforms.is_empty() || !self.open_shader_layers.is_empty() {
+            return None;
+        }
+        let order = *self.layer_stack.last()?;
+        Some((order, std::mem::take(&mut self.monochrome_sprites)))
+    }
+
+    pub(crate) fn restore_layer_sprites(&mut self, sprites: Vec<MonochromeSprite>, first: usize) {
+        self.monochrome_sprites = sprites;
+        if self.replayable_depth == 0 || first == self.monochrome_sprites.len() {
+            return;
+        }
+        let start = self.sprite_log.len();
+        self.sprite_log
+            .extend_from_slice(&self.monochrome_sprites[first..]);
+        let end = self.sprite_log.len();
+        let extendable = self.paint_operations.len() > self.sealed_operations.get();
+        match self.paint_operations.last_mut() {
+            Some(PaintOperation::MonochromeSprites(range)) if extendable && range.end == start => {
+                range.end = end;
+            }
+            _ => self
+                .paint_operations
+                .push(PaintOperation::MonochromeSprites(start..end)),
+        }
+    }
+
     pub(crate) fn begin_replayable(&mut self) {
         self.replayable_depth += 1;
     }
