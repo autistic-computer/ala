@@ -292,6 +292,13 @@ pub(crate) struct A11yIndex {
     active_descendant: Option<NodeId>,
 }
 
+pub(crate) fn synthetic_node_id(parent: NodeId, key: impl Hash) -> NodeId {
+    let mut hasher = std::hash::DefaultHasher::default();
+    parent.0.hash(&mut hasher);
+    key.hash(&mut hasher);
+    NodeId(hasher.finish())
+}
+
 pub struct A11ySubtreeBuilder<'a> {
     parent_id: NodeId,
     nodes: &'a mut A11yNodeBuilder,
@@ -316,10 +323,7 @@ impl<'a> A11ySubtreeBuilder<'a> {
     }
 
     pub fn synthetic_node_id(&self, key: impl Hash) -> NodeId {
-        let mut hasher = std::hash::DefaultHasher::default();
-        self.parent_id.0.hash(&mut hasher);
-        key.hash(&mut hasher);
-        NodeId(hasher.finish())
+        synthetic_node_id(self.parent_id, key)
     }
 
     pub fn push_child(&mut self, id: NodeId, node: accesskit::Node) -> bool {

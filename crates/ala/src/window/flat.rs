@@ -932,6 +932,10 @@ impl Ui {
                 let node = &self.nodes[label.node as usize];
                 Described {
                     key: label.key,
+                    press: self
+                        .targets
+                        .get(node.target as usize)
+                        .map(|target| target.key),
                     role: label.role,
                     text: label.text.clone(),
                     bounds: Bounds::new(
@@ -946,6 +950,7 @@ impl Ui {
 
 struct Described {
     key: u64,
+    press: Option<u64>,
     role: Role,
     text: SharedString,
     bounds: Bounds<Pixels>,
@@ -1079,7 +1084,7 @@ impl<V: Flat> Element for Surface<V> {
 
     fn paint(
         &mut self,
-        _id: Option<&GlobalElementId>,
+        id: Option<&GlobalElementId>,
         _inspector_id: Option<&InspectorElementId>,
         bounds: Bounds<Pixels>,
         _request_layout: &mut Self::RequestLayoutState,
@@ -1087,6 +1092,23 @@ impl<V: Flat> Element for Surface<V> {
         window: &mut Window,
         cx: &mut App,
     ) {
+        for item in &prepaint.described {
+            let (Some(id), Some(key)) = (id, item.press) else {
+                continue;
+            };
+            let node = super::a11y::synthetic_node_id(id.accesskit_node_id(), item.key);
+            let view = self.view.clone();
+            let click = Click {
+                key,
+                button: MouseButton::Left,
+                count: 1,
+                modifiers: Modifiers::default(),
+                position: item.bounds.center(),
+            };
+            window.on_a11y_action(node, accesskit::Action::Click, move |_, window, cx| {
+                view.update(cx, |view, cx| view.clicked(click, window, cx));
+            });
+        }
         let view = self.view.clone();
         window.on_mouse_event(move |_: &MouseUpEvent, phase, window, cx| {
             if phase != DispatchPhase::Bubble {
@@ -1120,6 +1142,9 @@ impl<V: Flat> Element for Surface<V> {
         for item in &prepaint.described {
             let mut node = accesskit::Node::new(item.role);
             node.set_label(item.text.to_string());
+            if item.press.is_some() {
+                node.add_action(accesskit::Action::Click);
+            }
             node.set_bounds(accesskit::Rect {
                 x0: f64::from(item.bounds.left().0) * scale,
                 y0: f64::from(item.bounds.top().0) * scale,
@@ -1134,6 +1159,85 @@ impl<V: Flat> Element for Surface<V> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{AppContext as _, Render, TestAppContext};
+
+    struct Pressable {
+        ui: Ui,
+        style: BoxStyleId,
+        clicked: Vec<u64>,
+    }
+
+    impl Flat for Pressable {
+        fn ui(&mut self) -> &mut Ui {
+            &mut self.ui
+        }
+
+        fn build(&mut self, bounds: Bounds<Pixels>, _: &mut Window, _: &mut Context<Self>) {
+            self.ui.begin();
+            let node = self.ui.open(self.style);
+            self.ui.target(node, 7, CursorStyle::Arrow);
+            self.ui
+                .describe(node, 3, Role::Button, &SharedString::new_static("Press"));
+            self.ui.close();
+            self.ui.layout(bounds.size);
+        }
+
+        fn clicked(&mut self, click: Click, _: &mut Window, _: &mut Context<Self>) {
+            self.clicked.push(click.key);
+        }
+    }
+
+    struct Host(Entity<Pressable>);
+
+    impl Render for Host {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            surface("flat", &self.0).size_full()
+        }
+    }
+
+    #[crate::test]
+    fn a_described_target_is_pressed_through_accessibility(cx: &mut TestAppContext) {
+        let window = cx.add_window(|window, cx| {
+            Host(cx.new(|_| {
+                let mut ui = Ui::new(window);
+                let style = ui.box_style(BoxStyle {
+                    width: Extent::Fixed(px(20.)),
+                    height: Extent::Fixed(px(10.)),
+                    ..BoxStyle::default()
+                });
+                Pressable {
+                    ui,
+                    style,
+                    clicked: Vec::new(),
+                }
+            }))
+        });
+        let clicked = cx
+            .update_window(window.into(), |host, window, cx| {
+                window.set_a11y_forced(true);
+                window.draw(cx).clear(cx);
+                let update = window.a11y.last_tree_update().expect("a tree was built");
+                let (target_node, node) = update
+                    .nodes
+                    .iter()
+                    .find(|(_, node)| node.label() == Some("Press"))
+                    .expect("the described node is in the tree");
+                assert!(node.supports_action(accesskit::Action::Click));
+                window.handle_a11y_action(
+                    accesskit::ActionRequest {
+                        action: accesskit::Action::Click,
+                        target_tree: accesskit::TreeId::ROOT,
+                        target_node: *target_node,
+                        data: None,
+                    },
+                    cx,
+                );
+                let host = host.downcast::<Host>().expect("the root is the host");
+                host.read(cx).0.read(cx).clicked.clone()
+            })
+            .unwrap();
+        assert_eq!(clicked, [7]);
+    }
 
     #[test]
     fn the_last_painted_target_under_the_pointer_wins() {
