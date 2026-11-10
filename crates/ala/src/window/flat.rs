@@ -1,19 +1,21 @@
-use super::{Window, quantize_glyph_origin};
-use crate::collections::FxHashMap;
+mod text;
+
+use super::Window;
+use crate::refineable::Refineable as _;
 use crate::{
-    AtlasTile, BorderStyle, Bounds, ContentMask, Corners, DrawOrder, Edges, Font, FontId, GlyphId,
-    Hsla, LineLayout, MonochromeSprite, Pixels, Point, RenderGlyphParams, SUBPIXEL_VARIANTS_Y,
-    ScaledPixels, SharedString, Size, TextRun, TransformationMatrix, WindowTextSystem, phi, point,
-    px, quad, size,
+    A11ySubtreeBuilder, App, AvailableSpace, BorderStyle, Bounds, ContentMask, Context, Corners,
+    CursorStyle, DispatchPhase, Edges, Element, ElementId, Entity, EntityId, Font, GlobalElementId,
+    Hitbox, HitboxBehavior, Hsla, InspectorElementId, IntoElement, LayoutId, Modifiers,
+    MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, Role,
+    ScrollWheelEvent, SharedString, Size, Style, StyleRefinement, Styled, TextRun,
+    TransformationMatrix, WindowTextSystem, phi, point, px, quad, size,
 };
 use anyhow::Result;
-use std::{mem, ops::Range, sync::Arc};
-
-const _: () = assert!(SUBPIXEL_VARIANTS_Y == 1);
+use std::{cell::RefCell, mem, rc::Rc, sync::Arc};
+use text::Paragraphs;
 
 const NONE: u32 = u32::MAX;
 const SWEEP_EVERY: u64 = 256;
-const KEEP_FRAMES: u64 = 512;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Flow {
@@ -44,6 +46,14 @@ pub enum Wrap {
     Never,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Align {
+    #[default]
+    Start,
+    Center,
+    End,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Insets {
     pub left: Pixels,
@@ -70,7 +80,10 @@ pub struct BoxStyle {
     pub height: Extent,
     pub padding: Insets,
     pub gap: Pixels,
+    pub align: Align,
     pub fill: Option<Hsla>,
+    pub border: Pixels,
+    pub border_color: Hsla,
     pub radius: Pixels,
     pub clip: Clip,
 }
@@ -92,6 +105,21 @@ pub struct TextStyleId(u16);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct NodeId(u32);
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Span {
+    pub len: usize,
+    pub style: TextStyleId,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Click {
+    pub key: u64,
+    pub button: MouseButton,
+    pub count: usize,
+    pub modifiers: Modifiers,
+    pub position: Point<Pixels>,
+}
+
 struct ResolvedText {
     run: TextRun,
     size: Pixels,
@@ -99,13 +127,22 @@ struct ResolvedText {
     wrap: Wrap,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Box,
+    Text,
+    Icon,
+}
+
 #[derive(Clone, Copy)]
 struct Node {
     parent: u32,
     end: u32,
     children: u32,
-    paragraph: u32,
+    payload: u32,
+    target: u32,
     style: u16,
+    kind: Kind,
     shift: f32,
     fit: f32,
     main: f32,
@@ -116,405 +153,67 @@ struct Node {
     h: f32,
 }
 
-impl Node {
-    fn is_text(&self) -> bool {
-        self.paragraph != NONE
-    }
+struct Icon {
+    path: SharedString,
+    color: Hsla,
+    size: Pixels,
 }
 
 #[derive(Clone, Copy)]
-struct Glyph {
-    x: Pixels,
-    y: Pixels,
-    id: GlyphId,
-    run: u16,
-    is_emoji: bool,
-    placed_at: Pixels,
-    device_x: ScaledPixels,
-    raster_y: ScaledPixels,
-    size: Size<ScaledPixels>,
-    tile: Option<AtlasTile>,
+struct Target {
+    key: u64,
+    cursor: CursorStyle,
 }
 
-struct Run {
-    font_id: FontId,
-    bounding_box: Size<Pixels>,
-}
-
-struct SourceLine {
-    layout: Option<Arc<LineLayout>>,
-    text: Range<usize>,
-    glyphs: Range<u32>,
-    baseline: Pixels,
-}
-
-struct VisualLine {
-    glyphs: Range<u32>,
-    start_x: Pixels,
-    baseline: Pixels,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum Wrapped {
-    Stale,
-    At(Option<Pixels>),
-}
-
-struct Paragraph {
-    key: Option<(u64, u16)>,
-    version: u64,
-    used: u64,
+struct Label {
+    node: u32,
+    key: u64,
+    role: Role,
     text: SharedString,
-    lines: Vec<SourceLine>,
-    runs: Vec<Run>,
-    glyphs: Vec<Glyph>,
-    visual_lines: Vec<VisualLine>,
-    wrapped: Wrapped,
-    width: Pixels,
-    generations: (usize, u64, u32),
-    has_emoji: bool,
-    has_offsets: bool,
 }
 
-impl Paragraph {
-    fn new(key: Option<(u64, u16)>) -> Self {
-        Self {
-            key,
-            version: 0,
-            used: 0,
-            text: SharedString::default(),
-            lines: Vec::new(),
-            runs: Vec::new(),
-            glyphs: Vec::new(),
-            visual_lines: Vec::new(),
-            wrapped: Wrapped::Stale,
-            width: Pixels::ZERO,
-            generations: (0, 0, 0),
-            has_emoji: false,
-            has_offsets: false,
-        }
-    }
-
-    fn shape(&mut self, text: &SharedString, style: &mut ResolvedText, system: &WindowTextSystem) {
-        self.text = text.clone();
-        self.lines.clear();
-        self.runs.clear();
-        self.glyphs.clear();
-        self.wrapped = Wrapped::Stale;
-        self.width = Pixels::ZERO;
-        self.has_emoji = false;
-        self.has_offsets = false;
-        let mut start = 0;
-        for line in text.split('\n') {
-            style.run.len = line.len();
-            let layout =
-                system.layout_line(line, style.size, std::slice::from_ref(&style.run), None);
-            let first = self.glyphs.len() as u32;
-            for shaped in &layout.runs {
-                let run = match self
-                    .runs
-                    .iter()
-                    .position(|run| run.font_id == shaped.font_id)
-                {
-                    Some(run) => run,
-                    None => {
-                        self.runs.push(Run {
-                            font_id: shaped.font_id,
-                            bounding_box: system.bounding_box(shaped.font_id, style.size).size,
-                        });
-                        self.runs.len() - 1
-                    }
-                };
-                for glyph in &shaped.glyphs {
-                    self.has_emoji |= glyph.is_emoji;
-                    self.has_offsets |= glyph.position.y != Pixels::ZERO;
-                    self.glyphs.push(Glyph {
-                        x: glyph.position.x,
-                        y: glyph.position.y,
-                        id: glyph.id,
-                        run: run as u16,
-                        is_emoji: glyph.is_emoji,
-                        placed_at: px(f32::NAN),
-                        device_x: ScaledPixels(0.),
-                        raster_y: ScaledPixels(0.),
-                        size: Size::default(),
-                        tile: None,
-                    });
-                }
-            }
-            let padding_top = (style.line_height - layout.ascent - layout.descent) / 2.;
-            self.width = self.width.max(layout.width);
-            self.lines.push(SourceLine {
-                baseline: padding_top + layout.ascent,
-                text: start..start + line.len(),
-                glyphs: first..self.glyphs.len() as u32,
-                layout: (style.wrap == Wrap::Words).then_some(layout),
-            });
-            start += line.len() + 1;
-        }
-    }
-
-    fn wrap(&mut self, width: Option<Pixels>) {
-        if self.wrapped == Wrapped::At(width) {
-            return;
-        }
-        self.wrapped = Wrapped::At(width);
-        self.visual_lines.clear();
-        for line in &self.lines {
-            let mut start = line.glyphs.start;
-            let mut start_x = Pixels::ZERO;
-            if let (Some(width), Some(layout)) = (width, &line.layout) {
-                let boundaries =
-                    layout.compute_wrap_boundaries(&self.text[line.text.clone()], width, None);
-                let mut run = 0;
-                let mut run_start = line.glyphs.start;
-                for boundary in boundaries {
-                    while run < boundary.run_ix {
-                        run_start += layout.runs[run].glyphs.len() as u32;
-                        run += 1;
-                    }
-                    let glyph = run_start + boundary.glyph_ix as u32;
-                    self.visual_lines.push(VisualLine {
-                        glyphs: start..glyph,
-                        start_x,
-                        baseline: line.baseline,
-                    });
-                    start = glyph;
-                    start_x = self.glyphs[glyph as usize].x;
-                }
-            }
-            self.visual_lines.push(VisualLine {
-                glyphs: start..line.glyphs.end,
-                start_x,
-                baseline: line.baseline,
-            });
-        }
-    }
-
-    fn paint(
-        &mut self,
-        style: &ResolvedText,
-        origin: Point<Pixels>,
-        window: &mut Window,
-    ) -> Result<()> {
-        let direct = window.text_fade.is_none()
-            && !self.has_emoji
-            && !self.has_offsets
-            && self
-                .runs
-                .iter()
-                .all(|run| !window.should_use_subpixel_rendering(run.font_id, style.size));
-        let Some((order, mut sprites)) = direct
-            .then(|| window.next_frame.scene.take_layer_sprites())
-            .flatten()
-        else {
-            return self.paint_glyphs(style, origin, window);
-        };
-        let first = sprites.len();
-        let result = self.paint_sprites(style, origin, order, &mut sprites, window);
-        window
-            .next_frame
-            .scene
-            .restore_layer_sprites(sprites, first);
-        result
-    }
-
-    fn first_visible_line(
-        &self,
-        style: &ResolvedText,
-        origin: Point<Pixels>,
-        mask: &Bounds<Pixels>,
-    ) -> usize {
-        let tallest = self.runs.iter().fold(Pixels::ZERO, |tallest, run| {
-            tallest.max(run.bounding_box.height)
-        });
-        ((mask.top() - tallest - origin.y) / style.line_height)
-            .floor()
-            .max(0.) as usize
-    }
-
-    fn paint_glyphs(
-        &self,
-        style: &ResolvedText,
-        origin: Point<Pixels>,
-        window: &mut Window,
-    ) -> Result<()> {
-        let mask = window.content_mask().bounds;
-        let first = self.first_visible_line(style, origin, &mask);
-        for (index, line) in self.visual_lines.iter().enumerate().skip(first) {
-            let top = origin.y + style.line_height * index;
-            if top >= mask.bottom() {
-                break;
-            }
-            let mut x = origin.x;
-            let mut previous_x = line.start_x;
-            for glyph in &self.glyphs[line.glyphs.start as usize..line.glyphs.end as usize] {
-                x += glyph.x - previous_x;
-                previous_x = glyph.x;
-                let run = &self.runs[glyph.run as usize];
-                let visible = Bounds {
-                    origin: point(x, top),
-                    size: run.bounding_box,
-                }
-                .intersects(&mask);
-                if !visible {
-                    continue;
-                }
-                let at = point(x, top) + point(px(0.), line.baseline) + point(px(0.), glyph.y);
-                if glyph.is_emoji {
-                    window.paint_emoji(at, run.font_id, glyph.id, style.size)?;
-                } else {
-                    window.paint_glyph(at, run.font_id, glyph.id, style.size, style.run.color)?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn paint_sprites(
-        &mut self,
-        style: &ResolvedText,
-        origin: Point<Pixels>,
-        order: DrawOrder,
-        sprites: &mut Vec<MonochromeSprite>,
-        window: &Window,
-    ) -> Result<()> {
-        let scale_factor = window.scale_factor();
-        let (font_generation, atlas_generation) = window.glyph_run_generations();
-        let generations = (font_generation, atlas_generation, scale_factor.to_bits());
-        if self.generations != generations {
-            self.generations = generations;
-            for glyph in &mut self.glyphs {
-                glyph.placed_at = px(f32::NAN);
-            }
-        }
-        let mask = window.content_mask().bounds;
-        let content_mask = window.snapped_content_mask();
-        let color = style.run.color.opacity(window.element_opacity());
-        let dilation = window
-            .text_system()
-            .glyph_dilation_for_color(style.run.color);
-        let font_smoothing_strength = match dilation {
-            0 => 0,
-            1 => 64,
-            2 => 128,
-            3 => 191,
-            _ => 255,
-        };
-        let first = self.first_visible_line(style, origin, &mask);
-        for (index, line) in self.visual_lines.iter().enumerate().skip(first) {
-            let top = origin.y + style.line_height * index;
-            if top >= mask.bottom() {
-                break;
-            }
-            let baseline = top + line.baseline;
-            let device_y = quantize_glyph_origin(point(px(0.), baseline).scale(scale_factor))
-                .0
-                .y;
-            let mut x = origin.x;
-            let mut previous_x = line.start_x;
-            for glyph in &mut self.glyphs[line.glyphs.start as usize..line.glyphs.end as usize] {
-                x += glyph.x - previous_x;
-                previous_x = glyph.x;
-                let run = &self.runs[glyph.run as usize];
-                let visible = Bounds {
-                    origin: point(x, top),
-                    size: run.bounding_box,
-                }
-                .intersects(&mask);
-                if !visible {
-                    continue;
-                }
-                if glyph.placed_at != x {
-                    let (integer_origin, variant) =
-                        quantize_glyph_origin(point(x, baseline).scale(scale_factor));
-                    let params = RenderGlyphParams {
-                        font_id: run.font_id,
-                        glyph_id: glyph.id,
-                        font_size: style.size,
-                        subpixel_variant: variant,
-                        scale_factor,
-                        is_emoji: false,
-                        subpixel_rendering: false,
-                        font_smoothing: dilation > 0,
-                        font_smoothing_strength,
-                        synthetic_bold: false,
-                        synthetic_italic: false,
-                    };
-                    let resolved = window.glyph_tile(&params)?;
-                    glyph.placed_at = x;
-                    glyph.tile = None;
-                    if let Some((raster_bounds, tile)) = resolved {
-                        let raster_origin: Point<ScaledPixels> =
-                            raster_bounds.origin.map(Into::into);
-                        glyph.device_x = integer_origin.x + raster_origin.x;
-                        glyph.raster_y = raster_origin.y;
-                        glyph.size = tile.bounds.size.map(Into::into);
-                        glyph.tile = Some(tile);
-                    }
-                }
-                let Some(tile) = glyph.tile else {
-                    continue;
-                };
-                let bounds = Bounds {
-                    origin: point(glyph.device_x, device_y + glyph.raster_y),
-                    size: glyph.size,
-                };
-                if bounds.intersect(&content_mask.bounds).is_empty() {
-                    continue;
-                }
-                sprites.push(MonochromeSprite {
-                    order,
-                    pad: 0,
-                    bounds,
-                    content_mask,
-                    color,
-                    tile,
-                    transformation: TransformationMatrix::unit(),
-                });
-            }
-        }
-        Ok(())
-    }
+#[derive(Clone, Copy)]
+struct TargetRect {
+    bounds: Bounds<Pixels>,
+    key: u64,
+    cursor: CursorStyle,
 }
 
 #[derive(Default)]
-struct Paragraphs {
-    slots: Vec<Paragraph>,
-    index: FxHashMap<(u64, u16), u32>,
-    free: Vec<u32>,
+struct Pointer {
+    rects: Vec<TargetRect>,
+    hovered: Option<u64>,
+    pressed: Option<(u64, MouseButton)>,
+    focused: Option<u64>,
+    clicks: Vec<Click>,
+    scroll: Point<Pixels>,
 }
 
-impl Paragraphs {
-    fn slot(&mut self, key: (u64, u16)) -> (u32, bool) {
-        if let Some(slot) = self.index.get(&key) {
-            return (*slot, false);
-        }
-        let slot = match self.free.pop() {
-            Some(slot) => {
-                self.slots[slot as usize].key = Some(key);
-                slot
-            }
-            None => {
-                self.slots.push(Paragraph::new(Some(key)));
-                self.slots.len() as u32 - 1
-            }
-        };
-        self.index.insert(key, slot);
-        (slot, true)
+impl Pointer {
+    fn pick(&self, position: Point<Pixels>) -> Option<TargetRect> {
+        self.rects
+            .iter()
+            .rev()
+            .find(|rect| rect.bounds.contains(&position))
+            .copied()
     }
 
-    fn sweep(&mut self, frame: u64) {
-        for (slot, paragraph) in self.slots.iter_mut().enumerate() {
-            let Some(key) = paragraph.key else {
-                continue;
-            };
-            if paragraph.used + KEEP_FRAMES < frame {
-                self.index.remove(&key);
-                *paragraph = Paragraph::new(None);
-                self.free.push(slot as u32);
-            }
+    fn step_focus(&mut self, forward: bool) {
+        let count = self.rects.len();
+        if count == 0 {
+            self.focused = None;
+            return;
         }
+        let current = self
+            .focused
+            .and_then(|key| self.rects.iter().position(|rect| rect.key == key));
+        let next = match (current, forward) {
+            (Some(index), true) => (index + 1) % count,
+            (Some(index), false) => (index + count - 1) % count,
+            (None, true) => 0,
+            (None, false) => count - 1,
+        };
+        self.focused = Some(self.rects[next].key);
     }
 }
 
@@ -526,8 +225,13 @@ pub struct Ui {
     text_styles: Vec<ResolvedText>,
     nodes: Vec<Node>,
     open: Vec<u32>,
+    icons: Vec<Icon>,
+    targets: Vec<Target>,
+    labels: Vec<Label>,
     clips: Vec<(u32, ContentMask<Pixels>)>,
     paragraphs: Paragraphs,
+    pointer: Rc<RefCell<Pointer>>,
+    scrollable: bool,
     frame: u64,
 }
 
@@ -541,10 +245,19 @@ impl Ui {
             text_styles: Vec::new(),
             nodes: Vec::new(),
             open: Vec::new(),
+            icons: Vec::new(),
+            targets: Vec::new(),
+            labels: Vec::new(),
             clips: Vec::new(),
             paragraphs: Paragraphs::default(),
+            pointer: Rc::default(),
+            scrollable: false,
             frame: 0,
         }
+    }
+
+    pub fn scale_factor(&self) -> f32 {
+        self.scale_factor
     }
 
     pub fn box_style(&mut self, style: BoxStyle) -> BoxStyleId {
@@ -581,9 +294,12 @@ impl Ui {
     pub fn begin(&mut self) {
         self.nodes.clear();
         self.open.clear();
+        self.icons.clear();
+        self.targets.clear();
+        self.labels.clear();
     }
 
-    fn push(&mut self, style: u16, paragraph: u32, shift: Pixels) -> u32 {
+    fn push(&mut self, kind: Kind, style: u16, payload: u32, shift: Pixels) -> u32 {
         let parent = self.open.last().copied().unwrap_or(NONE);
         if parent != NONE {
             self.nodes[parent as usize].children += 1;
@@ -593,8 +309,10 @@ impl Ui {
             parent,
             end: index + 1,
             children: 0,
-            paragraph,
+            payload,
+            target: NONE,
             style,
+            kind,
             shift: shift.0,
             fit: 0.,
             main: 0.,
@@ -612,7 +330,7 @@ impl Ui {
     }
 
     pub fn open_shifted(&mut self, style: BoxStyleId, shift: Pixels) -> NodeId {
-        let index = self.push(style.0, NONE, shift);
+        let index = self.push(Kind::Box, style.0, NONE, shift);
         self.open.push(index);
         NodeId(index)
     }
@@ -629,18 +347,99 @@ impl Ui {
         style: TextStyleId,
         text: &SharedString,
     ) -> NodeId {
+        self.spans(key, version, style, text, &[])
+    }
+
+    pub fn spans(
+        &mut self,
+        key: u64,
+        version: u64,
+        style: TextStyleId,
+        text: &SharedString,
+        spans: &[Span],
+    ) -> NodeId {
         let (slot, new) = self.paragraphs.slot((key, style.0));
         let paragraph = &mut self.paragraphs.slots[slot as usize];
         if new || paragraph.version != version {
             paragraph.version = version;
             paragraph.shape(
                 text,
-                &mut self.text_styles[style.0 as usize],
+                spans,
+                &self.text_styles[style.0 as usize],
+                &self.text_styles,
                 &self.text_system,
             );
         }
         paragraph.used = self.frame;
-        NodeId(self.push(style.0, slot, Pixels::ZERO))
+        NodeId(self.push(Kind::Text, style.0, slot, Pixels::ZERO))
+    }
+
+    pub fn icon(&mut self, path: &SharedString, size: Pixels, color: Hsla) -> NodeId {
+        self.icons.push(Icon {
+            path: path.clone(),
+            color,
+            size,
+        });
+        NodeId(self.push(Kind::Icon, 0, self.icons.len() as u32 - 1, Pixels::ZERO))
+    }
+
+    pub fn target(&mut self, node: NodeId, key: u64, cursor: CursorStyle) {
+        self.targets.push(Target { key, cursor });
+        self.nodes[node.0 as usize].target = self.targets.len() as u32 - 1;
+    }
+
+    pub fn describe(&mut self, node: NodeId, key: u64, role: Role, text: &SharedString) {
+        self.labels.push(Label {
+            node: node.0,
+            key,
+            role,
+            text: text.clone(),
+        });
+    }
+
+    pub fn hovered(&self) -> Option<u64> {
+        self.pointer.borrow().hovered
+    }
+
+    pub fn pressed(&self) -> Option<u64> {
+        self.pointer.borrow().pressed.map(|(key, _)| key)
+    }
+
+    pub fn focused(&self) -> Option<u64> {
+        self.pointer.borrow().focused
+    }
+
+    pub fn focus(&mut self, key: Option<u64>) {
+        self.pointer.borrow_mut().focused = key;
+    }
+
+    pub fn focus_next(&mut self) {
+        self.pointer.borrow_mut().step_focus(true);
+    }
+
+    pub fn focus_previous(&mut self) {
+        self.pointer.borrow_mut().step_focus(false);
+    }
+
+    pub fn clicks(&mut self) -> Vec<Click> {
+        mem::take(&mut self.pointer.borrow_mut().clicks)
+    }
+
+    pub fn set_scrollable(&mut self, scrollable: bool) {
+        self.scrollable = scrollable;
+    }
+
+    pub fn scrolled(&mut self) -> Point<Pixels> {
+        mem::take(&mut self.pointer.borrow_mut().scroll)
+    }
+
+    pub fn target_bounds(&self, key: u64) -> Option<Bounds<Pixels>> {
+        let pointer = self.pointer.borrow();
+        pointer
+            .rects
+            .iter()
+            .find(|rect| rect.key == key)
+            .map(|rect| rect.bounds)
     }
 
     pub fn layout(&mut self, available: Size<Pixels>) {
@@ -654,6 +453,8 @@ impl Ui {
             box_styles,
             text_styles,
             paragraphs,
+            icons,
+            scale_factor,
             ..
         } = self;
         if nodes.is_empty() {
@@ -662,23 +463,25 @@ impl Ui {
 
         for index in (0..nodes.len()).rev() {
             let node = nodes[index];
-            let fit = if node.is_text() {
-                match text_styles[node.style as usize].wrap {
+            let fit = match node.kind {
+                Kind::Text => match text_styles[node.style as usize].wrap {
                     Wrap::Words => 0.,
-                    Wrap::Never => paragraphs.slots[node.paragraph as usize].width.0,
-                }
-            } else {
-                let style = &box_styles[node.style as usize];
-                match style.width {
-                    Extent::Fixed(width) => width.0,
-                    Extent::Fit | Extent::Grow => {
-                        let inner = match style.flow {
-                            Flow::Row => {
-                                node.main + style.gap.0 * node.children.saturating_sub(1) as f32
-                            }
-                            Flow::Column => node.cross,
-                        };
-                        inner + style.padding.left.0 + style.padding.right.0
+                    Wrap::Never => paragraphs.slots[node.payload as usize].width.0,
+                },
+                Kind::Icon => icons[node.payload as usize].size.0,
+                Kind::Box => {
+                    let style = &box_styles[node.style as usize];
+                    match style.width {
+                        Extent::Fixed(width) => width.0,
+                        Extent::Fit | Extent::Grow => {
+                            let inner = match style.flow {
+                                Flow::Row => {
+                                    node.main + style.gap.0 * node.children.saturating_sub(1) as f32
+                                }
+                                Flow::Column => node.cross,
+                            };
+                            inner + style.padding.left.0 + style.padding.right.0
+                        }
                     }
                 }
             };
@@ -700,20 +503,18 @@ impl Ui {
         };
         for index in 0..nodes.len() {
             let node = nodes[index];
-            if node.is_text() {
+            if node.kind != Kind::Box {
                 continue;
             }
             let style = &box_styles[node.style as usize];
             let inner = (node.w - style.padding.left.0 - style.padding.right.0).max(0.);
-            let extent = |child: &Node| {
-                if child.is_text() {
-                    match style.flow {
-                        Flow::Column => Extent::Grow,
-                        Flow::Row => Extent::Fit,
-                    }
-                } else {
-                    box_styles[child.style as usize].width
-                }
+            let extent = |child: &Node| match child.kind {
+                Kind::Text => match text_styles[child.style as usize].wrap {
+                    Wrap::Words => Extent::Grow,
+                    Wrap::Never => Extent::Fit,
+                },
+                Kind::Icon => Extent::Fit,
+                Kind::Box => box_styles[child.style as usize].width,
             };
             let mut grow_share = 0.;
             if style.flow == Flow::Row {
@@ -748,27 +549,31 @@ impl Ui {
 
         for index in (0..nodes.len()).rev() {
             let node = nodes[index];
-            let height = if node.is_text() {
-                let text = &text_styles[node.style as usize];
-                let paragraph = &mut paragraphs.slots[node.paragraph as usize];
-                paragraph.wrap(match text.wrap {
-                    Wrap::Words => Some(px(node.w)),
-                    Wrap::Never => None,
-                });
-                (text.line_height * paragraph.visual_lines.len()).0
-            } else {
-                let style = &box_styles[node.style as usize];
-                match style.height {
-                    Extent::Fixed(height) => height.0,
-                    Extent::Grow if index == 0 => available.height.0,
-                    Extent::Fit | Extent::Grow => {
-                        let inner = match style.flow {
-                            Flow::Column => {
-                                node.main + style.gap.0 * node.children.saturating_sub(1) as f32
-                            }
-                            Flow::Row => node.cross,
-                        };
-                        inner + style.padding.top.0 + style.padding.bottom.0
+            let height = match node.kind {
+                Kind::Text => {
+                    let text = &text_styles[node.style as usize];
+                    let paragraph = &mut paragraphs.slots[node.payload as usize];
+                    paragraph.wrap(match text.wrap {
+                        Wrap::Words => Some(px(node.w)),
+                        Wrap::Never => None,
+                    });
+                    (text.line_height * paragraph.visual_line_count()).0
+                }
+                Kind::Icon => icons[node.payload as usize].size.0,
+                Kind::Box => {
+                    let style = &box_styles[node.style as usize];
+                    match style.height {
+                        Extent::Fixed(height) => height.0,
+                        Extent::Grow if index == 0 => available.height.0,
+                        Extent::Fit | Extent::Grow => {
+                            let inner = match style.flow {
+                                Flow::Column => {
+                                    node.main + style.gap.0 * node.children.saturating_sub(1) as f32
+                                }
+                                Flow::Row => node.cross,
+                            };
+                            inner + style.padding.top.0 + style.padding.bottom.0
+                        }
                     }
                 }
             };
@@ -782,23 +587,63 @@ impl Ui {
             }
         }
 
+        let scale = *scale_factor;
         nodes[0].x = 0.;
         nodes[0].y = 0.;
         for index in 0..nodes.len() {
             let node = nodes[index];
-            if node.is_text() {
+            if node.kind != Kind::Box {
                 continue;
             }
             let style = &box_styles[node.style as usize];
+            let inner_width = (node.w - style.padding.left.0 - style.padding.right.0).max(0.);
+            let inner_height = (node.h - style.padding.top.0 - style.padding.bottom.0).max(0.);
+            let grows = |child: &Node| {
+                child.kind == Kind::Box && box_styles[child.style as usize].height == Extent::Grow
+            };
+            let offset = |free: f32| match style.align {
+                Align::Start => 0.,
+                Align::Center => (free / 2. * scale).round() / scale,
+                Align::End => free,
+            };
+            let mut grow_share = 0.;
+            if style.flow == Flow::Column {
+                let mut taken = style.gap.0 * node.children.saturating_sub(1) as f32;
+                let mut growing = 0;
+                let mut child = index + 1;
+                while child < node.end as usize {
+                    if grows(&nodes[child]) {
+                        growing += 1;
+                    } else {
+                        taken += nodes[child].h;
+                    }
+                    child = nodes[child].end as usize;
+                }
+                if growing > 0 {
+                    grow_share = ((inner_height - taken) / growing as f32).max(0.);
+                }
+            }
             let mut x = node.x + style.padding.left.0;
             let mut y = node.y + style.padding.top.0 + node.shift;
             let mut child = index + 1;
             while child < node.end as usize {
-                nodes[child].x = x;
-                nodes[child].y = y;
+                if grows(&nodes[child]) {
+                    nodes[child].h = match style.flow {
+                        Flow::Row => inner_height,
+                        Flow::Column => nodes[child].h.max(grow_share),
+                    };
+                }
                 match style.flow {
-                    Flow::Column => y += nodes[child].h + style.gap.0,
-                    Flow::Row => x += nodes[child].w + style.gap.0,
+                    Flow::Column => {
+                        nodes[child].x = x + offset(inner_width - nodes[child].w);
+                        nodes[child].y = y;
+                        y += nodes[child].h + style.gap.0;
+                    }
+                    Flow::Row => {
+                        nodes[child].x = x;
+                        nodes[child].y = y + offset(inner_height - nodes[child].h);
+                        x += nodes[child].w + style.gap.0;
+                    }
                 }
                 child = nodes[child].end as usize;
             }
@@ -816,10 +661,10 @@ impl Ui {
         Bounds::new(point(px(node.x), px(node.y)), size(px(node.w), px(node.h)))
     }
 
-    pub fn paint(&mut self, origin: Point<Pixels>, window: &mut Window) -> Result<()> {
+    pub fn paint(&mut self, origin: Point<Pixels>, window: &mut Window, cx: &App) -> Result<()> {
         let bounds = Bounds::new(origin, self.size());
         let result = window.paint_layer(bounds, |window| {
-            self.paint_fills(origin, window);
+            self.paint_fills(origin, window, cx)?;
             self.paint_text(origin, window)
         });
         self.frame += 1;
@@ -829,49 +674,98 @@ impl Ui {
         result
     }
 
-    fn paint_fills(&mut self, origin: Point<Pixels>, window: &mut Window) {
+    fn paint_fills(&mut self, origin: Point<Pixels>, window: &mut Window, cx: &App) -> Result<()> {
         let mut clips = mem::take(&mut self.clips);
         clips.clear();
+        let mut pointer = self.pointer.borrow_mut();
+        pointer.rects.clear();
+        let mut result = Ok(());
         for (index, node) in self.nodes.iter().enumerate() {
             while clips.last().is_some_and(|(end, _)| index as u32 >= *end) {
                 clips.pop();
             }
-            if node.is_text() {
-                continue;
-            }
-            let style = &self.box_styles[node.style as usize];
             let bounds = Bounds::new(
                 origin + point(px(node.x), px(node.y)),
                 size(px(node.w), px(node.h)),
             );
-            if let Some(fill) = style.fill {
-                let mask = clips.last().map(|(_, mask)| *mask);
-                window.with_content_mask(mask, |window| {
-                    let radii =
-                        window.resolve_corner_radii(Corners::all(style.radius), bounds.size);
-                    let (radii, smoothing) = window.drawn_corners(radii, bounds.size, None);
-                    let mut background = quad(
+            let mask = clips.last().map(|(_, mask)| *mask);
+            if node.target != NONE {
+                let target = self.targets[node.target as usize];
+                let bounds = mask.map_or(bounds, |mask| bounds.intersect(&mask.bounds));
+                if !bounds.is_empty() {
+                    pointer.rects.push(TargetRect {
                         bounds,
-                        radii,
-                        fill,
-                        Edges::default(),
-                        fill.opacity(0.),
-                        BorderStyle::default(),
-                    );
-                    background.corner_smoothing = smoothing;
-                    window.paint_quad(background);
-                });
+                        key: target.key,
+                        cursor: target.cursor,
+                    });
+                }
             }
-            if style.clip == Clip::Bounds {
-                let mask = ContentMask { bounds };
-                let mask = match clips.last() {
-                    Some((_, outer)) => mask.intersect(outer),
-                    None => mask,
-                };
-                clips.push((node.end, mask));
+            match node.kind {
+                Kind::Text => {}
+                Kind::Icon => {
+                    let icon = &self.icons[node.payload as usize];
+                    result = window.with_content_mask(mask, |window| {
+                        window.paint_svg(
+                            bounds,
+                            icon.path.clone(),
+                            None,
+                            TransformationMatrix::unit(),
+                            icon.color,
+                            cx,
+                        )
+                    });
+                    if result.is_err() {
+                        break;
+                    }
+                }
+                Kind::Box => {
+                    let style = &self.box_styles[node.style as usize];
+                    let bordered = style.border > Pixels::ZERO && style.border_color.a > 0.;
+                    if style.fill.is_some() || bordered {
+                        window.with_content_mask(mask, |window| {
+                            let radii = window
+                                .resolve_corner_radii(Corners::all(style.radius), bounds.size);
+                            let (radii, smoothing) = window.drawn_corners(radii, bounds.size, None);
+                            if let Some(fill) = style.fill {
+                                let mut background = quad(
+                                    bounds,
+                                    radii,
+                                    fill,
+                                    Edges::default(),
+                                    fill.opacity(0.),
+                                    BorderStyle::default(),
+                                );
+                                background.corner_smoothing = smoothing;
+                                window.paint_quad(background);
+                            }
+                            if bordered {
+                                let mut border = quad(
+                                    bounds,
+                                    radii,
+                                    style.border_color.opacity(0.),
+                                    Edges::all(style.border),
+                                    style.border_color,
+                                    BorderStyle::default(),
+                                );
+                                border.corner_smoothing = smoothing;
+                                window.paint_quad(border);
+                            }
+                        });
+                    }
+                    if style.clip == Clip::Bounds {
+                        let mask = ContentMask { bounds };
+                        let mask = match clips.last() {
+                            Some((_, outer)) => mask.intersect(outer),
+                            None => mask,
+                        };
+                        clips.push((node.end, mask));
+                    }
+                }
             }
         }
+        drop(pointer);
         self.clips = clips;
+        result
     }
 
     fn paint_text(&mut self, origin: Point<Pixels>, window: &mut Window) -> Result<()> {
@@ -883,28 +777,315 @@ impl Ui {
                 clips.pop();
             }
             let at = origin + point(px(node.x), px(node.y));
-            if node.is_text() {
-                let style = &self.text_styles[node.style as usize];
-                let paragraph = &mut self.paragraphs.slots[node.paragraph as usize];
-                let mask = clips.last().map(|(_, mask)| *mask);
-                result =
-                    window.with_content_mask(mask, |window| paragraph.paint(style, at, window));
-                if result.is_err() {
-                    break;
+            match node.kind {
+                Kind::Icon => {}
+                Kind::Text => {
+                    let style = &self.text_styles[node.style as usize];
+                    let paragraph = &mut self.paragraphs.slots[node.payload as usize];
+                    let mask = clips.last().map(|(_, mask)| *mask);
+                    result =
+                        window.with_content_mask(mask, |window| paragraph.paint(style, at, window));
+                    if result.is_err() {
+                        break;
+                    }
                 }
-            } else if self.box_styles[node.style as usize].clip == Clip::Bounds {
-                let mask = ContentMask {
-                    bounds: Bounds::new(at, size(px(node.w), px(node.h))),
-                };
-                let mask = match clips.last() {
-                    Some((_, outer)) => mask.intersect(outer),
-                    None => mask,
-                };
-                clips.push((node.end, mask));
+                Kind::Box => {
+                    if self.box_styles[node.style as usize].clip == Clip::Bounds {
+                        let mask = ContentMask {
+                            bounds: Bounds::new(at, size(px(node.w), px(node.h))),
+                        };
+                        let mask = match clips.last() {
+                            Some((_, outer)) => mask.intersect(outer),
+                            None => mask,
+                        };
+                        clips.push((node.end, mask));
+                    }
+                }
             }
         }
         self.clips = clips;
         result
+    }
+
+    pub fn listen(&mut self, hitbox: &Hitbox, view: EntityId, window: &mut Window) {
+        let inside = hitbox.is_hovered(window);
+        let under = inside
+            .then(|| self.pointer.borrow().pick(window.mouse_position()))
+            .flatten();
+        let stale = {
+            let mut pointer = self.pointer.borrow_mut();
+            let key = under.map(|rect| rect.key);
+            let stale = pointer.hovered != key;
+            pointer.hovered = key;
+            stale
+        };
+        if stale {
+            window.on_next_frame(move |_, cx| cx.notify(view));
+        }
+        if let Some(rect) = under
+            && rect.cursor != CursorStyle::Arrow
+        {
+            window.set_cursor_style(rect.cursor, hitbox);
+        }
+
+        let pointer = self.pointer.clone();
+        let area = hitbox.clone();
+        window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
+            if phase != DispatchPhase::Capture {
+                return;
+            }
+            let mut pointer = pointer.borrow_mut();
+            let key = area
+                .is_hovered(window)
+                .then(|| pointer.pick(event.position))
+                .flatten()
+                .map(|rect| rect.key);
+            if pointer.hovered != key {
+                pointer.hovered = key;
+                cx.notify(view);
+            }
+        });
+
+        let pointer = self.pointer.clone();
+        let area = hitbox.clone();
+        window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+            if phase != DispatchPhase::Bubble || !area.is_hovered(window) {
+                return;
+            }
+            let mut pointer = pointer.borrow_mut();
+            if let Some(rect) = pointer.pick(event.position) {
+                pointer.pressed = Some((rect.key, event.button));
+                pointer.focused = Some(rect.key);
+                cx.notify(view);
+            }
+        });
+
+        let pointer = self.pointer.clone();
+        let area = hitbox.clone();
+        window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
+            if phase != DispatchPhase::Bubble {
+                return;
+            }
+            let mut pointer = pointer.borrow_mut();
+            let Some((key, button)) = pointer.pressed.take() else {
+                return;
+            };
+            let released = area
+                .is_hovered(window)
+                .then(|| pointer.pick(event.position))
+                .flatten()
+                .map(|rect| rect.key);
+            if button == event.button && released == Some(key) {
+                pointer.clicks.push(Click {
+                    key,
+                    button,
+                    count: event.click_count,
+                    modifiers: event.modifiers,
+                    position: event.position,
+                });
+            }
+            cx.notify(view);
+        });
+
+        if self.scrollable {
+            let pointer = self.pointer.clone();
+            let area = hitbox.clone();
+            window.on_mouse_event(move |event: &ScrollWheelEvent, phase, window, cx| {
+                if phase != DispatchPhase::Bubble || !area.should_handle_scroll(window) {
+                    return;
+                }
+                let delta = event.delta.pixel_delta(window.line_height());
+                let mut pointer = pointer.borrow_mut();
+                pointer.scroll = pointer.scroll + delta;
+                cx.notify(view);
+                cx.stop_propagation();
+            });
+        }
+    }
+
+    fn described(&self, origin: Point<Pixels>) -> Vec<Described> {
+        self.labels
+            .iter()
+            .map(|label| {
+                let node = &self.nodes[label.node as usize];
+                Described {
+                    key: label.key,
+                    role: label.role,
+                    text: label.text.clone(),
+                    bounds: Bounds::new(
+                        origin + point(px(node.x), px(node.y)),
+                        size(px(node.w), px(node.h)),
+                    ),
+                }
+            })
+            .collect()
+    }
+}
+
+struct Described {
+    key: u64,
+    role: Role,
+    text: SharedString,
+    bounds: Bounds<Pixels>,
+}
+
+pub trait Flat: 'static + Sized {
+    fn ui(&mut self) -> &mut Ui;
+
+    fn build(&mut self, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut Context<Self>);
+}
+
+pub struct Surface<V> {
+    id: ElementId,
+    view: Entity<V>,
+    style: StyleRefinement,
+    fit: bool,
+}
+
+pub fn surface<V: Flat>(id: impl Into<ElementId>, view: &Entity<V>) -> Surface<V> {
+    Surface {
+        id: id.into(),
+        view: view.clone(),
+        style: StyleRefinement::default(),
+        fit: false,
+    }
+}
+
+impl<V: Flat> Surface<V> {
+    pub fn fit_content(mut self) -> Self {
+        self.fit = true;
+        self
+    }
+}
+
+pub struct SurfaceState {
+    hitbox: Hitbox,
+    described: Vec<Described>,
+    scale_factor: f32,
+}
+
+impl<V: Flat> IntoElement for Surface<V> {
+    type Element = Self;
+
+    fn into_element(self) -> Self::Element {
+        self
+    }
+}
+
+impl<V: Flat> Styled for Surface<V> {
+    fn style(&mut self) -> &mut StyleRefinement {
+        &mut self.style
+    }
+}
+
+impl<V: Flat> Element for Surface<V> {
+    type RequestLayoutState = ();
+    type PrepaintState = SurfaceState;
+
+    fn id(&self) -> Option<ElementId> {
+        Some(self.id.clone())
+    }
+
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, Self::RequestLayoutState) {
+        let mut style = Style::default();
+        style.refine(&self.style);
+        if !self.fit {
+            return (window.request_layout(style, [], cx), ());
+        }
+        let view = self.view.clone();
+        let layout = window.request_measured_layout(style, move |known, available, window, cx| {
+            let width = known.width.unwrap_or(match available.width {
+                AvailableSpace::Definite(width) => width,
+                AvailableSpace::MinContent => Pixels::ZERO,
+                AvailableSpace::MaxContent => Pixels::MAX,
+            });
+            view.update(cx, |view, cx| {
+                view.build(
+                    Bounds::new(Point::default(), size(width, Pixels::ZERO)),
+                    window,
+                    cx,
+                );
+                view.ui().size()
+            })
+        });
+        (layout, ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        _request_layout: &mut Self::RequestLayoutState,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self::PrepaintState {
+        let hitbox = window.insert_hitbox(bounds, HitboxBehavior::Normal);
+        let described = self.view.update(cx, |view, cx| {
+            view.build(bounds, window, cx);
+            if window.a11y.is_active() {
+                view.ui().described(bounds.origin)
+            } else {
+                Vec::new()
+            }
+        });
+        SurfaceState {
+            hitbox,
+            described,
+            scale_factor: window.scale_factor(),
+        }
+    }
+
+    fn paint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        _request_layout: &mut Self::RequestLayoutState,
+        prepaint: &mut Self::PrepaintState,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        self.view.update(cx, |view, cx| {
+            let ui = view.ui();
+            if let Err(error) = ui.paint(bounds.origin, window, cx) {
+                log::error!("flat surface paint failed: {error:#}");
+            }
+            ui.listen(&prepaint.hitbox, cx.entity_id(), window);
+        });
+    }
+
+    fn a11y_role(&self) -> Option<Role> {
+        Some(Role::Group)
+    }
+
+    fn a11y_synthetic_children(
+        &mut self,
+        prepaint: &mut Self::PrepaintState,
+        builder: &mut A11ySubtreeBuilder,
+    ) {
+        let scale = f64::from(prepaint.scale_factor);
+        for item in &prepaint.described {
+            let mut node = accesskit::Node::new(item.role);
+            node.set_label(item.text.to_string());
+            node.set_bounds(accesskit::Rect {
+                x0: f64::from(item.bounds.left().0) * scale,
+                y0: f64::from(item.bounds.top().0) * scale,
+                x1: f64::from(item.bounds.right().0) * scale,
+                y1: f64::from(item.bounds.bottom().0) * scale,
+            });
+            builder.push_child(builder.synthetic_node_id(item.key), node);
+        }
     }
 }
 
@@ -913,16 +1094,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn swept_slot_is_freed_once() {
-        let mut paragraphs = Paragraphs::default();
-        let (kept, _) = paragraphs.slot((0, 0));
-        let (stale, _) = paragraphs.slot((1, 0));
-        paragraphs.slots[kept as usize].used = KEEP_FRAMES + 2;
-        paragraphs.sweep(KEEP_FRAMES + 1);
-        paragraphs.sweep(KEEP_FRAMES + 2);
-        assert_eq!(paragraphs.free, vec![stale]);
-        assert_eq!(paragraphs.slot((0, 0)), (kept, false));
-        assert_eq!(paragraphs.slot((2, 0)), (stale, true));
-        assert_eq!(paragraphs.slot((3, 0)), (2, true));
+    fn the_last_painted_target_under_the_pointer_wins() {
+        let rect = |x: f32, key| TargetRect {
+            bounds: Bounds::new(point(px(x), px(0.)), size(px(20.), px(10.))),
+            key,
+            cursor: CursorStyle::Arrow,
+        };
+        let mut pointer = Pointer {
+            rects: vec![rect(0., 1), rect(10., 2)],
+            ..Default::default()
+        };
+        let pick =
+            |pointer: &Pointer, x: f32| pointer.pick(point(px(x), px(5.))).map(|rect| rect.key);
+        assert_eq!(pick(&pointer, 15.), Some(2));
+        assert_eq!(pick(&pointer, 5.), Some(1));
+        assert_eq!(pick(&pointer, 35.), None);
+        pointer.step_focus(false);
+        assert_eq!(pointer.focused, Some(2));
+        pointer.step_focus(true);
+        assert_eq!(pointer.focused, Some(1));
     }
 }
