@@ -563,6 +563,7 @@ pub struct GlassUniform {
     pub clip_rect: [f32; 4],
     pub clip_radii: [f32; 4],
     pub clip: [f32; 4],
+    pub fade: [f32; 4],
 }
 
 impl GlassUniform {
@@ -646,6 +647,7 @@ pub struct Glass {
     pub corner_smoothing: f32,
     pub material: GlassMaterial,
     pub shadow: Option<GlassShadow>,
+    pub fade: Option<(ScaledPixels, ScaledPixels)>,
 }
 
 impl Glass {
@@ -886,6 +888,9 @@ impl Glass {
                 0.,
                 0.,
             ],
+            fade: self
+                .fade
+                .map_or([0.; 4], |(clear, solid)| [clear.0, solid.0, 1., 0.]),
         }
     }
 
@@ -1264,6 +1269,7 @@ fn glass_scene_over(alpha: f32, material: Option<GlassMaterial>) -> crate::Scene
         scene.insert_primitive(Glass {
             order: 0,
             shadow: None,
+            fade: None,
             bounds: shape.dilate(ScaledPixels(2.)),
             backdrop_bounds: shape.dilate(ScaledPixels(material.backdrop_reach().as_f32())),
             content_mask: ContentMask {
@@ -1343,6 +1349,7 @@ pub fn bench_glass_rendering(
             scene.insert_primitive(Glass {
                 order: 0,
                 shadow: None,
+                fade: None,
                 bounds: dilated,
                 backdrop_bounds: if material.reads_backdrop() {
                     bounds.dilate(ScaledPixels(material.backdrop_reach().as_f32()))
@@ -1494,6 +1501,89 @@ pub fn check_glass_over_a_translucent_frame(
             expected.0
         );
     }
+
+    use crate::{ContentMask, Quad, Scene};
+    let page = Bounds {
+        origin: point(ScaledPixels(0.), ScaledPixels(0.)),
+        size: size(ScaledPixels(64.), ScaledPixels(64.)),
+    };
+    let scene = |content: bool, material: Option<GlassMaterial>, fade| {
+        let mut scene = Scene::default();
+        for color in [Some(hsla(0., 0., 0.2, 0.3)), content.then(white)]
+            .into_iter()
+            .flatten()
+        {
+            scene.insert_primitive(Quad {
+                bounds: page,
+                content_mask: ContentMask { bounds: page }.into(),
+                background: color.into(),
+                ..Default::default()
+            });
+        }
+        if let Some(material) = material {
+            let mut shapes: [(Bounds<ScaledPixels>, Corners<ScaledPixels>); GLASS_MAX_SHAPES] =
+                Default::default();
+            shapes[0] = (
+                page.dilate(ScaledPixels(-8.)),
+                Corners::all(ScaledPixels(4.)),
+            );
+            scene.insert_primitive(Glass {
+                order: 0,
+                bounds: page,
+                backdrop_bounds: page,
+                content_mask: ContentMask { bounds: page }.into(),
+                shapes,
+                shape_count: 1,
+                corner_smoothing: 2.,
+                material,
+                shadow: None,
+                fade,
+            });
+        }
+        scene.finish();
+        scene
+    };
+    let chrome = render(&scene(false, None, None))?.get_pixel(32, 32).0;
+    let flat = GlassMaterial {
+        blur: px(0.),
+        bezel: px(0.),
+        refraction: px(0.),
+        tint: hsla(0., 0., 0.6, 0.5),
+        saturation: 1.,
+        brightness: 0.,
+        specular: 0.,
+        fresnel: 0.,
+        edge_shadow: 0.,
+        ..GlassMaterial::regular()
+    };
+    let glassed = render(&scene(false, Some(flat), None))?.get_pixel(32, 32).0;
+    let tinted = (f32::from(chrome[0]) + 0.6 * f32::from(chrome[3])) / 2.;
+    anyhow::ensure!(
+        glassed[3] == chrome[3] && (f32::from(glassed[0]) - tinted).abs() <= 1.,
+        "glass over see-through chrome {chrome:?} should keep its alpha and tint it to {tinted}, got {glassed:?}"
+    );
+
+    let ground = hsla(0., 0., 0.2, 0.3);
+    let fade = GlassMaterial {
+        tint: ground,
+        ..flat
+    };
+    let faded = render(&scene(
+        true,
+        Some(fade),
+        Some((ScaledPixels(0.), ScaledPixels(32.))),
+    ))?;
+    let gone = 16.5 / 32.;
+    let half = |channel: usize| 255. * (1. - gone) + f32::from(chrome[channel]) * gone;
+    let (middle, end) = (faded.get_pixel(32, 16).0, faded.get_pixel(32, 48).0);
+    anyhow::ensure!(
+        end.iter().zip(chrome).all(|(a, b)| a.abs_diff(b) <= 1)
+            && [0, 3]
+                .iter()
+                .all(|&c| (f32::from(middle[c]) - half(c)).abs() <= 1.),
+        "a fade over white should reach the chrome {chrome:?} at its end and halfway at {:?}, got {end:?} and {middle:?}",
+        [half(0), half(3)]
+    );
     Ok(())
 }
 
@@ -1529,6 +1619,7 @@ pub fn check_glass_hides_the_frame_under_it(
         scene.insert_primitive(Glass {
             order: 0,
             shadow: None,
+            fade: None,
             bounds: shape.dilate(ScaledPixels(2.)),
             backdrop_bounds: shape.dilate(ScaledPixels(material.backdrop_reach().as_f32())),
             content_mask: ContentMask {
@@ -1594,6 +1685,7 @@ pub fn check_rim_glass_lights_only_the_edge(
             scene.insert_primitive(Glass {
                 order: 0,
                 shadow: None,
+                fade: None,
                 bounds: shape.dilate(ScaledPixels(2.)),
                 backdrop_bounds: shape.dilate(ScaledPixels(2.)),
                 content_mask: ContentMask { bounds: page }.into(),
@@ -1802,6 +1894,7 @@ pub fn check_glass_rendering(
     stacked.insert_primitive(Glass {
         order: 0,
         shadow: None,
+        fade: None,
         bounds: shape.dilate(ScaledPixels(2.)),
         backdrop_bounds: shape.dilate(ScaledPixels(clear.backdrop_reach().as_f32())),
         content_mask: crate::ContentMask {
@@ -2016,6 +2109,7 @@ fn glass_body_scene(
     scene.insert_primitive(Glass {
         order: 0,
         shadow: None,
+        fade: None,
         bounds,
         backdrop_bounds: if material.reads_backdrop() {
             union
@@ -2152,7 +2246,7 @@ mod tests {
 
     #[test]
     fn uniform_blocks_match_the_shader_layout() {
-        assert_eq!(std::mem::size_of::<GlassUniform>(), 608);
+        assert_eq!(std::mem::size_of::<GlassUniform>(), 624);
         assert_eq!(std::mem::size_of::<GlassBlurUniform>(), 32);
     }
 
@@ -2182,6 +2276,7 @@ mod tests {
         Glass {
             order: 0,
             shadow: None,
+            fade: None,
             bounds,
             backdrop_bounds: bounds.dilate(ScaledPixels(material.backdrop_reach().as_f32())),
             content_mask: crate::ContentMask {

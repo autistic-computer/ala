@@ -4609,6 +4609,47 @@ impl Window {
         self.next_frame.scene.insert_primitive(glass);
     }
 
+    pub fn paint_fade(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        ground: Hsla,
+        clear: Pixels,
+        solid: Pixels,
+    ) -> bool {
+        self.invalidator.debug_assert_paint();
+        if ground.a >= 1. || !self.supports_backdrop_sampling() {
+            return false;
+        }
+        let scale_factor = self.scale_factor();
+        let bounds = bounds.scale(scale_factor);
+        let (clear, solid) = (clear.scale(scale_factor), solid.scale(scale_factor));
+        if clear == solid || bounds.is_empty() {
+            return true;
+        }
+        let mut shapes: [(Bounds<ScaledPixels>, Corners<ScaledPixels>); crate::GLASS_MAX_SHAPES] =
+            Default::default();
+        shapes[0] = (bounds, Corners::default());
+        self.next_frame.scene.insert_primitive(Glass {
+            order: 0,
+            bounds,
+            backdrop_bounds: bounds,
+            content_mask: self.snapped_content_mask(),
+            shapes,
+            shape_count: 1,
+            corner_smoothing: self.default_corner_smoothing,
+            material: GlassMaterial {
+                tint: ground,
+                blur: px(0.),
+                refraction: px(0.),
+                opacity: self.element_opacity(),
+                ..GlassMaterial::default()
+            },
+            shadow: None,
+            fade: Some((clear, solid)),
+        });
+        true
+    }
+
     pub(crate) fn glass_primitive(
         &self,
         shapes: &[GlassShape],
@@ -4636,6 +4677,7 @@ impl Window {
             corner_smoothing: corner_smoothing.unwrap_or(self.default_corner_smoothing),
             material,
             shadow: None,
+            fade: None,
         }
     }
 

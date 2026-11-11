@@ -50,6 +50,7 @@ fn body(bounds: &[Bounds<ScaledPixels>], radius: f32, smoothing: f32, merge: f32
         corner_smoothing: smoothing,
         material,
         shadow: None,
+        fade: None,
     }
 }
 

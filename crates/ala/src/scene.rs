@@ -1710,6 +1710,7 @@ mod tests {
             corner_smoothing: 2.,
             material: crate::GlassMaterial::default(),
             shadow: None,
+            fade: None,
         };
         let mut scene = Scene::default();
         scene.insert_primitive(glass(64.));

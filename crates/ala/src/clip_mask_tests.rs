@@ -71,6 +71,7 @@ fn glass() -> Glass {
         corner_smoothing: 2.,
         material: GlassMaterial::regular().tint(red()),
         shadow: None,
+        fade: None,
     }
 }
 

@@ -27,6 +27,7 @@ struct Glass {
     clip_rect: vec4<f32>,
     clip_radii: vec4<f32>,
     clip: vec4<f32>,
+    fade: vec4<f32>,
 }
 
 struct Blur {
@@ -364,7 +365,18 @@ fn toned(color: vec4<f32>) -> vec3<f32> {
     return mix(rgb, glass.tint.rgb, glass.tint.a);
 }
 
-fn finish(position: vec2<f32>, color: vec4<f32>, lit: vec3<f32>, coverage: f32, contour: f32) -> vec4<f32> {
+fn fade(position: vec2<f32>) -> vec4<f32> {
+    let held = under(position);
+    var keep = content_clip(position) * glass.rim.w;
+    if (glass.mask.y > 0.5) {
+        let window = GlassShape(glass.mask_rect, glass.mask_radii);
+        keep *= saturate(0.5 - rounded_rect(position, window, glass.mask.x, 0.0).x);
+    }
+    let gone = saturate((position.y - glass.fade.x) / (glass.fade.y - glass.fade.x)) * keep;
+    return mix(held, vec4<f32>(glass.tint.rgb * glass.tint.a, glass.tint.a), gone);
+}
+
+fn finish(position: vec2<f32>, color: vec4<f32>, lit: vec3<f32>, coverage: f32, contour: f32, lift: f32) -> vec4<f32> {
     var rgb = lit;
     if (glass.glow.w > 0.0) {
         let reach = 1.0 - saturate(length(position - glass.glow.xy) / max(glass.glow.z, 1.0));
@@ -377,7 +389,7 @@ fn finish(position: vec2<f32>, color: vec4<f32>, lit: vec3<f32>, coverage: f32, 
     rgb = clamp(rgb, vec3<f32>(0.0), vec3<f32>(1.0));
 
     let strength = coverage * glass.rim.w;
-    let face = color.a + (1.0 - color.a) * glass.tint.a;
+    let face = color.a + (1.0 - color.a) * saturate(lift);
     let edge = contour * glass.rim.w;
     if (glass.tint.a < 1.0) {
         let held = under(position);
@@ -395,6 +407,9 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     if (glass.shadow.z > 0.5) {
         return glass_shadow(position);
     }
+    if (glass.fade.z > 0.5) {
+        return fade(position);
+    }
     let rim_only = glass.edge_color.w > 0.5;
     if (on_face(position)) {
         if (rim_only) {
@@ -404,7 +419,7 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         if (glass.tint.a < 1.0) {
             color = backdrop(position);
         }
-        return finish(position, color, toned(color), 1.0, 0.0);
+        return finish(position, color, toned(color), 1.0, 0.0, 0.0);
     }
     let field = glass_field(position);
     let distance = field.x;
@@ -433,7 +448,7 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     contour = contour * clip;
     let coverage = saturate(0.5 - distance) * clip;
     if (coverage <= 0.0) {
-        return finish(position, vec4<f32>(0.0, 0.0, 0.0, 1.0), vec3<f32>(0.0), 0.0, contour);
+        return finish(position, vec4<f32>(0.0, 0.0, 0.0, 1.0), vec3<f32>(0.0), 0.0, contour, 0.0);
     }
 
     let depth = max(-distance, 0.0);
@@ -476,5 +491,5 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     var rgb = toned(color) + glass.light_color.rgb * glint;
     rgb = rgb * (1.0 - glow * glass.light_color.a) + glass.light_color.rgb * glow;
 
-    return finish(position, color, rgb, coverage, contour);
+    return finish(position, color, rgb, coverage, contour, glint + glow);
 }
