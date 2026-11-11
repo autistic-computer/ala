@@ -5573,9 +5573,12 @@ impl Window {
         };
 
         let content_mask = self.snapped_content_mask();
-        let corner_radii = corner_radii
-            .clamp_radii_for_quad_size(visible_bounds.size)
-            .scale(self.scale_factor());
+        let (corner_radii, corner_smoothing) = self.drawn_corners(
+            corner_radii.clamp_radii_for_quad_size(visible_bounds.size),
+            visible_bounds.size,
+            None,
+        );
+        let corner_radii = corner_radii.scale(self.scale_factor());
         let opacity = self.element_opacity();
 
         self.next_frame.scene.insert_primitive(PolychromeSprite {
@@ -5585,7 +5588,7 @@ impl Window {
             bounds: visible_bounds_snapped,
             content_mask,
             corner_radii,
-            corner_smoothing: self.default_corner_smoothing,
+            corner_smoothing: corner_smoothing.unwrap_or(self.default_corner_smoothing),
             pad2: 0,
             tile: sub_tile,
             opacity,
@@ -5604,6 +5607,7 @@ impl Window {
 
         self.invalidator.debug_assert_paint();
 
+        let (corner_radii, corner_smoothing) = self.drawn_corners(corner_radii, bounds.size, None);
         let bounds = self.snap_bounds(bounds);
         let content_mask = self.snapped_content_mask();
         self.next_frame.scene.insert_primitive(PaintSurface {
@@ -5611,7 +5615,7 @@ impl Window {
             bounds,
             content_mask,
             corner_radii: corner_radii.scale(self.scale_factor()),
-            corner_smoothing: self.default_corner_smoothing,
+            corner_smoothing: corner_smoothing.unwrap_or(self.default_corner_smoothing),
             image_buffer: Some(image_buffer),
             underlay: false,
         });
@@ -5628,6 +5632,7 @@ impl Window {
 
         self.invalidator.debug_assert_paint();
 
+        let (corner_radii, corner_smoothing) = self.drawn_corners(corner_radii, bounds.size, None);
         let bounds = self.snap_bounds(bounds);
         let content_mask = self.snapped_content_mask();
         self.next_frame.scene.insert_primitive(PaintSurface {
@@ -5635,7 +5640,7 @@ impl Window {
             bounds,
             content_mask,
             corner_radii: corner_radii.scale(self.scale_factor()),
-            corner_smoothing: self.default_corner_smoothing,
+            corner_smoothing: corner_smoothing.unwrap_or(self.default_corner_smoothing),
             image_buffer: Some(image_buffer),
             underlay: true,
         });
@@ -5664,6 +5669,7 @@ impl Window {
 
         self.invalidator.debug_assert_paint();
 
+        let (corner_radii, corner_smoothing) = self.drawn_corners(corner_radii, bounds.size, None);
         let bounds = self.snap_bounds(bounds);
         let content_mask = self.snapped_content_mask();
         self.next_frame.scene.insert_primitive(PaintSurface {
@@ -5671,7 +5677,7 @@ impl Window {
             bounds,
             content_mask,
             corner_radii: corner_radii.scale(self.scale_factor()),
-            corner_smoothing: self.default_corner_smoothing,
+            corner_smoothing: corner_smoothing.unwrap_or(self.default_corner_smoothing),
             texture_view: view,
         });
     }
@@ -5687,6 +5693,7 @@ impl Window {
 
         self.invalidator.debug_assert_paint();
 
+        let (corner_radii, corner_smoothing) = self.drawn_corners(corner_radii, bounds.size, None);
         let bounds = self.snap_bounds(bounds);
         let content_mask = self.snapped_content_mask();
         self.next_frame.scene.insert_primitive(PaintSurface {
@@ -5694,7 +5701,7 @@ impl Window {
             bounds,
             content_mask,
             corner_radii: corner_radii.scale(self.scale_factor()),
-            corner_smoothing: self.default_corner_smoothing,
+            corner_smoothing: corner_smoothing.unwrap_or(self.default_corner_smoothing),
             texture,
         });
     }
