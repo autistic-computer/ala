@@ -578,6 +578,16 @@ pub trait Styled: Sized {
         self
     }
 
+    fn contain_shadows(mut self) -> Self {
+        self.style().contains_shadows = Some(true);
+        self
+    }
+
+    fn shadow_reach(mut self, reach: Pixels) -> Self {
+        self.style().shadow_reach = Some(reach);
+        self
+    }
+
     fn opacity(mut self, opacity: f32) -> Self {
         self.style().opacity = Some(opacity);
         self
