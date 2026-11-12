@@ -1035,7 +1035,11 @@ impl MacWindow {
                     style_mask |= NSWindowStyleMaskNonactivatingPanel;
                     msg_send![PANEL_CLASS, alloc]
                 }
-                WindowKind::Floating | WindowKind::Dialog => {
+                WindowKind::Floating => {
+                    style_mask |= NSWindowStyleMaskNonactivatingPanel;
+                    msg_send![PANEL_CLASS, alloc]
+                }
+                WindowKind::Dialog => {
                     msg_send![PANEL_CLASS, alloc]
                 }
             };
@@ -1222,7 +1226,10 @@ impl MacWindow {
                 WindowKind::Normal | WindowKind::Floating => {
                     if kind == WindowKind::Floating {
                         native_window.setLevel_(NSFloatingWindowLevel);
-                        native_window.setAcceptsMouseMovedEvents_(YES);
+                        native_window.setAcceptsMouseMovedEvents_(NO);
+                        let _: () = msg_send![native_window, setBecomesKeyOnlyIfNeeded: YES];
+                        let _: () = msg_send![native_window, setHidesOnDeactivate: YES];
+                        add_mouse_tracking_area(tracking_view);
                     } else {
                         native_window.setLevel_(NSNormalWindowLevel);
                         native_window.setAcceptsMouseMovedEvents_(NO);

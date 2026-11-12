@@ -27,6 +27,8 @@ pub struct GlassMaterial {
     pub contrast: f32,
     pub specular: f32,
     pub glint_width: Pixels,
+    #[serde(default)]
+    pub glint_spread: f32,
     pub light_angle: f32,
     #[serde(default)]
     pub light_directionality: f32,
@@ -87,6 +89,7 @@ impl GlassMaterial {
             contrast: 1.0,
             specular: 0.6,
             glint_width: px(1.2),
+            glint_spread: 0.,
             light_angle: -std::f32::consts::FRAC_PI_4 * 3.,
             light_directionality: 0.,
             inactive_flattening: 0.,
@@ -438,6 +441,7 @@ impl Interpolate for GlassMaterial {
             contrast: lerp(from.contrast, to.contrast),
             specular: lerp(from.specular, to.specular),
             glint_width: length(from.glint_width, to.glint_width),
+            glint_spread: lerp(from.glint_spread, to.glint_spread),
             light_angle: lerp(from.light_angle, to.light_angle),
             light_directionality: lerp(from.light_directionality, to.light_directionality),
             inactive_flattening: lerp(from.inactive_flattening, to.inactive_flattening),
@@ -885,7 +889,7 @@ impl Glass {
                 } else {
                     0.
                 },
-                0.,
+                material.glint_spread.clamp(0., 1.),
                 0.,
             ],
             fade: self

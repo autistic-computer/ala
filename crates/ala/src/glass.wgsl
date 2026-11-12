@@ -452,8 +452,10 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     }
 
     let depth = max(-distance, 0.0);
+    let inset = select(0.0, contour_width, rim_only && glass.rim.y > 0.0);
+    let lit_depth = depth - inset;
     let bezel = clamp(glass.optics.x, 1e-3, max(field.w * 0.5, 1e-3));
-    let edge = 1.0 - saturate(depth / bezel);
+    let edge = 1.0 - saturate(max(lit_depth, 0.0) / bezel);
     let refraction = clamp(glass.optics.y, -field.w, field.w);
     let pull = refraction * (1.0 - sqrt(max(1.0 - edge * edge, 0.0)));
     let offset = -normal * pull;
@@ -473,19 +475,29 @@ fn fs_glass(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
 
     var glint = 0.0;
     var glow = 0.0;
-    if (edge > 0.0) {
+    if (edge > 0.0 && lit_depth >= 0.0) {
         let glint_width = max(glass.light.w, 1e-3);
-        let line = saturate(1.0 - depth / glint_width) + 0.2 * saturate(1.0 - depth / (glint_width * 4.0));
+        let line = saturate(1.0 - lit_depth / glint_width) + 0.2 * saturate(1.0 - lit_depth / (glint_width * 4.0));
         let lobe = facing * facing;
         let directional_lobe = 0.06 + 0.94 * toward * toward + 0.12 * pow(away, 4.0);
-        glint = glass.light.z * line * mix(mix(0.15, 1.0, lobe), directional_lobe, directionality);
+        var lit = mix(mix(0.15, 1.0, lobe), directional_lobe, directionality);
+        if (glass.clip.z > 0.0) {
+            lit = mix(lit, 1.0, glass.clip.z);
+        }
+        glint = glass.light.z * line * lit;
         glow = glass.rim.x * edge * edge * edge * mix(1.0, 0.25 + 0.75 * toward, directionality);
     }
 
     if (rim_only) {
         let veil = glow * glass.light_color.a;
         let light = glass.light_color.rgb * (glint * (1.0 - veil) + glow);
-        return vec4<f32>(light, veil) * (coverage * glass.rim.w);
+        let cover = saturate(max(veil, max(light.r, max(light.g, light.b))));
+        let lit = vec4<f32>(light, cover) * (coverage * glass.rim.w);
+        if (inset > 0.0) {
+            let shade = glass.rim.y * saturate(inset - depth + 0.5) * coverage * glass.rim.w;
+            return vec4<f32>(glass.edge_color.rgb * shade, shade) + lit * (1.0 - shade);
+        }
+        return lit;
     }
 
     var rgb = toned(color) + glass.light_color.rgb * glint;
