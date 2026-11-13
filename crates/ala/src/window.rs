@@ -3909,7 +3909,9 @@ impl Window {
         };
         self.content_mask_stack.push(ContentMask { bounds }.into());
         self.next_frame.scene.push_transform(transform);
+        self.next_frame.scene.begin_replayable();
         let result = f(self);
+        self.next_frame.scene.end_replayable();
         self.next_frame.scene.pop_transform();
         self.content_mask_stack.pop();
         result
