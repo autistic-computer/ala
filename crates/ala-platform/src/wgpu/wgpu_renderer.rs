@@ -3030,6 +3030,7 @@ pub struct WgpuHeadlessRenderer {
     core: WgpuRendererCore,
     render_target: Option<HeadlessRenderTarget>,
     observed_error_generation: u64,
+    transparent: bool,
 }
 
 #[cfg(all(
@@ -3052,7 +3053,27 @@ impl WgpuHeadlessRenderer {
             core,
             render_target: None,
             observed_error_generation: 0,
+            transparent: false,
         })
+    }
+
+    pub fn update_transparency(&mut self, transparent: bool) {
+        let alpha_mode = if transparent {
+            wgpu::CompositeAlphaMode::PreMultiplied
+        } else {
+            wgpu::CompositeAlphaMode::Opaque
+        };
+        let core = &mut self.core;
+        core.resources.pipelines = WgpuRendererCore::create_pipelines(
+            &core.resources.device,
+            &core.resources.bind_group_layouts,
+            core.target_format,
+            alpha_mode,
+            core.rendering_params.path_sample_count,
+            core.dual_source_blending,
+            core.uses_webgl_instance_data,
+        );
+        self.transparent = transparent;
     }
 
     fn ensure_render_target(&mut self, size: Size<DevicePixels>) -> anyhow::Result<()> {
@@ -3120,8 +3141,13 @@ impl WgpuHeadlessRenderer {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Headless render target was not created"))?;
         let (texture, view) = (target.texture.clone(), target.view.clone());
+        let clear = if self.transparent {
+            wgpu::Color::TRANSPARENT
+        } else {
+            wgpu::Color::BLACK
+        };
         self.core
-            .render_frame(scene, &texture, &view, size, false, wgpu::Color::BLACK)?;
+            .render_frame(scene, &texture, &view, size, self.transparent, clear)?;
         Ok(())
     }
 
@@ -4370,6 +4396,25 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 },
             )
         })
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn glass_keeps_a_translucent_frame() -> anyhow::Result<()> {
+        use ala::PlatformHeadlessRenderer;
+        let mut renderer = WgpuHeadlessRenderer::new()?;
+        renderer.update_transparency(true);
+        let mut render = |scene: &Scene| {
+            renderer.render_scene_to_image(
+                scene,
+                Size {
+                    width: DevicePixels(64),
+                    height: DevicePixels(64),
+                },
+            )
+        };
+        ala::check_glass_over_a_translucent_frame(&mut render)?;
+        ala::check_glass_beside_a_clear_margin(&mut render)
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]

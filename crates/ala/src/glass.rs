@@ -1592,6 +1592,59 @@ pub fn check_glass_over_a_translucent_frame(
 }
 
 #[cfg(any(test, feature = "test-support", feature = "bench-support"))]
+pub fn check_glass_beside_a_clear_margin(
+    mut render: impl FnMut(&crate::Scene) -> anyhow::Result<image::RgbaImage>,
+) -> anyhow::Result<()> {
+    use crate::{ContentMask, Quad, Scene};
+    let rect = |x: f32, y: f32, width: f32, height: f32| Bounds {
+        origin: point(ScaledPixels(x), ScaledPixels(y)),
+        size: size(ScaledPixels(width), ScaledPixels(height)),
+    };
+    let window = rect(8., 0., 56., 64.);
+    let shape = rect(10., 16., 44., 32.);
+    let material = GlassMaterial::regular()
+        .blur(px(30.))
+        .tint(hsla(0., 0., 0.3, 0.75));
+    let mut shapes: [(Bounds<ScaledPixels>, Corners<ScaledPixels>); GLASS_MAX_SHAPES] =
+        Default::default();
+    shapes[0] = (shape, Corners::all(ScaledPixels(6.)));
+    let mut scene = Scene::default();
+    scene.insert_primitive(Quad {
+        bounds: window,
+        content_mask: ContentMask { bounds: window }.into(),
+        background: hsla(0., 0., 0.2, 1.).into(),
+        ..Default::default()
+    });
+    scene.insert_primitive(Glass {
+        order: 0,
+        shadow: None,
+        fade: None,
+        bounds: shape.dilate(ScaledPixels(2.)),
+        backdrop_bounds: shape.dilate(ScaledPixels(material.backdrop_reach().as_f32())),
+        content_mask: ContentMask { bounds: window }.into(),
+        shapes,
+        shape_count: 1,
+        corner_smoothing: 2.,
+        material,
+    });
+    scene.finish();
+    let image = render(&scene)?;
+    for x in 10..54 {
+        let pixel = image.get_pixel(x, 32).0;
+        anyhow::ensure!(
+            pixel[3] == 255,
+            "glass on an opaque window let the clear margin through at x = {x}: {pixel:?}"
+        );
+    }
+    anyhow::ensure!(
+        image.get_pixel(4, 32).0 == [0, 0, 0, 0],
+        "the margin beside the window should stay clear, got {:?}",
+        image.get_pixel(4, 32).0
+    );
+    Ok(())
+}
+
+#[cfg(any(test, feature = "test-support", feature = "bench-support"))]
 pub fn check_glass_hides_the_frame_under_it(
     mut render: impl FnMut(&crate::Scene) -> anyhow::Result<image::RgbaImage>,
 ) -> anyhow::Result<()> {
