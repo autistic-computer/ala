@@ -242,6 +242,10 @@ impl Platform for AndroidPlatform {
         crate::android::dispatcher::defer(move || bridge::open_url(&url));
     }
 
+    fn selection_haptic(&self) {
+        crate::android::dispatcher::defer(bridge::selection_haptic);
+    }
+
     fn on_open_urls(&self, callback: Box<dyn FnMut(Vec<String>)>) {
         self.0.lock().open_urls = Some(callback);
     }

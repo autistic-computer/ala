@@ -2637,6 +2637,11 @@ impl Window {
         self.platform_window.hide_soft_keyboard();
     }
 
+    pub fn set_long_press_delay(&mut self, delay: Duration, cx: &mut App) {
+        self.touch_gestures.hold_after(delay);
+        self.schedule_long_press_timer(cx);
+    }
+
     pub fn on_system_back(
         &self,
         cx: &App,

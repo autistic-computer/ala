@@ -1002,6 +1002,19 @@ impl TouchGestureRecognizer {
         }))
     }
 
+    pub(crate) fn hold_after(&mut self, delay: Duration) {
+        if let TouchGestureState::Pending {
+            deadline,
+            long_press_offered: false,
+            ..
+        } = &mut self.state
+        {
+            if let Some(start) = deadline.checked_sub(self.tuning.long_press_duration) {
+                *deadline = start + delay;
+            }
+        }
+    }
+
     pub(crate) fn resolve_long_press(&mut self, claimed: bool) {
         if !claimed {
             return;

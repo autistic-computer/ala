@@ -593,6 +593,15 @@ pub(crate) fn set_keyboard_visible(visible: bool) {
     );
 }
 
+pub(crate) fn selection_haptic() {
+    with_view(|env, view| {
+        let ticked = env.call_method(view, "performHapticFeedback", "(I)Z", &[JValue::Int(4)]);
+        if ticked.is_err() && env.exception_check().unwrap_or(false) {
+            env.exception_clear().ok();
+        }
+    });
+}
+
 pub(crate) fn restart_input() {
     call_activity("restartInput", "()V", &[]);
 }

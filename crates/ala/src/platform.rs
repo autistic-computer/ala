@@ -185,6 +185,7 @@ pub trait Platform: 'static {
     }
 
     fn open_url(&self, url: &str);
+    fn selection_haptic(&self) {}
     fn on_open_urls(&self, callback: Box<dyn FnMut(Vec<String>)>);
     fn register_url_scheme(&self, url: &str) -> Task<Result<()>>;
 

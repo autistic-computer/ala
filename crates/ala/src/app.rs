@@ -1414,6 +1414,10 @@ impl App {
         self.platform.open_url(url);
     }
 
+    pub fn selection_haptic(&self) {
+        self.platform.selection_haptic();
+    }
+
     pub fn register_url_scheme(&self, scheme: &str) -> Task<Result<()>> {
         self.platform.register_url_scheme(scheme)
     }

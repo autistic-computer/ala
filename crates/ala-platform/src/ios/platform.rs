@@ -198,6 +198,16 @@ impl Platform for IosPlatform {
         crate::ios::window::set_window_appearance(appearance);
     }
 
+    fn selection_haptic(&self) {
+        unsafe {
+            let generator: id = msg_send![class!(UISelectionFeedbackGenerator), new];
+            if !generator.is_null() {
+                let _: () = msg_send![generator, selectionChanged];
+                let _: () = msg_send![generator, release];
+            }
+        }
+    }
+
     fn open_url(&self, url: &str) {
         let url = url.to_owned();
         self.foreground_executor()
