@@ -681,7 +681,7 @@ impl Glass {
     }
 
     pub fn backdrop_region(&self, viewport: Size<i32>) -> Option<Bounds<i32>> {
-        let bounds = self.backdrop_bounds;
+        let bounds = self.backdrop_bounds.intersect(&self.content_mask.bounds);
         let left = (bounds.origin.x.0.floor() as i32).max(0);
         let top = (bounds.origin.y.0.floor() as i32).max(0);
         let right = (bounds.bottom_right().x.0.ceil() as i32).min(viewport.width);
