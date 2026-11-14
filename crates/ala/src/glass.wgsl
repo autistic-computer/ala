@@ -392,7 +392,7 @@ fn finish(position: vec2<f32>, color: vec4<f32>, lit: vec3<f32>, coverage: f32, 
     let edge = contour * glass.rim.w;
     if (glass.tint.a < 1.0) {
         let held = under(position);
-        let face = held.a + (1.0 - held.a) * saturate(lift);
+        let face = color.a + (1.0 - color.a) * saturate(lift);
         let outlined = vec4<f32>(glass.edge_color.rgb * edge, edge) + held * (1.0 - edge);
         return mix(outlined, vec4<f32>(rgb * face, face), strength);
     }

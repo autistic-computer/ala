@@ -4368,6 +4368,23 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
+    fn glass_blurs_the_alpha_of_a_clear_frame() -> anyhow::Result<()> {
+        use ala::PlatformHeadlessRenderer;
+        let mut renderer = WgpuHeadlessRenderer::new()?;
+        renderer.update_transparency(true);
+        ala::check_glass_blurs_the_alpha_of_a_clear_frame(|scene| {
+            renderer.render_scene_to_image(
+                scene,
+                Size {
+                    width: DevicePixels(64),
+                    height: DevicePixels(64),
+                },
+            )
+        })
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
     fn rim_glass_lights_only_the_edge() -> anyhow::Result<()> {
         use ala::PlatformHeadlessRenderer;
         let mut renderer = WgpuHeadlessRenderer::new()?;
