@@ -1588,6 +1588,45 @@ pub fn check_glass_over_a_translucent_frame(
         "a fade over white should reach the chrome {chrome:?} at its end and halfway at {:?}, got {end:?} and {middle:?}",
         [half(0), half(3)]
     );
+
+    let mark = Bounds {
+        origin: point(ScaledPixels(28.), ScaledPixels(40.)),
+        size: size(ScaledPixels(8.), ScaledPixels(16.)),
+    };
+    let mut blurred = Scene::default();
+    for (bounds, color) in [(page, white()), (mark, hsla(0., 0., 0., 1.))] {
+        blurred.insert_primitive(Quad {
+            bounds,
+            content_mask: ContentMask { bounds: page }.into(),
+            background: color.into(),
+            ..Default::default()
+        });
+    }
+    let mut shapes: [(Bounds<ScaledPixels>, Corners<ScaledPixels>); GLASS_MAX_SHAPES] =
+        Default::default();
+    shapes[0] = (page, Corners::default());
+    blurred.insert_primitive(Glass {
+        order: 0,
+        bounds: page,
+        backdrop_bounds: page,
+        content_mask: ContentMask { bounds: page }.into(),
+        shapes,
+        shape_count: 1,
+        corner_smoothing: 2.,
+        material: GlassMaterial {
+            blur: px(8.),
+            tint: hsla(0., 0., 0., 0.45),
+            ..flat
+        },
+        shadow: None,
+        fade: Some((ScaledPixels(0.), ScaledPixels(32.))),
+    });
+    blurred.finish();
+    let soft = render(&blurred)?.get_pixel(32, 48).0;
+    anyhow::ensure!(
+        soft[0] > 48,
+        "a blurred fade should soften a black mark past its solid end, got {soft:?}"
+    );
     Ok(())
 }
 

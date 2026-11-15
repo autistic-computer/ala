@@ -4682,6 +4682,17 @@ impl Window {
         clear: Pixels,
         solid: Pixels,
     ) -> bool {
+        self.paint_blur_fade(bounds, ground, px(0.), clear, solid)
+    }
+
+    pub fn paint_blur_fade(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        ground: Hsla,
+        blur: Pixels,
+        clear: Pixels,
+        solid: Pixels,
+    ) -> bool {
         self.invalidator.debug_assert_paint();
         if ground.a >= 1. || !self.supports_backdrop_sampling() {
             return false;
@@ -4705,7 +4716,7 @@ impl Window {
             corner_smoothing: self.default_corner_smoothing,
             material: GlassMaterial {
                 tint: ground,
-                blur: px(0.),
+                blur: px(blur.as_f32() * scale_factor),
                 refraction: px(0.),
                 opacity: self.element_opacity(),
                 ..GlassMaterial::default()

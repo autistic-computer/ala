@@ -1414,8 +1414,8 @@ impl App {
         self.platform.open_url(url);
     }
 
-    pub fn selection_haptic(&self) {
-        self.platform.selection_haptic();
+    pub fn haptic(&self, kind: crate::Haptic) {
+        self.platform.haptic(kind);
     }
 
     pub fn register_url_scheme(&self, scheme: &str) -> Task<Result<()>> {

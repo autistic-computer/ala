@@ -1,9 +1,9 @@
 use crate::android::{bridge, dispatcher::AndroidDispatcher, display::AndroidDisplay, window};
 use ala::{
     Action, AnyWindowHandle, BackgroundExecutor, ClipboardItem, CursorStyle, DummyKeyboardMapper,
-    ForegroundExecutor, Keymap, Menu, MenuItem, PathPromptOptions, Platform, PlatformDisplay,
-    PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem, PlatformWindow, Task,
-    ThermalState, WindowAppearance, WindowParams,
+    ForegroundExecutor, Haptic, Keymap, Menu, MenuItem, PathPromptOptions, Platform,
+    PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem,
+    PlatformWindow, Task, ThermalState, WindowAppearance, WindowParams,
 };
 use anyhow::{Result, anyhow};
 use futures::channel::oneshot;
@@ -242,8 +242,8 @@ impl Platform for AndroidPlatform {
         crate::android::dispatcher::defer(move || bridge::open_url(&url));
     }
 
-    fn selection_haptic(&self) {
-        crate::android::dispatcher::defer(bridge::selection_haptic);
+    fn haptic(&self, kind: Haptic) {
+        crate::android::dispatcher::defer(move || bridge::haptic(kind));
     }
 
     fn on_open_urls(&self, callback: Box<dyn FnMut(Vec<String>)>) {

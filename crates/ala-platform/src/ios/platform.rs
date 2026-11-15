@@ -1,9 +1,9 @@
 use crate::ios::{IosDisplay, IosWindow, nil, ns_string};
 use ala::{
     Action, AnyWindowHandle, BackgroundExecutor, ClipboardItem, CursorStyle, DummyKeyboardMapper,
-    ForegroundExecutor, Keymap, Menu, MenuItem, PathPromptOptions, Platform, PlatformDisplay,
-    PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem, PlatformWindow, Task,
-    ThermalState, WindowAppearance, WindowParams,
+    ForegroundExecutor, Haptic, Keymap, Menu, MenuItem, PathPromptOptions, Platform,
+    PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem,
+    PlatformWindow, Task, ThermalState, WindowAppearance, WindowParams,
 };
 use anyhow::{Result, anyhow};
 use futures::channel::oneshot;
@@ -27,6 +27,13 @@ use std::{
 };
 
 use crate::ios::id;
+
+const IMPACT_LIGHT: isize = 0;
+const IMPACT_MEDIUM: isize = 1;
+const IMPACT_HEAVY: isize = 2;
+const NOTIFY_SUCCESS: isize = 0;
+const NOTIFY_WARNING: isize = 1;
+const NOTIFY_ERROR: isize = 2;
 
 static PLATFORM: AtomicPtr<IosPlatform> = AtomicPtr::new(std::ptr::null_mut());
 static REGISTER_DELEGATE: Once = Once::new();
@@ -198,13 +205,42 @@ impl Platform for IosPlatform {
         crate::ios::window::set_window_appearance(appearance);
     }
 
-    fn selection_haptic(&self) {
+    fn haptic(&self, kind: Haptic) {
         unsafe {
-            let generator: id = msg_send![class!(UISelectionFeedbackGenerator), new];
-            if !generator.is_null() {
-                let _: () = msg_send![generator, selectionChanged];
-                let _: () = msg_send![generator, release];
+            let impact = |style: isize| -> id {
+                let generator: id = msg_send![class!(UIImpactFeedbackGenerator), alloc];
+                msg_send![generator, initWithStyle: style]
+            };
+            let generator: id = match kind {
+                Haptic::Selection => msg_send![class!(UISelectionFeedbackGenerator), new],
+                Haptic::Light => impact(IMPACT_LIGHT),
+                Haptic::Medium => impact(IMPACT_MEDIUM),
+                Haptic::Heavy => impact(IMPACT_HEAVY),
+                Haptic::Success | Haptic::Warning | Haptic::Error => {
+                    msg_send![class!(UINotificationFeedbackGenerator), new]
+                }
+            };
+            if generator.is_null() {
+                return;
             }
+            match kind {
+                Haptic::Selection => {
+                    let _: () = msg_send![generator, selectionChanged];
+                }
+                Haptic::Light | Haptic::Medium | Haptic::Heavy => {
+                    let _: () = msg_send![generator, impactOccurred];
+                }
+                Haptic::Success => {
+                    let _: () = msg_send![generator, notificationOccurred: NOTIFY_SUCCESS];
+                }
+                Haptic::Warning => {
+                    let _: () = msg_send![generator, notificationOccurred: NOTIFY_WARNING];
+                }
+                Haptic::Error => {
+                    let _: () = msg_send![generator, notificationOccurred: NOTIFY_ERROR];
+                }
+            }
+            let _: () = msg_send![generator, release];
         }
     }
 

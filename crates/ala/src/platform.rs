@@ -65,6 +65,17 @@ pub use app_menu::*;
 pub use keyboard::*;
 pub use keystroke::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Haptic {
+    Selection,
+    Light,
+    Medium,
+    Heavy,
+    Success,
+    Warning,
+    Error,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowVisibility {
     Visible,
@@ -185,7 +196,7 @@ pub trait Platform: 'static {
     }
 
     fn open_url(&self, url: &str);
-    fn selection_haptic(&self) {}
+    fn haptic(&self, _kind: Haptic) {}
     fn on_open_urls(&self, callback: Box<dyn FnMut(Vec<String>)>);
     fn register_url_scheme(&self, url: &str) -> Task<Result<()>>;
 
