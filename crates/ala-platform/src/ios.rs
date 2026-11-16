@@ -42,6 +42,6 @@ pub use platform::IosPlatform;
 pub(crate) use window::*;
 #[cfg(target_os = "ios")]
 pub use window::{
-    Accessibility, accessibility, request_paste, set_compact_keyboard, set_status_bar_on_dark,
-    show_edit_menu,
+    Accessibility, accessibility, hardware_keyboard, request_paste, set_app_key_row,
+    set_compact_keyboard, set_status_bar_on_dark, show_edit_menu,
 };

@@ -63,6 +63,7 @@ pub(crate) struct IosWindowState {
     keyboard_requested: bool,
     soft_keyboard: bool,
     compact_keyboard: bool,
+    app_key_row: bool,
     shown_input_mode: TextInputMode,
     keyboard_sync_pending: bool,
     reload_input_views: bool,
@@ -206,6 +207,7 @@ impl IosWindow {
                 keyboard_requested: false,
                 soft_keyboard: false,
                 compact_keyboard: false,
+                app_key_row: false,
                 shown_input_mode: TextInputMode::Text,
                 keyboard_sync_pending: false,
                 reload_input_views: false,
@@ -1463,7 +1465,7 @@ extern "C" fn input_accessory_view(this: &Object, _: Sel) -> id {
     let state = state.borrow();
     if terminal_key_row(
         state.soft_keyboard,
-        state.compact_keyboard,
+        state.compact_keyboard || state.app_key_row,
         &state.text_input,
     ) {
         state.accessory_view
@@ -1481,10 +1483,10 @@ extern "C" fn input_accessory_view(this: &Object, _: Sel) -> id {
 
 fn terminal_key_row(
     soft_keyboard: bool,
-    compact_keyboard: bool,
+    own_key_row: bool,
     text_input: &TextInputConfiguration,
 ) -> bool {
-    soft_keyboard && !compact_keyboard && text_input.input_action == TextInputAction::Enter
+    soft_keyboard && !own_key_row && text_input.input_action == TextInputAction::Enter
 }
 
 extern "C" fn resign_first_responder(this: &Object, _: Sel) -> BOOL {
@@ -1840,6 +1842,26 @@ pub fn set_compact_keyboard(enabled: bool) {
             return;
         }
         state.compact_keyboard = enabled;
+        state.latched = Modifiers::default();
+        state.reload_input_views = true;
+    }
+    schedule_keyboard_sync(view);
+}
+
+pub fn set_app_key_row(enabled: bool) {
+    let view = ACTIVE_VIEW.get();
+    let Some(state) = (!view.is_null())
+        .then(|| unsafe { try_window_state(&*view) })
+        .flatten()
+    else {
+        return;
+    };
+    {
+        let mut state = state.borrow_mut();
+        if state.app_key_row == enabled {
+            return;
+        }
+        state.app_key_row = enabled;
         state.latched = Modifiers::default();
         state.reload_input_views = true;
     }
@@ -2630,7 +2652,7 @@ fn take_latch(this: &Object) -> Modifiers {
     latched
 }
 
-fn hardware_keyboard() -> bool {
+pub fn hardware_keyboard() -> bool {
     unsafe {
         let keyboard: id = msg_send![class!(GCKeyboard), coalescedKeyboard];
         !keyboard.is_null()
