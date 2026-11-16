@@ -55,6 +55,8 @@ pub(crate) struct IosWindowState {
     accessory_view: id,
     done_bar: id,
     keyboard_probe: id,
+    assistant_groups: [id; 2],
+    assistant_shown: bool,
     keyboard_overlap: f64,
     keyboard_rest: f64,
     keyboard_motion: Option<KeyboardMotion>,
@@ -196,6 +198,8 @@ impl IosWindow {
                 accessory_view: accessory_view(native_view),
                 done_bar: done_bar(native_view),
                 keyboard_probe: install_keyboard_probe(native_view),
+                assistant_groups: input_assistant_groups(native_view),
+                assistant_shown: hardware_keyboard(),
                 keyboard_overlap: 0.0,
                 keyboard_rest: 0.0,
                 keyboard_motion: None,
@@ -256,6 +260,11 @@ impl IosWindow {
             install_back_gesture(native_view);
             follow_display_corners(native_view);
             observe_hardware_keyboard(native_view);
+            let (groups, shown) = {
+                let state = state.borrow();
+                (state.assistant_groups, state.assistant_shown)
+            };
+            show_input_assistant(native_view, groups, shown);
             crate::ios::drop::install(native_view);
             let edit_menu: id = msg_send![class!(UIEditMenuInteraction), alloc];
             let edit_menu: id = msg_send![edit_menu, initWithDelegate: native_view];
@@ -314,6 +323,9 @@ impl Drop for IosWindow {
                 let _: () = msg_send![state.accessory_view, release];
                 let _: () = msg_send![state.done_bar, release];
                 let _: () = msg_send![state.keyboard_probe, release];
+                for group in state.assistant_groups {
+                    let _: () = msg_send![group, release];
+                }
                 let center: id = msg_send![class!(NSNotificationCenter), defaultCenter];
                 let _: () = msg_send![center, removeObserver: state.native_view];
             }
@@ -2641,6 +2653,25 @@ unsafe fn observe_hardware_keyboard(view: id) {
     }
 }
 
+unsafe fn input_assistant_groups(view: id) -> [id; 2] {
+    let item: id = msg_send![view, inputAssistantItem];
+    let leading: id = msg_send![item, leadingBarButtonGroups];
+    let trailing: id = msg_send![item, trailingBarButtonGroups];
+    [msg_send![leading, retain], msg_send![trailing, retain]]
+}
+
+unsafe fn show_input_assistant(view: id, groups: [id; 2], shown: bool) {
+    let item: id = msg_send![view, inputAssistantItem];
+    let [leading, trailing] = if shown {
+        groups
+    } else {
+        let empty = ns_array(&[]);
+        [empty, empty]
+    };
+    let _: () = msg_send![item, setLeadingBarButtonGroups: leading];
+    let _: () = msg_send![item, setTrailingBarButtonGroups: trailing];
+}
+
 extern "C" fn hardware_keyboard_changed(this: &Object, _: Sel, _: id) {
     schedule_keyboard_sync(this as *const Object as id);
 }
@@ -2669,22 +2700,27 @@ extern "C" fn sync_keyboard(context: *mut c_void) {
     let view = context as id;
     unsafe {
         if let Some(state) = try_window_state(&*view) {
-            let (visible, reload) = {
+            let (visible, reload, groups, assistant) = {
                 let mut state = state.borrow_mut();
                 state.keyboard_sync_pending = false;
+                let hardware = hardware_keyboard();
                 let visible = state.keyboard_requested
                     && state.text_input.input_mode != TextInputMode::None
-                    && !hardware_keyboard();
+                    && !hardware;
+                let assistant = visible || hardware;
                 let reload = state.soft_keyboard != visible
+                    || state.assistant_shown != assistant
                     || std::mem::take(&mut state.reload_input_views)
                     || (visible && state.keyboard_target() == 0.0);
                 state.soft_keyboard = visible;
+                state.assistant_shown = assistant;
                 if visible {
                     state.shown_input_mode = state.text_input.input_mode;
                 }
-                (visible, reload)
+                (visible, reload, state.assistant_groups, assistant)
             };
             if reload {
+                show_input_assistant(view, groups, assistant);
                 let first_responder: BOOL = msg_send![view, isFirstResponder];
                 if first_responder == YES {
                     let _: () = msg_send![view, reloadInputViews];
