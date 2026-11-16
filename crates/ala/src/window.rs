@@ -3243,7 +3243,7 @@ impl Window {
         keyboard
     }
 
-    pub(crate) fn last_input_was_touch(&self) -> bool {
+    pub fn last_input_was_touch(&self) -> bool {
         let touch = self.last_input_modality == InputModality::Touch;
         self.record_input_read(InputRead::Touch(touch));
         touch
