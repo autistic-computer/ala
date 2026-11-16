@@ -25,12 +25,12 @@ pub use ala::Platform;
 pub mod mobile {
     #[cfg(target_os = "android")]
     pub use crate::android::{
-        Accessibility, accessibility, display_corner_radius, phone, request_paste,
+        Accessibility, accessibility, clipboard_image, display_corner_radius, phone, request_paste,
         set_compact_keyboard, set_status_bar_on_dark, show_edit_menu,
     };
     #[cfg(target_os = "ios")]
     pub use crate::ios::{
-        Accessibility, accessibility, display_corner_radius, phone, request_paste,
+        Accessibility, accessibility, clipboard_image, display_corner_radius, phone, request_paste,
         set_compact_keyboard, set_status_bar_on_dark, show_edit_menu,
     };
 }
