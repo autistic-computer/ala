@@ -32,7 +32,7 @@ pub mod mobile {
     pub use crate::ios::{
         Accessibility, accessibility, display_corner_radius, hardware_keyboard, phone,
         request_paste, set_app_key_row, set_compact_keyboard, set_status_bar_on_dark,
-        show_edit_menu,
+        show_edit_menu, soft_keyboard,
     };
 }
 

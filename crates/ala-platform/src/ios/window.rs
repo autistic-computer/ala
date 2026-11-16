@@ -1492,9 +1492,14 @@ fn terminal_key_row(
 extern "C" fn resign_first_responder(this: &Object, _: Sel) -> BOOL {
     release_all_keys(this);
     if let Some(state) = unsafe { try_window_state(this) } {
-        let mut state = state.borrow_mut();
-        state.keyboard_requested = false;
-        state.soft_keyboard = false;
+        let hidden = {
+            let mut state = state.borrow_mut();
+            state.keyboard_requested = false;
+            std::mem::replace(&mut state.soft_keyboard, false)
+        };
+        if hidden {
+            schedule_viewport_refresh(this as *const Object as id);
+        }
     }
     unsafe { msg_send![super(this, class!(UIView)), resignFirstResponder] }
 }
@@ -1866,6 +1871,14 @@ pub fn set_app_key_row(enabled: bool) {
         state.reload_input_views = true;
     }
     schedule_keyboard_sync(view);
+}
+
+pub fn soft_keyboard() -> bool {
+    let view = ACTIVE_VIEW.get();
+    (!view.is_null())
+        .then(|| unsafe { try_window_state(&*view) })
+        .flatten()
+        .is_some_and(|state| state.borrow().soft_keyboard)
 }
 
 pub fn set_status_bar_on_dark(dark: Option<bool>) {
@@ -2722,7 +2735,7 @@ extern "C" fn sync_keyboard(context: *mut c_void) {
     let view = context as id;
     unsafe {
         if let Some(state) = try_window_state(&*view) {
-            let (visible, reload, groups, assistant) = {
+            let (visible, toggled, reload, groups, assistant) = {
                 let mut state = state.borrow_mut();
                 state.keyboard_sync_pending = false;
                 let hardware = hardware_keyboard();
@@ -2730,7 +2743,8 @@ extern "C" fn sync_keyboard(context: *mut c_void) {
                     && state.text_input.input_mode != TextInputMode::None
                     && !hardware;
                 let assistant = visible || hardware;
-                let reload = state.soft_keyboard != visible
+                let toggled = state.soft_keyboard != visible;
+                let reload = toggled
                     || state.assistant_shown != assistant
                     || std::mem::take(&mut state.reload_input_views)
                     || (visible && state.keyboard_target() == 0.0);
@@ -2739,7 +2753,7 @@ extern "C" fn sync_keyboard(context: *mut c_void) {
                 if visible {
                     state.shown_input_mode = state.text_input.input_mode;
                 }
-                (visible, reload, state.assistant_groups, assistant)
+                (visible, toggled, reload, state.assistant_groups, assistant)
             };
             if reload {
                 show_input_assistant(view, groups, assistant);
@@ -2750,6 +2764,26 @@ extern "C" fn sync_keyboard(context: *mut c_void) {
                     let _: BOOL = msg_send![view, becomeFirstResponder];
                 }
             }
+            if toggled {
+                viewport_changed(&*view);
+            }
+        }
+        let _: () = msg_send![view, release];
+    }
+}
+
+fn schedule_viewport_refresh(view: id) {
+    unsafe {
+        let _: id = msg_send![view, retain];
+        dispatch2::DispatchQueue::main().exec_async_f(view.cast(), refresh_viewport);
+    }
+}
+
+extern "C" fn refresh_viewport(context: *mut c_void) {
+    let view = context as id;
+    unsafe {
+        if try_window_state(&*view).is_some() {
+            viewport_changed(&*view);
         }
         let _: () = msg_send![view, release];
     }
