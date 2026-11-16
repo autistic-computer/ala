@@ -84,6 +84,7 @@ pub(crate) struct IosPlatformState {
     menus: crate::ios::menu::MenuState,
     menu_action: Option<Box<dyn FnMut(&dyn Action)>>,
     open_urls: Option<Box<dyn FnMut(Vec<String>)>>,
+    system_notifications: crate::apple::system_notifications::SystemNotificationState,
 }
 
 impl Default for IosPlatform {
@@ -113,6 +114,8 @@ impl IosPlatform {
             menus: Default::default(),
             menu_action: None,
             open_urls: None,
+            system_notifications: crate::apple::system_notifications::SystemNotificationState::new(
+            ),
         }))
     }
 
@@ -203,6 +206,33 @@ impl Platform for IosPlatform {
     fn set_window_appearance(&self, appearance: Option<WindowAppearance>) {
         self.0.lock().appearance = appearance;
         crate::ios::window::set_window_appearance(appearance);
+    }
+
+    fn show_system_notification(&self, notification: ala::SystemNotification) {
+        let mut state = self.0.lock();
+        let executor = state.foreground_executor.clone();
+        state.system_notifications.show(&executor, notification);
+    }
+
+    fn dismiss_system_notification(&self, tag: &str) {
+        let mut state = self.0.lock();
+        let executor = state.foreground_executor.clone();
+        state.system_notifications.dismiss(&executor, tag);
+    }
+
+    fn on_system_notification_response(
+        &self,
+        callback: Box<dyn FnMut(ala::SystemNotificationResponse)>,
+    ) {
+        let mut state = self.0.lock();
+        let executor = state.foreground_executor.clone();
+        state.system_notifications.on_response(&executor, callback);
+    }
+
+    fn set_app_badge(&self, count: usize) {
+        let mut state = self.0.lock();
+        let executor = state.foreground_executor.clone();
+        state.system_notifications.set_badge(&executor, count);
     }
 
     fn haptic(&self, kind: Haptic) {

@@ -42,6 +42,7 @@ pub struct WebPlatform {
     cursor_visible: Rc<Cell<bool>>,
     last_cursor_css: Rc<Cell<&'static str>>,
     gestures: Rc<WebGestures>,
+    notifications: RefCell<crate::web::notifications::WebNotifications>,
     _cursor_restore_listeners: Vec<EventListenerHandle>,
 }
 
@@ -174,6 +175,10 @@ impl WebPlatform {
             &browser_window.navigator().user_agent().unwrap_or_default(),
         ));
 
+        let notifications = RefCell::new(crate::web::notifications::WebNotifications::new(
+            browser_window.clone(),
+        ));
+
         Self {
             browser_window,
             dispatcher,
@@ -191,6 +196,7 @@ impl WebPlatform {
             cursor_visible,
             last_cursor_css,
             gestures,
+            notifications,
             _cursor_restore_listeners: cursor_restore_listeners,
         }
     }
@@ -459,6 +465,25 @@ impl Platform for WebPlatform {
         } else {
             WindowAppearance::Light
         }
+    }
+
+    fn show_system_notification(&self, notification: ala::SystemNotification) {
+        self.notifications
+            .borrow_mut()
+            .show(&self.foreground_executor, notification);
+    }
+
+    fn dismiss_system_notification(&self, tag: &str) {
+        self.notifications.borrow_mut().dismiss(tag);
+    }
+
+    fn on_system_notification_response(
+        &self,
+        callback: Box<dyn FnMut(ala::SystemNotificationResponse)>,
+    ) {
+        self.notifications
+            .borrow_mut()
+            .on_response(&self.foreground_executor, callback);
     }
 
     fn open_url(&self, url: &str) {

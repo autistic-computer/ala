@@ -1434,6 +1434,10 @@ impl App {
         self.platform.dismiss_system_notification(tag);
     }
 
+    pub fn set_app_badge(&self, count: usize) {
+        self.platform.set_app_badge(count);
+    }
+
     pub fn on_system_notification_response<F>(&self, mut callback: F)
     where
         F: 'static + FnMut(SystemNotificationResponse, &mut App),

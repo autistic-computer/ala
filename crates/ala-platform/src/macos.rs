@@ -6,7 +6,6 @@ mod display_link;
 mod events;
 mod keyboard;
 mod pasteboard;
-mod system_notifications;
 
 use crate::apple::metal_renderer as renderer;
 

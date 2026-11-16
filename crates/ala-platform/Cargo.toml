@@ -422,6 +422,9 @@ web-sys = { version = "0.3", features = [
     "MouseEvent",
     "Navigator",
     "Node",
+    "Notification",
+    "NotificationOptions",
+    "NotificationPermission",
     "OffscreenCanvas",
     "OffscreenCanvasRenderingContext2d",
     "PointerEvent",
@@ -477,6 +480,17 @@ image = { workspace = true, features = [
 log = { workspace = true, features = ["kv_unstable_serde", "serde"] }
 memmap2 = "0.9.11"
 objc.workspace = true
+objc2.workspace = true
+objc2-foundation = { workspace = true, features = [
+    "NSArray",
+    "NSBundle",
+    "NSError",
+    "NSObject",
+    "NSSet",
+    "NSString",
+    "std",
+] }
+objc2-user-notifications.workspace = true
 parking_lot.workspace = true
 raw-window-handle.workspace = true
 uuid.workspace = true

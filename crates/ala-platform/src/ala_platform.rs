@@ -1,5 +1,5 @@
 pub mod android;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub mod apple;
 pub mod ios;
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
