@@ -2697,6 +2697,9 @@ impl WgpuRendererCore {
                         .staging_belt
                         .write_buffer(encoder, buffer, start, size);
                     for ((data, _), offset) in parts.iter().zip(offsets) {
+                        if data.is_empty() {
+                            continue;
+                        }
                         let at = (offset - start) as usize;
                         view.slice(at..at + data.len()).copy_from_slice(data);
                     }

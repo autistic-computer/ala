@@ -3213,6 +3213,10 @@ impl Window {
         self.mouse_position
     }
 
+    pub fn tooltip_bounds(&self) -> Option<Bounds<Pixels>> {
+        self.tooltip_bounds.as_ref().map(|tooltip| tooltip.bounds)
+    }
+
     pub fn capture_pointer(&mut self, hitbox_id: HitboxId) {
         self.captured_hitbox = Some(hitbox_id);
     }

@@ -568,7 +568,11 @@ impl WebWindowInner {
             let event: web_sys::WheelEvent = event.unchecked_into();
 
             let mouse_event: &web_sys::MouseEvent = event.as_ref();
-            let position = mouse_position_in_element(mouse_event);
+            let canvas = this.canvas.get_bounding_client_rect();
+            let position = point(
+                px((f64::from(mouse_event.client_x()) - canvas.left()) as f32),
+                px((f64::from(mouse_event.client_y()) - canvas.top()) as f32),
+            );
             let modifiers = modifiers_from_wheel_event(mouse_event, this.is_mac);
 
             let delta_mode = event.delta_mode();
