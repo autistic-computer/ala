@@ -25,6 +25,8 @@ use crate::windows::directx_renderer::shader_resources::{
 use crate::windows::*;
 use ala::*;
 
+mod glass;
+
 pub(crate) const DISABLE_DIRECT_COMPOSITION: &str = "ALA_DISABLE_DIRECT_COMPOSITION";
 const RENDER_TARGET_FORMAT: DXGI_FORMAT = DXGI_FORMAT_B8G8R8A8_UNORM;
 const PATH_MULTISAMPLE_COUNT: u32 = 4;
@@ -77,6 +79,7 @@ struct DirectXResources {
 }
 
 struct DirectXRenderPipelines {
+    glass: Option<glass::GlassPipeline>,
     shadow_pipeline: PipelineState<Shadow>,
     quad_pipeline: PipelineState<Quad>,
     path_rasterization_pipeline: PipelineState<PathRasterizationSprite>,
@@ -343,7 +346,11 @@ impl DirectXRenderer {
             WindowBackgroundAppearance::Opaque => [1.0f32; 4],
             _ => [0.0f32; 4],
         })?;
-        self.draw_scene(scene)
+        let result = self.draw_scene(scene);
+        if let Some(glass) = &mut self.pipelines.glass {
+            glass.finish_frame();
+        }
+        result
     }
 
     fn draw_scene(&mut self, scene: &Scene) -> Result<()> {
@@ -386,7 +393,18 @@ impl DirectXRenderer {
                     }
                     self.upload_scene_buffers(scene)
                 }
-                PrimitiveBatch::Glass(_) => Ok(()),
+                PrimitiveBatch::Glass(range) => {
+                    if let Some(glass) = &mut self.pipelines.glass {
+                        glass.draw(
+                            self.devices.as_ref().context("devices missing")?,
+                            self.resources.as_ref().context("resources missing")?,
+                            &self.globals,
+                            &scene.glasses[range],
+                            scene.window_corner_mask,
+                        )?;
+                    }
+                    Ok(())
+                }
             }
             .with_context(|| {
                 format!(
@@ -879,6 +897,10 @@ impl DirectXRenderer {
     pub(crate) fn mark_drawable(&mut self) {
         self.skip_draws = false;
     }
+
+    pub(crate) fn supports_backdrop_sampling(&self) -> bool {
+        self.pipelines.glass.is_some()
+    }
 }
 
 impl DirectXResources {
@@ -971,14 +993,14 @@ impl DirectXRenderPipelines {
             "path_rasterization_pipeline",
             ShaderModule::PathRasterization,
             32,
-            create_blend_state_for_path_rasterization(device)?,
+            create_premultiplied_blend_state(device)?,
         )?;
         let path_sprite_pipeline = PipelineState::new(
             device,
             "path_sprite_pipeline",
             ShaderModule::PathSprite,
             4,
-            create_blend_state_for_path_sprite(device)?,
+            create_premultiplied_blend_state(device)?,
         )?;
         let underline_pipeline = PipelineState::new(
             device,
@@ -1018,6 +1040,9 @@ impl DirectXRenderPipelines {
 
         Ok(Self {
             shadow_pipeline,
+            glass: glass::GlassPipeline::new(device)
+                .context("Windows glass unavailable")
+                .log_err(),
             quad_pipeline,
             path_rasterization_pipeline,
             path_sprite_pipeline,
@@ -1417,7 +1442,7 @@ fn create_resources(
     let (render_target, render_target_view) =
         create_render_target_and_its_view(swap_chain, &devices.device)?;
     let (path_intermediate_texture, path_intermediate_srv) =
-        create_path_intermediate_texture(&devices.device, width, height)?;
+        create_sampled_render_texture(&devices.device, width, height)?;
     let (path_intermediate_msaa_texture, path_intermediate_msaa_view) =
         create_path_intermediate_msaa_texture_and_view(&devices.device, width, height)?;
     let viewport = D3D11_VIEWPORT {
@@ -1451,7 +1476,7 @@ fn create_render_target_and_its_view(
 }
 
 #[inline]
-fn create_path_intermediate_texture(
+fn create_sampled_render_texture(
     device: &ID3D11Device,
     width: u32,
     height: u32,
@@ -1576,25 +1601,7 @@ fn create_blend_state_for_subpixel_rendering(device: &ID3D11Device) -> Result<ID
 }
 
 #[inline]
-fn create_blend_state_for_path_rasterization(device: &ID3D11Device) -> Result<ID3D11BlendState> {
-    let mut desc = D3D11_BLEND_DESC::default();
-    desc.RenderTarget[0].BlendEnable = true.into();
-    desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
-    desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8;
-    unsafe {
-        let mut state = None;
-        device.CreateBlendState(&desc, Some(&mut state))?;
-        Ok(state.unwrap())
-    }
-}
-
-#[inline]
-fn create_blend_state_for_path_sprite(device: &ID3D11Device) -> Result<ID3D11BlendState> {
+fn create_premultiplied_blend_state(device: &ID3D11Device) -> Result<ID3D11BlendState> {
     let mut desc = D3D11_BLEND_DESC::default();
     desc.RenderTarget[0].BlendEnable = true.into();
     desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
