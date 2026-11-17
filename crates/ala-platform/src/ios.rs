@@ -37,7 +37,7 @@ pub use ffi::*;
 #[cfg(target_os = "ios")]
 pub use menu::MenuCommand;
 #[cfg(target_os = "ios")]
-pub use platform::IosPlatform;
+pub use platform::{IosPlatform, clipboard_image};
 #[cfg(target_os = "ios")]
 pub(crate) use window::*;
 #[cfg(target_os = "ios")]

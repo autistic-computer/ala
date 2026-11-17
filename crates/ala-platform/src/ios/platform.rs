@@ -742,6 +742,25 @@ pub(crate) fn screen_appearance() -> WindowAppearance {
     }
 }
 
+pub fn clipboard_image() -> Option<ala::Image> {
+    let has_images: BOOL = unsafe {
+        let pasteboard: id = msg_send![class!(UIPasteboard), generalPasteboard];
+        if pasteboard.is_null() {
+            return None;
+        }
+        msg_send![pasteboard, hasImages]
+    };
+    if has_images != YES {
+        return None;
+    }
+    read_clipboard()?
+        .into_entries()
+        .find_map(|entry| match entry {
+            ala::ClipboardEntry::Image(image) => Some(image),
+            _ => None,
+        })
+}
+
 pub(crate) fn read_clipboard() -> Option<ClipboardItem> {
     unsafe {
         let pasteboard: id = msg_send![class!(UIPasteboard), generalPasteboard];

@@ -414,17 +414,20 @@ fn sync_idle_timer() {
     bridge::set_keep_screen_on(IDLE_GUARDS.load(Ordering::Acquire) > 0);
 }
 
+pub fn clipboard_image() -> Option<ala::Image> {
+    let (kind, bytes) = bridge::clipboard_image()?;
+    let format = if kind == "image/png" {
+        ala::ImageFormat::Png
+    } else {
+        ala::ImageFormat::Jpeg
+    };
+    Some(ala::Image::from_bytes(format, bytes))
+}
+
 pub(crate) fn read_clipboard() -> Option<ClipboardItem> {
     let mut entries = Vec::new();
-    if let Some((kind, bytes)) = bridge::clipboard_image() {
-        let format = if kind == "image/png" {
-            ala::ImageFormat::Png
-        } else {
-            ala::ImageFormat::Jpeg
-        };
-        entries.push(ala::ClipboardEntry::Image(ala::Image::from_bytes(
-            format, bytes,
-        )));
+    if let Some(image) = clipboard_image() {
+        entries.push(ala::ClipboardEntry::Image(image));
     }
     if let Some(text) = bridge::clipboard_text() {
         entries.push(ala::ClipboardEntry::String(ala::ClipboardString::new(text)));
