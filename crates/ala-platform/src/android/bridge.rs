@@ -609,14 +609,17 @@ pub(crate) fn haptic(kind: ala::Haptic) {
     };
     with_view(|env, view| {
         for &constant in tries {
-            match env.call_method(
-                view,
-                "performHapticFeedback",
-                "(I)Z",
-                &[JValue::Int(constant)],
-            ) {
-                Ok(done) if done.z().unwrap_or(false) => return,
-                Ok(_) => {}
+            match env
+                .call_method(
+                    view,
+                    "performHapticFeedback",
+                    "(I)Z",
+                    &[JValue::Int(constant)],
+                )
+                .map(|done| done.z().unwrap_or(false))
+            {
+                Ok(true) => return,
+                Ok(false) => {}
                 Err(_) => {
                     if env.exception_check().unwrap_or(false) {
                         env.exception_clear().ok();
