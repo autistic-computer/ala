@@ -1,6 +1,8 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicIsize, Ordering};
 
 use ala::{
     ForegroundExecutor, SharedString, SystemNotification, SystemNotificationAction,
@@ -54,6 +56,14 @@ impl SystemNotificationState {
         }
     }
 
+    #[cfg(target_os = "ios")]
+    pub(crate) fn set_badge(&mut self, executor: &ForegroundExecutor, count: usize) {
+        self.initialize(executor);
+        if let Some(center) = &self.center {
+            center.set_badge(count);
+        }
+    }
+
     pub(crate) fn on_response(
         &mut self,
         executor: &ForegroundExecutor,
@@ -95,6 +105,7 @@ struct NotificationCenter {
         HashMap<Vec<SystemNotificationAction>, (SharedString, Retained<UNNotificationCategory>)>,
     >,
     authorization_requested: Cell<bool>,
+    badge: Arc<AtomicIsize>,
 }
 
 impl NotificationCenter {
@@ -113,6 +124,7 @@ impl NotificationCenter {
             _delegate: delegate,
             categories: RefCell::new(HashMap::new()),
             authorization_requested: Cell::new(false),
+            badge: Arc::new(AtomicIsize::new(-1)),
         })
     }
 
@@ -120,7 +132,9 @@ impl NotificationCenter {
         if self.authorization_requested.replace(true) {
             return;
         }
-        let completion = RcBlock::new(|granted: Bool, error: *mut NSError| {
+        let center = self.center.clone();
+        let badge = self.badge.clone();
+        let completion = RcBlock::new(move |granted: Bool, error: *mut NSError| {
             if let Some(error) = unsafe { error.as_ref() } {
                 log::warn!(
                     "system notification authorization failed: {}",
@@ -128,13 +142,27 @@ impl NotificationCenter {
                 );
             } else if !granted.as_bool() {
                 log::info!("system notification authorization denied");
+            } else if let Ok(count) = usize::try_from(badge.load(Ordering::Acquire)) {
+                apply_badge(&center, count);
             }
         });
+        let options = UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound;
+        #[cfg(target_os = "ios")]
+        let options = options | UNAuthorizationOptions::Badge;
         self.center
-            .requestAuthorizationWithOptions_completionHandler(
-                UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound,
-                &completion,
-            );
+            .requestAuthorizationWithOptions_completionHandler(options, &completion);
+    }
+
+    #[cfg(target_os = "ios")]
+    fn set_badge(&self, count: usize) {
+        let count = isize::try_from(count).unwrap_or(isize::MAX);
+        if self.badge.swap(count, Ordering::AcqRel) == count {
+            return;
+        }
+        if count > 0 {
+            self.request_authorization();
+        }
+        apply_badge(&self.center, count.unsigned_abs());
     }
 
     fn show(&self, notification: SystemNotification) {
@@ -208,6 +236,21 @@ impl NotificationCenter {
         self.center
             .removeDeliveredNotificationsWithIdentifiers(&identifiers);
     }
+}
+
+fn apply_badge(center: &UNUserNotificationCenter, count: usize) {
+    let completion = RcBlock::new(|error: *mut NSError| {
+        if let Some(error) = unsafe { error.as_ref() } {
+            log::debug!(
+                "failed to set the app badge: {}",
+                error.localizedDescription()
+            );
+        }
+    });
+    center.setBadgeCount_withCompletionHandler(
+        isize::try_from(count).unwrap_or(isize::MAX),
+        Some(&completion),
+    );
 }
 
 struct DelegateIvars {

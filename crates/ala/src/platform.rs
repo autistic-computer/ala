@@ -271,6 +271,10 @@ pub trait Platform: 'static {
         _ = callback;
     }
 
+    fn set_app_badge(&self, count: usize) {
+        _ = count;
+    }
+
     fn compositor_name(&self) -> &'static str {
         ""
     }
