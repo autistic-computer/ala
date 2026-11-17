@@ -892,9 +892,10 @@ impl Glass {
                 material.glint_spread.clamp(0., 1.),
                 0.,
             ],
-            fade: self
-                .fade
-                .map_or([0.; 4], |(clear, solid)| [clear.0, solid.0, 1., 0.]),
+            fade: self.fade.map_or([0.; 4], |(clear, solid)| {
+                let into_ground = if material.blur > px(0.) { 0. } else { 1. };
+                [clear.0, solid.0, 1., into_ground]
+            }),
         }
     }
 
@@ -1626,6 +1627,36 @@ pub fn check_glass_over_a_translucent_frame(
     anyhow::ensure!(
         soft[0] > 48,
         "a blurred fade should soften a black mark past its solid end, got {soft:?}"
+    );
+
+    let mut faint = Scene::default();
+    faint.insert_primitive(Quad {
+        bounds: page,
+        content_mask: ContentMask { bounds: page }.into(),
+        background: white().into(),
+        ..Default::default()
+    });
+    faint.insert_primitive(Glass {
+        order: 0,
+        bounds: page,
+        backdrop_bounds: page,
+        content_mask: ContentMask { bounds: page }.into(),
+        shapes,
+        shape_count: 1,
+        corner_smoothing: 2.,
+        material: GlassMaterial {
+            blur: px(0.3),
+            tint: hsla(0., 0., 0., 0.2),
+            ..flat
+        },
+        shadow: None,
+        fade: Some((ScaledPixels(-2.), ScaledPixels(-1.))),
+    });
+    faint.finish();
+    let dimmed = render(&faint)?.get_pixel(32, 32).0;
+    anyhow::ensure!(
+        dimmed[0].abs_diff(204) <= 1 && dimmed[3] == 255,
+        "a fade whose blur is under half a pixel should tint white by its 0.2 to 204 and keep its alpha, got {dimmed:?}"
     );
     Ok(())
 }

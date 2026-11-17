@@ -373,7 +373,7 @@ fn fade(position: vec2<f32>) -> vec4<f32> {
         keep *= saturate(0.5 - rounded_rect(position, window, glass.mask.x, 0.0).x);
     }
     let gone = saturate((position.y - glass.fade.x) / (glass.fade.y - glass.fade.x)) * keep;
-    if (glass.optics.w < 0.5) {
+    if (glass.fade.w > 0.5) {
         return mix(held, vec4<f32>(glass.tint.rgb * glass.tint.a, glass.tint.a), gone);
     }
     let rest = 1.0 - gone;
