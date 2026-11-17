@@ -3213,6 +3213,10 @@ impl Window {
         self.mouse_position
     }
 
+    pub fn touch_position(&self) -> Option<Point<Pixels>> {
+        self.touch_gestures.touch_position()
+    }
+
     pub fn tooltip_bounds(&self) -> Option<Bounds<Pixels>> {
         self.tooltip_bounds.as_ref().map(|tooltip| tooltip.bounds)
     }

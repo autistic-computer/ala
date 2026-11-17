@@ -969,6 +969,17 @@ impl TouchGestureRecognizer {
         recognized
     }
 
+    pub(crate) fn touch_position(&self) -> Option<Point<Pixels>> {
+        match &self.state {
+            TouchGestureState::Idle => None,
+            TouchGestureState::Pending { touch, .. }
+            | TouchGestureState::Panning { touch, .. }
+            | TouchGestureState::Caught(touch)
+            | TouchGestureState::LongPressing(touch)
+            | TouchGestureState::TouchDragging(touch) => Some(touch.last_position),
+        }
+    }
+
     pub(crate) fn pending_long_press(&self) -> Option<(TouchId, Duration)> {
         let TouchGestureState::Pending {
             touch,
