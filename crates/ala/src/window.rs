@@ -4751,6 +4751,10 @@ impl Window {
     ) {
         self.invalidator.debug_assert_paint();
 
+        if shadows.iter().all(|shadow| shadow.inset) {
+            return;
+        }
+
         let scale_factor = self.scale_factor();
         let content_mask = self.snapped_content_mask();
         let opacity = self.element_opacity();
@@ -4845,6 +4849,10 @@ impl Window {
         corner_smoothing: Option<f32>,
     ) {
         self.invalidator.debug_assert_paint();
+
+        if !shadows.iter().any(|shadow| shadow.inset) {
+            return;
+        }
 
         let scale_factor = self.scale_factor();
         let content_mask = self.snapped_content_mask();
