@@ -25,6 +25,6 @@ pub use bridge::{
 #[cfg(target_os = "android")]
 pub use jni;
 #[cfg(target_os = "android")]
-pub use platform::AndroidPlatform;
+pub use platform::{AndroidPlatform, clipboard_image};
 #[cfg(target_os = "android")]
 pub use window::{request_paste, set_compact_keyboard, show_edit_menu};

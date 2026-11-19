@@ -373,7 +373,13 @@ fn fade(position: vec2<f32>) -> vec4<f32> {
         keep *= saturate(0.5 - rounded_rect(position, window, glass.mask.x, 0.0).x);
     }
     let gone = saturate((position.y - glass.fade.x) / (glass.fade.y - glass.fade.x)) * keep;
-    return mix(held, vec4<f32>(glass.tint.rgb * glass.tint.a, glass.tint.a), gone);
+    if (glass.fade.w > 0.5) {
+        return mix(held, vec4<f32>(glass.tint.rgb * glass.tint.a, glass.tint.a), gone);
+    }
+    let rest = 1.0 - gone;
+    let seen = mix(held, backdrop(position), 1.0 - rest * rest * rest);
+    let tinted = mix(seen.rgb, glass.tint.rgb * seen.a, glass.tint.a * gone);
+    return vec4<f32>(tinted, seen.a);
 }
 
 fn finish(position: vec2<f32>, color: vec4<f32>, lit: vec3<f32>, coverage: f32, contour: f32, lift: f32) -> vec4<f32> {
@@ -389,13 +395,14 @@ fn finish(position: vec2<f32>, color: vec4<f32>, lit: vec3<f32>, coverage: f32, 
     rgb = clamp(rgb, vec3<f32>(0.0), vec3<f32>(1.0));
 
     let strength = coverage * glass.rim.w;
-    let face = color.a + (1.0 - color.a) * saturate(lift);
     let edge = contour * glass.rim.w;
     if (glass.tint.a < 1.0) {
         let held = under(position);
+        let face = color.a + (1.0 - color.a) * saturate(lift);
         let outlined = vec4<f32>(glass.edge_color.rgb * edge, edge) + held * (1.0 - edge);
         return mix(outlined, vec4<f32>(rgb * face, face), strength);
     }
+    let face = color.a + (1.0 - color.a) * saturate(lift);
     let body = vec4<f32>(rgb * face, face) * strength;
     let alpha = body.a + (1.0 - body.a) * edge;
     return vec4<f32>(body.rgb + glass.edge_color.rgb * (alpha - body.a), alpha);

@@ -1414,6 +1414,10 @@ impl App {
         self.platform.open_url(url);
     }
 
+    pub fn haptic(&self, kind: crate::Haptic) {
+        self.platform.haptic(kind);
+    }
+
     pub fn register_url_scheme(&self, scheme: &str) -> Task<Result<()>> {
         self.platform.register_url_scheme(scheme)
     }
@@ -1428,6 +1432,10 @@ impl App {
 
     pub fn dismiss_system_notification(&self, tag: &str) {
         self.platform.dismiss_system_notification(tag);
+    }
+
+    pub fn set_app_badge(&self, count: usize) {
+        self.platform.set_app_badge(count);
     }
 
     pub fn on_system_notification_response<F>(&self, mut callback: F)

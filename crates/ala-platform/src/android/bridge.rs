@@ -14,6 +14,12 @@ use std::{
     sync::OnceLock,
 };
 
+const LONG_PRESS: i32 = 0;
+const VIRTUAL_KEY: i32 = 1;
+const CLOCK_TICK: i32 = 4;
+const CONFIRM: i32 = 16;
+const REJECT: i32 = 17;
+
 static VM: OnceLock<JavaVM> = OnceLock::new();
 static MAIN: OnceLock<fn()> = OnceLock::new();
 static FILES: OnceLock<PathBuf> = OnceLock::new();
@@ -591,6 +597,38 @@ pub(crate) fn set_keyboard_visible(visible: bool) {
         "(Z)V",
         &[JValue::Bool(u8::from(visible))],
     );
+}
+
+pub(crate) fn haptic(kind: ala::Haptic) {
+    let tries: &[i32] = match kind {
+        ala::Haptic::Selection => &[CLOCK_TICK],
+        ala::Haptic::Light => &[VIRTUAL_KEY],
+        ala::Haptic::Medium | ala::Haptic::Heavy => &[LONG_PRESS],
+        ala::Haptic::Success => &[CONFIRM, VIRTUAL_KEY],
+        ala::Haptic::Warning | ala::Haptic::Error => &[REJECT, LONG_PRESS],
+    };
+    with_view(|env, view| {
+        for &constant in tries {
+            match env
+                .call_method(
+                    view,
+                    "performHapticFeedback",
+                    "(I)Z",
+                    &[JValue::Int(constant)],
+                )
+                .map(|done| done.z().unwrap_or(false))
+            {
+                Ok(true) => return,
+                Ok(false) => {}
+                Err(_) => {
+                    if env.exception_check().unwrap_or(false) {
+                        env.exception_clear().ok();
+                    }
+                    return;
+                }
+            }
+        }
+    });
 }
 
 pub(crate) fn restart_input() {

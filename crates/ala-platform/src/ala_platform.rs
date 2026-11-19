@@ -1,5 +1,5 @@
 pub mod android;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub mod apple;
 pub mod ios;
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
@@ -25,13 +25,14 @@ pub use ala::Platform;
 pub mod mobile {
     #[cfg(target_os = "android")]
     pub use crate::android::{
-        Accessibility, accessibility, display_corner_radius, phone, request_paste,
+        Accessibility, accessibility, clipboard_image, display_corner_radius, phone, request_paste,
         set_compact_keyboard, set_status_bar_on_dark, show_edit_menu,
     };
     #[cfg(target_os = "ios")]
     pub use crate::ios::{
-        Accessibility, accessibility, display_corner_radius, phone, request_paste,
-        set_compact_keyboard, set_status_bar_on_dark, show_edit_menu,
+        Accessibility, accessibility, clipboard_image, display_corner_radius, hardware_keyboard,
+        phone, request_paste, set_app_key_row, set_compact_keyboard, set_status_bar_on_dark,
+        show_edit_menu, soft_keyboard,
     };
 }
 

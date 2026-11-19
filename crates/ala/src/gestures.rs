@@ -969,6 +969,17 @@ impl TouchGestureRecognizer {
         recognized
     }
 
+    pub(crate) fn touch_position(&self) -> Option<Point<Pixels>> {
+        match &self.state {
+            TouchGestureState::Idle => None,
+            TouchGestureState::Pending { touch, .. }
+            | TouchGestureState::Panning { touch, .. }
+            | TouchGestureState::Caught(touch)
+            | TouchGestureState::LongPressing(touch)
+            | TouchGestureState::TouchDragging(touch) => Some(touch.last_position),
+        }
+    }
+
     pub(crate) fn pending_long_press(&self) -> Option<(TouchId, Duration)> {
         let TouchGestureState::Pending {
             touch,
@@ -1000,6 +1011,19 @@ impl TouchGestureRecognizer {
             start_position: touch.start_position,
             position: touch.last_position,
         }))
+    }
+
+    pub(crate) fn hold_after(&mut self, delay: Duration) {
+        if let TouchGestureState::Pending {
+            deadline,
+            long_press_offered: false,
+            ..
+        } = &mut self.state
+        {
+            if let Some(start) = deadline.checked_sub(self.tuning.long_press_duration) {
+                *deadline = start + delay;
+            }
+        }
     }
 
     pub(crate) fn resolve_long_press(&mut self, claimed: bool) {

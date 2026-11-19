@@ -1,9 +1,9 @@
 use crate::android::{bridge, dispatcher::AndroidDispatcher, display::AndroidDisplay, window};
 use ala::{
     Action, AnyWindowHandle, BackgroundExecutor, ClipboardItem, CursorStyle, DummyKeyboardMapper,
-    ForegroundExecutor, Keymap, Menu, MenuItem, PathPromptOptions, Platform, PlatformDisplay,
-    PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem, PlatformWindow, Task,
-    ThermalState, WindowAppearance, WindowParams,
+    ForegroundExecutor, Haptic, Keymap, Menu, MenuItem, PathPromptOptions, Platform,
+    PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem,
+    PlatformWindow, Task, ThermalState, WindowAppearance, WindowParams,
 };
 use anyhow::{Result, anyhow};
 use futures::channel::oneshot;
@@ -242,6 +242,10 @@ impl Platform for AndroidPlatform {
         crate::android::dispatcher::defer(move || bridge::open_url(&url));
     }
 
+    fn haptic(&self, kind: Haptic) {
+        crate::android::dispatcher::defer(move || bridge::haptic(kind));
+    }
+
     fn on_open_urls(&self, callback: Box<dyn FnMut(Vec<String>)>) {
         self.0.lock().open_urls = Some(callback);
     }
@@ -410,17 +414,20 @@ fn sync_idle_timer() {
     bridge::set_keep_screen_on(IDLE_GUARDS.load(Ordering::Acquire) > 0);
 }
 
+pub fn clipboard_image() -> Option<ala::Image> {
+    let (kind, bytes) = bridge::clipboard_image()?;
+    let format = if kind == "image/png" {
+        ala::ImageFormat::Png
+    } else {
+        ala::ImageFormat::Jpeg
+    };
+    Some(ala::Image::from_bytes(format, bytes))
+}
+
 pub(crate) fn read_clipboard() -> Option<ClipboardItem> {
     let mut entries = Vec::new();
-    if let Some((kind, bytes)) = bridge::clipboard_image() {
-        let format = if kind == "image/png" {
-            ala::ImageFormat::Png
-        } else {
-            ala::ImageFormat::Jpeg
-        };
-        entries.push(ala::ClipboardEntry::Image(ala::Image::from_bytes(
-            format, bytes,
-        )));
+    if let Some(image) = clipboard_image() {
+        entries.push(ala::ClipboardEntry::Image(image));
     }
     if let Some(text) = bridge::clipboard_text() {
         entries.push(ala::ClipboardEntry::String(ala::ClipboardString::new(text)));

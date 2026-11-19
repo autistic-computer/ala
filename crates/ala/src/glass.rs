@@ -681,7 +681,7 @@ impl Glass {
     }
 
     pub fn backdrop_region(&self, viewport: Size<i32>) -> Option<Bounds<i32>> {
-        let bounds = self.backdrop_bounds;
+        let bounds = self.backdrop_bounds.intersect(&self.content_mask.bounds);
         let left = (bounds.origin.x.0.floor() as i32).max(0);
         let top = (bounds.origin.y.0.floor() as i32).max(0);
         let right = (bounds.bottom_right().x.0.ceil() as i32).min(viewport.width);
@@ -892,9 +892,10 @@ impl Glass {
                 material.glint_spread.clamp(0., 1.),
                 0.,
             ],
-            fade: self
-                .fade
-                .map_or([0.; 4], |(clear, solid)| [clear.0, solid.0, 1., 0.]),
+            fade: self.fade.map_or([0.; 4], |(clear, solid)| {
+                let into_ground = if material.blur > px(0.) { 0. } else { 1. };
+                [clear.0, solid.0, 1., into_ground]
+            }),
         }
     }
 
@@ -1588,6 +1589,128 @@ pub fn check_glass_over_a_translucent_frame(
         "a fade over white should reach the chrome {chrome:?} at its end and halfway at {:?}, got {end:?} and {middle:?}",
         [half(0), half(3)]
     );
+
+    let mark = Bounds {
+        origin: point(ScaledPixels(28.), ScaledPixels(40.)),
+        size: size(ScaledPixels(8.), ScaledPixels(16.)),
+    };
+    let mut blurred = Scene::default();
+    for (bounds, color) in [(page, white()), (mark, hsla(0., 0., 0., 1.))] {
+        blurred.insert_primitive(Quad {
+            bounds,
+            content_mask: ContentMask { bounds: page }.into(),
+            background: color.into(),
+            ..Default::default()
+        });
+    }
+    let mut shapes: [(Bounds<ScaledPixels>, Corners<ScaledPixels>); GLASS_MAX_SHAPES] =
+        Default::default();
+    shapes[0] = (page, Corners::default());
+    blurred.insert_primitive(Glass {
+        order: 0,
+        bounds: page,
+        backdrop_bounds: page,
+        content_mask: ContentMask { bounds: page }.into(),
+        shapes,
+        shape_count: 1,
+        corner_smoothing: 2.,
+        material: GlassMaterial {
+            blur: px(8.),
+            tint: hsla(0., 0., 0., 0.45),
+            ..flat
+        },
+        shadow: None,
+        fade: Some((ScaledPixels(0.), ScaledPixels(32.))),
+    });
+    blurred.finish();
+    let soft = render(&blurred)?.get_pixel(32, 48).0;
+    anyhow::ensure!(
+        soft[0] > 48,
+        "a blurred fade should soften a black mark past its solid end, got {soft:?}"
+    );
+
+    let mut faint = Scene::default();
+    faint.insert_primitive(Quad {
+        bounds: page,
+        content_mask: ContentMask { bounds: page }.into(),
+        background: white().into(),
+        ..Default::default()
+    });
+    faint.insert_primitive(Glass {
+        order: 0,
+        bounds: page,
+        backdrop_bounds: page,
+        content_mask: ContentMask { bounds: page }.into(),
+        shapes,
+        shape_count: 1,
+        corner_smoothing: 2.,
+        material: GlassMaterial {
+            blur: px(0.3),
+            tint: hsla(0., 0., 0., 0.2),
+            ..flat
+        },
+        shadow: None,
+        fade: Some((ScaledPixels(-2.), ScaledPixels(-1.))),
+    });
+    faint.finish();
+    let dimmed = render(&faint)?.get_pixel(32, 32).0;
+    anyhow::ensure!(
+        dimmed[0].abs_diff(204) <= 1 && dimmed[3] == 255,
+        "a fade whose blur is under half a pixel should tint white by its 0.2 to 204 and keep its alpha, got {dimmed:?}"
+    );
+    Ok(())
+}
+
+#[cfg(any(test, feature = "test-support", feature = "bench-support"))]
+pub fn check_glass_beside_a_clear_margin(
+    mut render: impl FnMut(&crate::Scene) -> anyhow::Result<image::RgbaImage>,
+) -> anyhow::Result<()> {
+    use crate::{ContentMask, Quad, Scene};
+    let rect = |x: f32, y: f32, width: f32, height: f32| Bounds {
+        origin: point(ScaledPixels(x), ScaledPixels(y)),
+        size: size(ScaledPixels(width), ScaledPixels(height)),
+    };
+    let window = rect(8., 0., 56., 64.);
+    let shape = rect(10., 16., 44., 32.);
+    let material = GlassMaterial::regular()
+        .blur(px(30.))
+        .tint(hsla(0., 0., 0.3, 0.75));
+    let mut shapes: [(Bounds<ScaledPixels>, Corners<ScaledPixels>); GLASS_MAX_SHAPES] =
+        Default::default();
+    shapes[0] = (shape, Corners::all(ScaledPixels(6.)));
+    let mut scene = Scene::default();
+    scene.insert_primitive(Quad {
+        bounds: window,
+        content_mask: ContentMask { bounds: window }.into(),
+        background: hsla(0., 0., 0.2, 1.).into(),
+        ..Default::default()
+    });
+    scene.insert_primitive(Glass {
+        order: 0,
+        shadow: None,
+        fade: None,
+        bounds: shape.dilate(ScaledPixels(2.)),
+        backdrop_bounds: shape.dilate(ScaledPixels(material.backdrop_reach().as_f32())),
+        content_mask: ContentMask { bounds: window }.into(),
+        shapes,
+        shape_count: 1,
+        corner_smoothing: 2.,
+        material,
+    });
+    scene.finish();
+    let image = render(&scene)?;
+    for x in 10..54 {
+        let pixel = image.get_pixel(x, 32).0;
+        anyhow::ensure!(
+            pixel[3] == 255,
+            "glass on an opaque window let the clear margin through at x = {x}: {pixel:?}"
+        );
+    }
+    anyhow::ensure!(
+        image.get_pixel(4, 32).0 == [0, 0, 0, 0],
+        "the margin beside the window should stay clear, got {:?}",
+        image.get_pixel(4, 32).0
+    );
     Ok(())
 }
 
@@ -1649,6 +1772,66 @@ pub fn check_glass_hides_the_frame_under_it(
     anyhow::ensure!(
         under_line[0].abs_diff(under_plain[0]) < 48,
         "the line showed through the glass: {under_plain:?} became {under_line:?}"
+    );
+    Ok(())
+}
+
+#[cfg(any(test, feature = "test-support", feature = "bench-support"))]
+pub fn check_glass_blurs_the_alpha_of_a_clear_frame(
+    mut render: impl FnMut(&crate::Scene) -> anyhow::Result<image::RgbaImage>,
+) -> anyhow::Result<()> {
+    use crate::{ContentMask, Quad, Scene};
+    let rect = |x: f32, y: f32, width: f32, height: f32| Bounds {
+        origin: point(ScaledPixels(x), ScaledPixels(y)),
+        size: size(ScaledPixels(width), ScaledPixels(height)),
+    };
+    let material = GlassMaterial::regular()
+        .blur(px(6.))
+        .refraction(px(0.))
+        .tint(hsla(0., 0., 0.1, 0.6));
+    let line = rect(31., 0., 2., 64.);
+    let shape = rect(8., 8., 48., 48.);
+    let mut shapes: [(Bounds<ScaledPixels>, Corners<ScaledPixels>); GLASS_MAX_SHAPES] =
+        Default::default();
+    shapes[0] = (shape, Corners::all(ScaledPixels(8.)));
+    let mut scene = Scene::default();
+    scene.insert_primitive(Quad {
+        bounds: line,
+        content_mask: ContentMask { bounds: line }.into(),
+        background: hsla(0., 0., 1., 1.).into(),
+        ..Default::default()
+    });
+    scene.insert_primitive(Glass {
+        order: 0,
+        shadow: None,
+        fade: None,
+        bounds: shape.dilate(ScaledPixels(2.)),
+        backdrop_bounds: shape.dilate(ScaledPixels(material.backdrop_reach().as_f32())),
+        content_mask: ContentMask {
+            bounds: rect(0., 0., 64., 64.),
+        }
+        .into(),
+        shapes,
+        shape_count: 1,
+        corner_smoothing: 2.,
+        material,
+    });
+    scene.finish();
+    let image = render(&scene)?;
+    let alpha = |x: u32| image.get_pixel(x, 32).0[3];
+    let (on, beside, away) = (alpha(32), alpha(30), alpha(44));
+    let outside = image.get_pixel(32, 2).0[3];
+    anyhow::ensure!(
+        outside == 255,
+        "the line should stay opaque outside the glass, got alpha {outside}"
+    );
+    anyhow::ensure!(
+        on.abs_diff(beside) <= 4,
+        "the line's shape survived in the glass's alpha: {on} on it, {beside} beside it"
+    );
+    anyhow::ensure!(
+        away < on,
+        "the glass's alpha should fall away from the line, got {on} on it and {away} 12px off"
     );
     Ok(())
 }

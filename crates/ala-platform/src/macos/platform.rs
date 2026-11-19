@@ -200,7 +200,7 @@ pub(crate) struct MacPlatformState {
     menus: Option<Vec<OwnedMenu>>,
     keyboard_mapper: Rc<MacKeyboardMapper>,
     cursor_visible: Arc<AtomicBool>,
-    system_notifications: crate::macos::system_notifications::SystemNotificationState,
+    system_notifications: crate::apple::system_notifications::SystemNotificationState,
 }
 
 impl MacPlatform {
@@ -249,7 +249,7 @@ impl MacPlatform {
             menus: None,
             keyboard_mapper,
             cursor_visible: Arc::new(AtomicBool::new(true)),
-            system_notifications: crate::macos::system_notifications::SystemNotificationState::new(
+            system_notifications: crate::apple::system_notifications::SystemNotificationState::new(
             ),
         });
         Self(state, marker)

@@ -231,6 +231,10 @@ pub struct Style {
 
     pub edge_mark: Option<EdgeMark>,
 
+    pub contains_shadows: bool,
+
+    pub shadow_reach: Option<Pixels>,
+
     #[refineable]
     pub text: TextStyleRefinement,
 
@@ -625,28 +629,30 @@ impl Style {
             self.corner_smoothing,
         );
 
-        if let Some(material) = &self.glass {
-            window.paint_glass_with_shadows(
-                crate::GlassShape {
+        window.with_shadow_reach(self.shadow_reach, |window| {
+            if let Some(material) = &self.glass {
+                window.paint_glass_with_shadows(
+                    crate::GlassShape {
+                        bounds,
+                        corner_radii,
+                    },
+                    material,
+                    corner_smoothing,
+                    &self.box_shadow,
+                );
+            } else {
+                window.paint_drop_shadows_with_smoothing(
                     bounds,
                     corner_radii,
-                },
-                material,
-                corner_smoothing,
-                &self.box_shadow,
-            );
-        } else {
-            window.paint_drop_shadows_with_smoothing(
-                bounds,
-                corner_radii,
-                &self.box_shadow,
-                corner_smoothing,
-                self.background
-                    .as_ref()
-                    .and_then(Fill::color)
-                    .is_some_and(|color| color.is_opaque()),
-            );
-        }
+                    &self.box_shadow,
+                    corner_smoothing,
+                    self.background
+                        .as_ref()
+                        .and_then(Fill::color)
+                        .is_some_and(|color| color.is_opaque()),
+                );
+            }
+        });
 
         let background_color = self.background.as_ref().and_then(Fill::color);
         if background_color.is_some_and(|color| !color.is_transparent()) {
@@ -765,6 +771,8 @@ impl Default for Style {
             box_shadow: Default::default(),
             glass: None,
             edge_mark: None,
+            contains_shadows: false,
+            shadow_reach: None,
             text: TextStyleRefinement::default(),
             mouse_cursor: None,
             opacity: None,

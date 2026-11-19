@@ -2121,6 +2121,9 @@ impl Interactivity {
 
                 window.with_element_opacity(style.opacity, |window| {
                     style.paint(bounds, window, cx, |window: &mut Window, cx: &mut App| {
+                        if style.contains_shadows {
+                            window.push_shadow_region(bounds);
+                        }
                         window.with_text_style(style.text_style().cloned(), |window| {
                             window.with_clip_mask(
                                 style.overflow_clip_mask(bounds, window),
@@ -2200,6 +2203,9 @@ impl Interactivity {
                                 },
                             );
                         });
+                        if style.contains_shadows {
+                            window.pop_shadow_region();
+                        }
                     });
                 });
 

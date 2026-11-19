@@ -1122,6 +1122,8 @@ pub struct Window {
     pub(crate) text_fade: Option<TextFade>,
     pub(crate) glass_groups: Vec<crate::GlassGroupShapes>,
     pub(crate) content_mask_stack: Vec<ClipMask<Pixels>>,
+    shadow_regions: Vec<ClipMask<Pixels>>,
+    shadow_reach: Option<Pixels>,
     pub(crate) draw_number: u64,
     pub(crate) requested_autoscroll: Option<Bounds<Pixels>>,
     last_text_input_configuration: Option<TextInputConfiguration>,
@@ -1956,6 +1958,8 @@ impl Window {
             rendered_entity_stack: Vec::new(),
             element_offset_stack: Vec::new(),
             content_mask_stack: Vec::new(),
+            shadow_regions: Vec::new(),
+            shadow_reach: None,
             draw_number: 0,
             element_opacity: 1.0,
             text_fade: None,
@@ -2633,6 +2637,11 @@ impl Window {
         self.platform_window.hide_soft_keyboard();
     }
 
+    pub fn set_long_press_delay(&mut self, delay: Duration, cx: &mut App) {
+        self.touch_gestures.hold_after(delay);
+        self.schedule_long_press_timer(cx);
+    }
+
     pub fn on_system_back(
         &self,
         cx: &App,
@@ -3078,7 +3087,62 @@ impl Window {
 
     #[inline]
     pub(crate) fn snapped_content_mask(&self) -> ClipMask<ScaledPixels> {
-        let mask = self.clip_mask();
+        self.snap_clip(self.clip_mask())
+    }
+
+    pub(crate) fn push_shadow_region(&mut self, bounds: Bounds<Pixels>) {
+        self.invalidator.debug_assert_paint();
+        let region = self.clip_mask().clip(&bounds);
+        self.shadow_regions.push(region);
+    }
+
+    pub(crate) fn pop_shadow_region(&mut self) {
+        self.shadow_regions.pop();
+    }
+
+    pub(crate) fn with_shadow_reach<R>(
+        &mut self,
+        reach: Option<Pixels>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let outer = std::mem::replace(&mut self.shadow_reach, reach);
+        let result = f(self);
+        self.shadow_reach = outer;
+        result
+    }
+
+    pub(crate) fn shadow_mask(&self, piece: Bounds<Pixels>) -> ClipMask<ScaledPixels> {
+        let clip = self.clip_mask();
+        let mut mask = match self.shadow_regions.last() {
+            Some(region) => {
+                let (inner, outer) = (clip.bounds, region.bounds);
+                let side = |crosses: bool, inner: Pixels, outer: Pixels| {
+                    if crosses { inner } else { outer }
+                };
+                region.clip(&Bounds::from_corners(
+                    point(
+                        side(piece.left() < inner.left(), inner.left(), outer.left()),
+                        side(piece.top() < inner.top(), inner.top(), outer.top()),
+                    ),
+                    point(
+                        side(piece.right() > inner.right(), inner.right(), outer.right()),
+                        side(
+                            piece.bottom() > inner.bottom(),
+                            inner.bottom(),
+                            outer.bottom(),
+                        ),
+                    ),
+                ))
+            }
+            None => clip,
+        };
+        if let Some(reach) = self.shadow_reach {
+            mask = mask.clip(&piece.dilate(reach));
+        }
+        self.snap_clip(mask)
+    }
+
+    fn snap_clip(&self, mask: ClipMask<Pixels>) -> ClipMask<ScaledPixels> {
         let bounds = self.cover_bounds(mask.bounds);
         if !mask.is_rounded() {
             return ContentMask { bounds }.into();
@@ -3149,6 +3213,14 @@ impl Window {
         self.mouse_position
     }
 
+    pub fn touch_position(&self) -> Option<Point<Pixels>> {
+        self.touch_gestures.touch_position()
+    }
+
+    pub fn tooltip_bounds(&self) -> Option<Bounds<Pixels>> {
+        self.tooltip_bounds.as_ref().map(|tooltip| tooltip.bounds)
+    }
+
     pub fn capture_pointer(&mut self, hitbox_id: HitboxId) {
         self.captured_hitbox = Some(hitbox_id);
     }
@@ -3179,7 +3251,7 @@ impl Window {
         keyboard
     }
 
-    pub(crate) fn last_input_was_touch(&self) -> bool {
+    pub fn last_input_was_touch(&self) -> bool {
         let touch = self.last_input_modality == InputModality::Touch;
         self.record_input_read(InputRead::Touch(touch));
         touch
@@ -3845,7 +3917,9 @@ impl Window {
         };
         self.content_mask_stack.push(ContentMask { bounds }.into());
         self.next_frame.scene.push_transform(transform);
+        self.next_frame.scene.begin_replayable();
         let result = f(self);
+        self.next_frame.scene.end_replayable();
         self.next_frame.scene.pop_transform();
         self.content_mask_stack.pop();
         result
@@ -4616,6 +4690,17 @@ impl Window {
         clear: Pixels,
         solid: Pixels,
     ) -> bool {
+        self.paint_blur_fade(bounds, ground, px(0.), clear, solid)
+    }
+
+    pub fn paint_blur_fade(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        ground: Hsla,
+        blur: Pixels,
+        clear: Pixels,
+        solid: Pixels,
+    ) -> bool {
         self.invalidator.debug_assert_paint();
         if ground.a >= 1. || !self.supports_backdrop_sampling() {
             return false;
@@ -4639,7 +4724,7 @@ impl Window {
             corner_smoothing: self.default_corner_smoothing,
             material: GlassMaterial {
                 tint: ground,
-                blur: px(0.),
+                blur: px(blur.as_f32() * scale_factor),
                 refraction: px(0.),
                 opacity: self.element_opacity(),
                 ..GlassMaterial::default()
@@ -4725,9 +4810,11 @@ impl Window {
                 color: shadow.color.opacity(self.element_opacity()),
                 corner_smoothing: corner_smoothing.unwrap_or(self.default_corner_smoothing),
             };
-            self.next_frame
-                .scene
-                .insert_primitive(glass.with_shadow(caster));
+            let shadow = Glass {
+                content_mask: self.shadow_mask(shape.bounds),
+                ..glass.with_shadow(caster)
+            };
+            self.next_frame.scene.insert_primitive(shadow);
         }
     }
 
@@ -4756,7 +4843,7 @@ impl Window {
         }
 
         let scale_factor = self.scale_factor();
-        let content_mask = self.snapped_content_mask();
+        let content_mask = self.shadow_mask(bounds);
         let opacity = self.element_opacity();
         let element_bounds = self.cover_bounds(bounds);
         let element_corner_radii = corner_radii.scale(scale_factor);
@@ -8860,6 +8947,66 @@ mod tests {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
             div()
         }
+    }
+
+    #[ala::test]
+    fn a_shadow_leaves_its_clip_for_its_region_except_on_sides_it_crosses(cx: &mut TestAppContext) {
+        struct Pieces;
+
+        impl Render for Pieces {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                let piece = |left: f32, top: f32| {
+                    div()
+                        .absolute()
+                        .left(px(left))
+                        .top(px(top))
+                        .size(px(20.))
+                        .shadow(vec![crate::BoxShadow {
+                            color: hsla(0., 0., 0., 0.5),
+                            offset: point(px(0.), px(0.)),
+                            blur_radius: px(4.),
+                            spread_radius: px(0.),
+                            inset: false,
+                        }])
+                };
+                div().size(px(200.)).contain_shadows().child(
+                    div()
+                        .absolute()
+                        .left(px(50.))
+                        .top(px(50.))
+                        .size(px(100.))
+                        .overflow_hidden()
+                        .child(piece(10., 10.))
+                        .child(piece(60., -5.)),
+                )
+            }
+        }
+
+        let window = cx.add_window(|_, _| Pieces);
+        let masks = cx
+            .update_window(window.into(), |_, window, cx| {
+                window.draw(cx).clear(cx);
+                let scale = window.scale_factor();
+                let mut masks: Vec<_> = window
+                    .rendered_frame
+                    .scene
+                    .shadows
+                    .iter()
+                    .map(|shadow| {
+                        let bounds = shadow.content_mask.bounds;
+                        [
+                            bounds.left().0 / scale,
+                            bounds.top().0 / scale,
+                            bounds.right().0 / scale,
+                            bounds.bottom().0 / scale,
+                        ]
+                    })
+                    .collect();
+                masks.sort_by(|a, b| a[1].total_cmp(&b[1]));
+                masks
+            })
+            .expect("draw window");
+        assert_eq!(masks, [[0., 0., 200., 200.], [0., 50., 200., 200.]]);
     }
 
     #[ala::test]

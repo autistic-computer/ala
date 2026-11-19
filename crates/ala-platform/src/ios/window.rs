@@ -55,12 +55,15 @@ pub(crate) struct IosWindowState {
     accessory_view: id,
     done_bar: id,
     keyboard_probe: id,
+    assistant_groups: [id; 2],
+    assistant_shown: bool,
     keyboard_overlap: f64,
     keyboard_rest: f64,
     keyboard_motion: Option<KeyboardMotion>,
     keyboard_requested: bool,
     soft_keyboard: bool,
     compact_keyboard: bool,
+    app_key_row: bool,
     shown_input_mode: TextInputMode,
     keyboard_sync_pending: bool,
     reload_input_views: bool,
@@ -196,12 +199,15 @@ impl IosWindow {
                 accessory_view: accessory_view(native_view),
                 done_bar: done_bar(native_view),
                 keyboard_probe: install_keyboard_probe(native_view),
+                assistant_groups: input_assistant_groups(native_view),
+                assistant_shown: hardware_keyboard(),
                 keyboard_overlap: 0.0,
                 keyboard_rest: 0.0,
                 keyboard_motion: None,
                 keyboard_requested: false,
                 soft_keyboard: false,
                 compact_keyboard: false,
+                app_key_row: false,
                 shown_input_mode: TextInputMode::Text,
                 keyboard_sync_pending: false,
                 reload_input_views: false,
@@ -256,6 +262,11 @@ impl IosWindow {
             install_back_gesture(native_view);
             follow_display_corners(native_view);
             observe_hardware_keyboard(native_view);
+            let (groups, shown) = {
+                let state = state.borrow();
+                (state.assistant_groups, state.assistant_shown)
+            };
+            show_input_assistant(native_view, groups, shown);
             crate::ios::drop::install(native_view);
             let edit_menu: id = msg_send![class!(UIEditMenuInteraction), alloc];
             let edit_menu: id = msg_send![edit_menu, initWithDelegate: native_view];
@@ -314,6 +325,9 @@ impl Drop for IosWindow {
                 let _: () = msg_send![state.accessory_view, release];
                 let _: () = msg_send![state.done_bar, release];
                 let _: () = msg_send![state.keyboard_probe, release];
+                for group in state.assistant_groups {
+                    let _: () = msg_send![group, release];
+                }
                 let center: id = msg_send![class!(NSNotificationCenter), defaultCenter];
                 let _: () = msg_send![center, removeObserver: state.native_view];
             }
@@ -1451,7 +1465,7 @@ extern "C" fn input_accessory_view(this: &Object, _: Sel) -> id {
     let state = state.borrow();
     if terminal_key_row(
         state.soft_keyboard,
-        state.compact_keyboard,
+        state.compact_keyboard || state.app_key_row,
         &state.text_input,
     ) {
         state.accessory_view
@@ -1469,18 +1483,23 @@ extern "C" fn input_accessory_view(this: &Object, _: Sel) -> id {
 
 fn terminal_key_row(
     soft_keyboard: bool,
-    compact_keyboard: bool,
+    own_key_row: bool,
     text_input: &TextInputConfiguration,
 ) -> bool {
-    soft_keyboard && !compact_keyboard && text_input.input_action == TextInputAction::Enter
+    soft_keyboard && !own_key_row && text_input.input_action == TextInputAction::Enter
 }
 
 extern "C" fn resign_first_responder(this: &Object, _: Sel) -> BOOL {
     release_all_keys(this);
     if let Some(state) = unsafe { try_window_state(this) } {
-        let mut state = state.borrow_mut();
-        state.keyboard_requested = false;
-        state.soft_keyboard = false;
+        let hidden = {
+            let mut state = state.borrow_mut();
+            state.keyboard_requested = false;
+            std::mem::replace(&mut state.soft_keyboard, false)
+        };
+        if hidden {
+            schedule_viewport_refresh(this as *const Object as id);
+        }
     }
     unsafe { msg_send![super(this, class!(UIView)), resignFirstResponder] }
 }
@@ -1832,6 +1851,34 @@ pub fn set_compact_keyboard(enabled: bool) {
         state.reload_input_views = true;
     }
     schedule_keyboard_sync(view);
+}
+
+pub fn set_app_key_row(enabled: bool) {
+    let view = ACTIVE_VIEW.get();
+    let Some(state) = (!view.is_null())
+        .then(|| unsafe { try_window_state(&*view) })
+        .flatten()
+    else {
+        return;
+    };
+    {
+        let mut state = state.borrow_mut();
+        if state.app_key_row == enabled {
+            return;
+        }
+        state.app_key_row = enabled;
+        state.latched = Modifiers::default();
+        state.reload_input_views = true;
+    }
+    schedule_keyboard_sync(view);
+}
+
+pub fn soft_keyboard() -> bool {
+    let view = ACTIVE_VIEW.get();
+    (!view.is_null())
+        .then(|| unsafe { try_window_state(&*view) })
+        .flatten()
+        .is_some_and(|state| state.borrow().soft_keyboard)
 }
 
 pub fn set_status_bar_on_dark(dark: Option<bool>) {
@@ -2618,7 +2665,7 @@ fn take_latch(this: &Object) -> Modifiers {
     latched
 }
 
-fn hardware_keyboard() -> bool {
+pub fn hardware_keyboard() -> bool {
     unsafe {
         let keyboard: id = msg_send![class!(GCKeyboard), coalescedKeyboard];
         !keyboard.is_null()
@@ -2639,6 +2686,25 @@ unsafe fn observe_hardware_keyboard(view: id) {
             object: nil
         ];
     }
+}
+
+unsafe fn input_assistant_groups(view: id) -> [id; 2] {
+    let item: id = msg_send![view, inputAssistantItem];
+    let leading: id = msg_send![item, leadingBarButtonGroups];
+    let trailing: id = msg_send![item, trailingBarButtonGroups];
+    [msg_send![leading, retain], msg_send![trailing, retain]]
+}
+
+unsafe fn show_input_assistant(view: id, groups: [id; 2], shown: bool) {
+    let item: id = msg_send![view, inputAssistantItem];
+    let [leading, trailing] = if shown {
+        groups
+    } else {
+        let empty = ns_array(&[]);
+        [empty, empty]
+    };
+    let _: () = msg_send![item, setLeadingBarButtonGroups: leading];
+    let _: () = msg_send![item, setTrailingBarButtonGroups: trailing];
 }
 
 extern "C" fn hardware_keyboard_changed(this: &Object, _: Sel, _: id) {
@@ -2669,22 +2735,28 @@ extern "C" fn sync_keyboard(context: *mut c_void) {
     let view = context as id;
     unsafe {
         if let Some(state) = try_window_state(&*view) {
-            let (visible, reload) = {
+            let (visible, toggled, reload, groups, assistant) = {
                 let mut state = state.borrow_mut();
                 state.keyboard_sync_pending = false;
+                let hardware = hardware_keyboard();
                 let visible = state.keyboard_requested
                     && state.text_input.input_mode != TextInputMode::None
-                    && !hardware_keyboard();
-                let reload = state.soft_keyboard != visible
+                    && !hardware;
+                let assistant = visible || hardware;
+                let toggled = state.soft_keyboard != visible;
+                let reload = toggled
+                    || state.assistant_shown != assistant
                     || std::mem::take(&mut state.reload_input_views)
                     || (visible && state.keyboard_target() == 0.0);
                 state.soft_keyboard = visible;
+                state.assistant_shown = assistant;
                 if visible {
                     state.shown_input_mode = state.text_input.input_mode;
                 }
-                (visible, reload)
+                (visible, toggled, reload, state.assistant_groups, assistant)
             };
             if reload {
+                show_input_assistant(view, groups, assistant);
                 let first_responder: BOOL = msg_send![view, isFirstResponder];
                 if first_responder == YES {
                     let _: () = msg_send![view, reloadInputViews];
@@ -2692,6 +2764,26 @@ extern "C" fn sync_keyboard(context: *mut c_void) {
                     let _: BOOL = msg_send![view, becomeFirstResponder];
                 }
             }
+            if toggled {
+                viewport_changed(&*view);
+            }
+        }
+        let _: () = msg_send![view, release];
+    }
+}
+
+fn schedule_viewport_refresh(view: id) {
+    unsafe {
+        let _: id = msg_send![view, retain];
+        dispatch2::DispatchQueue::main().exec_async_f(view.cast(), refresh_viewport);
+    }
+}
+
+extern "C" fn refresh_viewport(context: *mut c_void) {
+    let view = context as id;
+    unsafe {
+        if try_window_state(&*view).is_some() {
+            viewport_changed(&*view);
         }
         let _: () = msg_send![view, release];
     }

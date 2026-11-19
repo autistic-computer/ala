@@ -1,9 +1,9 @@
 use crate::ios::{IosDisplay, IosWindow, nil, ns_string};
 use ala::{
     Action, AnyWindowHandle, BackgroundExecutor, ClipboardItem, CursorStyle, DummyKeyboardMapper,
-    ForegroundExecutor, Keymap, Menu, MenuItem, PathPromptOptions, Platform, PlatformDisplay,
-    PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem, PlatformWindow, Task,
-    ThermalState, WindowAppearance, WindowParams,
+    ForegroundExecutor, Haptic, Keymap, Menu, MenuItem, PathPromptOptions, Platform,
+    PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem,
+    PlatformWindow, Task, ThermalState, WindowAppearance, WindowParams,
 };
 use anyhow::{Result, anyhow};
 use futures::channel::oneshot;
@@ -27,6 +27,13 @@ use std::{
 };
 
 use crate::ios::id;
+
+const IMPACT_LIGHT: isize = 0;
+const IMPACT_MEDIUM: isize = 1;
+const IMPACT_HEAVY: isize = 2;
+const NOTIFY_SUCCESS: isize = 0;
+const NOTIFY_WARNING: isize = 1;
+const NOTIFY_ERROR: isize = 2;
 
 static PLATFORM: AtomicPtr<IosPlatform> = AtomicPtr::new(std::ptr::null_mut());
 static REGISTER_DELEGATE: Once = Once::new();
@@ -77,6 +84,7 @@ pub(crate) struct IosPlatformState {
     menus: crate::ios::menu::MenuState,
     menu_action: Option<Box<dyn FnMut(&dyn Action)>>,
     open_urls: Option<Box<dyn FnMut(Vec<String>)>>,
+    system_notifications: crate::apple::system_notifications::SystemNotificationState,
 }
 
 impl Default for IosPlatform {
@@ -106,6 +114,8 @@ impl IosPlatform {
             menus: Default::default(),
             menu_action: None,
             open_urls: None,
+            system_notifications: crate::apple::system_notifications::SystemNotificationState::new(
+            ),
         }))
     }
 
@@ -196,6 +206,72 @@ impl Platform for IosPlatform {
     fn set_window_appearance(&self, appearance: Option<WindowAppearance>) {
         self.0.lock().appearance = appearance;
         crate::ios::window::set_window_appearance(appearance);
+    }
+
+    fn show_system_notification(&self, notification: ala::SystemNotification) {
+        let mut state = self.0.lock();
+        let executor = state.foreground_executor.clone();
+        state.system_notifications.show(&executor, notification);
+    }
+
+    fn dismiss_system_notification(&self, tag: &str) {
+        let mut state = self.0.lock();
+        let executor = state.foreground_executor.clone();
+        state.system_notifications.dismiss(&executor, tag);
+    }
+
+    fn on_system_notification_response(
+        &self,
+        callback: Box<dyn FnMut(ala::SystemNotificationResponse)>,
+    ) {
+        let mut state = self.0.lock();
+        let executor = state.foreground_executor.clone();
+        state.system_notifications.on_response(&executor, callback);
+    }
+
+    fn set_app_badge(&self, count: usize) {
+        let mut state = self.0.lock();
+        let executor = state.foreground_executor.clone();
+        state.system_notifications.set_badge(&executor, count);
+    }
+
+    fn haptic(&self, kind: Haptic) {
+        unsafe {
+            let impact = |style: isize| -> id {
+                let generator: id = msg_send![class!(UIImpactFeedbackGenerator), alloc];
+                msg_send![generator, initWithStyle: style]
+            };
+            let generator: id = match kind {
+                Haptic::Selection => msg_send![class!(UISelectionFeedbackGenerator), new],
+                Haptic::Light => impact(IMPACT_LIGHT),
+                Haptic::Medium => impact(IMPACT_MEDIUM),
+                Haptic::Heavy => impact(IMPACT_HEAVY),
+                Haptic::Success | Haptic::Warning | Haptic::Error => {
+                    msg_send![class!(UINotificationFeedbackGenerator), new]
+                }
+            };
+            if generator.is_null() {
+                return;
+            }
+            match kind {
+                Haptic::Selection => {
+                    let _: () = msg_send![generator, selectionChanged];
+                }
+                Haptic::Light | Haptic::Medium | Haptic::Heavy => {
+                    let _: () = msg_send![generator, impactOccurred];
+                }
+                Haptic::Success => {
+                    let _: () = msg_send![generator, notificationOccurred: NOTIFY_SUCCESS];
+                }
+                Haptic::Warning => {
+                    let _: () = msg_send![generator, notificationOccurred: NOTIFY_WARNING];
+                }
+                Haptic::Error => {
+                    let _: () = msg_send![generator, notificationOccurred: NOTIFY_ERROR];
+                }
+            }
+            let _: () = msg_send![generator, release];
+        }
     }
 
     fn open_url(&self, url: &str) {
@@ -694,6 +770,25 @@ pub(crate) fn screen_appearance() -> WindowAppearance {
             WindowAppearance::Dark
         }
     }
+}
+
+pub fn clipboard_image() -> Option<ala::Image> {
+    let has_images: BOOL = unsafe {
+        let pasteboard: id = msg_send![class!(UIPasteboard), generalPasteboard];
+        if pasteboard.is_null() {
+            return None;
+        }
+        msg_send![pasteboard, hasImages]
+    };
+    if has_images != YES {
+        return None;
+    }
+    read_clipboard()?
+        .into_entries()
+        .find_map(|entry| match entry {
+            ala::ClipboardEntry::Image(image) => Some(image),
+            _ => None,
+        })
 }
 
 pub(crate) fn read_clipboard() -> Option<ClipboardItem> {

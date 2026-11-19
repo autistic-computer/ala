@@ -178,6 +178,10 @@ Each backend compiles for its own target only. From macOS:
   language rules `fxc` follows. It catches syntax, type and missing-symbol errors; what it
   misses is what only shader model 4 rejects, such as gradient sampling inside varying flow
   control.
+- Windows glass uses the shared `glass.wgsl`. Its HLSL translator is pinned to naga 24 for
+  fixed sampler registers on D3D11. The backend compiles the five shader entries once per
+  process and falls back to the solid material if the device cannot create the pipeline.
+  Run the `glass_samples_the_windows_frame` test on Windows for the GPU readback checks.
 - iOS: `cargo clippy -p ala-platform --all-features --target aarch64-apple-ios`.
 - Android: point `CC_aarch64_linux_android`, `AR_aarch64_linux_android` and
   `CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER` at the NDK's

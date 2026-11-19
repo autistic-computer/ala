@@ -665,23 +665,25 @@ impl WebWindowInner {
         Some(result)
     }
 
-    pub(crate) fn register_appearance_change(self: &Rc<Self>) -> Option<EventListenerHandle> {
-        let mql = self
-            .browser_window
-            .match_media("(prefers-color-scheme: dark)")
-            .ok()??;
-
-        let this = Rc::clone(self);
-        Some(EventListenerHandle::add(
-            mql.as_ref(),
-            "change",
-            move |_event: JsValue| {
+    pub(crate) fn register_appearance_change(self: &Rc<Self>) -> Vec<EventListenerHandle> {
+        [
+            "(prefers-color-scheme: dark)",
+            "(prefers-reduced-motion: reduce)",
+            "(prefers-reduced-transparency: reduce)",
+            "(prefers-contrast: more)",
+        ]
+        .into_iter()
+        .filter_map(|query| self.browser_window.match_media(query).ok().flatten())
+        .map(|mql| {
+            let this = Rc::clone(self);
+            EventListenerHandle::add(mql.as_ref(), "change", move |_event: JsValue| {
                 this.with_callback(
                     |callbacks| &mut callbacks.appearance_changed,
                     |callback| callback(),
                 );
-            },
-        ))
+            })
+        })
+        .collect()
     }
 }
 

@@ -28,6 +28,8 @@ mod keyboard;
 #[cfg(target_family = "wasm")]
 mod logging;
 #[cfg(target_family = "wasm")]
+mod notifications;
+#[cfg(target_family = "wasm")]
 mod platform;
 #[cfg(any(target_family = "wasm", test))]
 mod run_replacements;

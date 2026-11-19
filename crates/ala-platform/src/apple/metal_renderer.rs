@@ -2354,6 +2354,16 @@ mod tests {
     }
 
     #[test]
+    fn glass_blurs_the_alpha_of_a_clear_frame() -> Result<()> {
+        let mut renderer =
+            MetalRenderer::new_headless(Arc::new(Mutex::new(InstanceBufferPool::default())));
+        renderer.update_transparency(true);
+        ala::check_glass_blurs_the_alpha_of_a_clear_frame(|scene| {
+            renderer.render_scene_to_image(scene, size(64.into(), 64.into()))
+        })
+    }
+
+    #[test]
     fn rim_glass_lights_only_the_edge() -> Result<()> {
         let mut renderer =
             MetalRenderer::new_headless(Arc::new(Mutex::new(InstanceBufferPool::default())));

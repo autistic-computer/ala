@@ -181,6 +181,7 @@ naga = { version = "30.0.1", features = ["wgsl-in", "msl-out"] }
 font-kit = { git = "https://github.com/zed-industries/font-kit", rev = "94b0f28166665e8fd2f53ff6d268a14955c82269", package = "zed-font-kit", version = "0.14.1-zed", optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
+naga-dx11 = { package = "naga", version = "24", features = ["wgsl-in", "hlsl-out"] }
 ala = { workspace = true, features = ["windows-manifest"] }
 accesskit.workspace = true
 accesskit_windows.workspace = true
@@ -427,6 +428,9 @@ web-sys = { version = "0.3", features = [
     "MouseEvent",
     "Navigator",
     "Node",
+    "Notification",
+    "NotificationOptions",
+    "NotificationPermission",
     "OffscreenCanvas",
     "OffscreenCanvasRenderingContext2d",
     "PointerEvent",
@@ -482,6 +486,17 @@ image = { workspace = true, features = [
 log = { workspace = true, features = ["kv_unstable_serde", "serde"] }
 memmap2 = "0.9.11"
 objc.workspace = true
+objc2.workspace = true
+objc2-foundation = { workspace = true, features = [
+    "NSArray",
+    "NSBundle",
+    "NSError",
+    "NSObject",
+    "NSSet",
+    "NSString",
+    "std",
+] }
+objc2-user-notifications.workspace = true
 parking_lot.workspace = true
 raw-window-handle.workspace = true
 uuid.workspace = true
