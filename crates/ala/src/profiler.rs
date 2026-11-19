@@ -541,9 +541,6 @@ impl ThreadTimings {
             start,
         });
     }
-    #[cfg(not(feature = "profiler"))]
-    pub fn update_running_task(&mut self, _: SpawnTime, _: &'static std::panic::Location<'_>) {}
-
     #[cfg(feature = "profiler")]
     pub fn save_task_timing(&mut self, ended: YieldTime) -> TaskTiming {
         let ActiveTiming {
@@ -574,9 +571,6 @@ impl ThreadTimings {
         }
         timing
     }
-    #[cfg(not(feature = "profiler"))]
-    pub fn save_task_timing(&mut self, _: YieldTime) {}
-
     pub fn get_thread_task_timings(&self, includes: TasksIncluded) -> ThreadTaskTimings {
         ThreadTaskTimings {
             thread_name: self.thread_name.clone(),
@@ -620,24 +614,24 @@ impl Drop for ThreadTimings {
 #[doc(hidden)]
 pub fn update_running_task(spawned: SpawnTime, location: &'static std::panic::Location<'_>) {
     #[cfg(feature = "profiler")]
-    journal::begin_foreground_turn();
-    THREAD_TIMINGS.with(|timings| {
-        timings.lock().update_running_task(spawned, location);
-    });
+    {
+        journal::begin_foreground_turn();
+        THREAD_TIMINGS.with(|timings| {
+            timings.lock().update_running_task(spawned, location);
+        });
+    }
+    #[cfg(not(feature = "profiler"))]
+    let _ = (spawned, location);
 }
 
 #[doc(hidden)]
 pub fn save_task_timing() {
-    let yielded_at = YieldTime(Instant::now());
     #[cfg(feature = "profiler")]
     {
+        let yielded_at = YieldTime(Instant::now());
         let timing = THREAD_TIMINGS.with(|timings| timings.lock().save_task_timing(yielded_at));
         journal::record_task_poll(timing);
     }
-    #[cfg(not(feature = "profiler"))]
-    THREAD_TIMINGS.with(|timings| {
-        timings.lock().save_task_timing(yielded_at);
-    });
 }
 
 #[doc(hidden)]
