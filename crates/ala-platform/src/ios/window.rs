@@ -2064,6 +2064,10 @@ thread_local! {
     static STATUS_BAR_STYLE: std::cell::Cell<isize> = const { std::cell::Cell::new(0) };
 }
 
+pub(crate) fn active_view() -> id {
+    ACTIVE_VIEW.get()
+}
+
 pub(crate) fn is_live_view(view: id) -> bool {
     VIEWS.with_borrow(|views| views.contains(&view))
 }

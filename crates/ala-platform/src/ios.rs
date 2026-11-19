@@ -20,6 +20,8 @@ mod menu;
 #[cfg(target_os = "ios")]
 mod perf;
 #[cfg(target_os = "ios")]
+mod picker;
+#[cfg(target_os = "ios")]
 mod platform;
 #[cfg(target_os = "ios")]
 mod text_input;
@@ -36,6 +38,8 @@ pub use display::{display_corner_radius, phone};
 pub use ffi::*;
 #[cfg(target_os = "ios")]
 pub use menu::MenuCommand;
+#[cfg(target_os = "ios")]
+pub use picker::{can_pick, pick};
 #[cfg(target_os = "ios")]
 pub use platform::{IosPlatform, clipboard_image};
 #[cfg(target_os = "ios")]

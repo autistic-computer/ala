@@ -22,18 +22,26 @@ pub mod windows;
 pub use ala::Platform;
 
 #[cfg(any(target_os = "ios", target_os = "android"))]
+mod pick;
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
 pub mod mobile {
     #[cfg(target_os = "android")]
     pub use crate::android::{
         Accessibility, accessibility, clipboard_image, display_corner_radius, phone, request_paste,
         set_compact_keyboard, set_status_bar_on_dark, show_edit_menu,
     };
+    #[cfg(target_os = "android")]
+    pub use crate::android::{can_pick, pick};
     #[cfg(target_os = "ios")]
     pub use crate::ios::{
         Accessibility, accessibility, clipboard_image, display_corner_radius, hardware_keyboard,
         phone, request_paste, set_app_key_row, set_compact_keyboard, set_status_bar_on_dark,
         show_edit_menu, soft_keyboard,
     };
+    #[cfg(target_os = "ios")]
+    pub use crate::ios::{can_pick, pick};
+    pub use crate::pick::{PickSource, PickedFile};
 }
 
 use std::rc::Rc;

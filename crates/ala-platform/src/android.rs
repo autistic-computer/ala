@@ -28,3 +28,17 @@ pub use jni;
 pub use platform::{AndroidPlatform, clipboard_image};
 #[cfg(target_os = "android")]
 pub use window::{request_paste, set_compact_keyboard, show_edit_menu};
+
+#[cfg(target_os = "android")]
+pub fn can_pick(_: crate::pick::PickSource) -> bool {
+    false
+}
+
+#[cfg(target_os = "android")]
+pub fn pick(
+    _: crate::pick::PickSource,
+    _: u64,
+    done: impl FnOnce(Vec<crate::pick::PickedFile>) + 'static,
+) {
+    done(Vec::new());
+}
