@@ -65,7 +65,7 @@ pub fn pick(source: PickSource, limit: u64, done: impl FnOnce(Vec<PickedFile>) +
     }
 }
 
-unsafe fn top_controller() -> Option<id> {
+pub(super) unsafe fn top_controller() -> Option<id> {
     let view = crate::ios::window::active_view();
     if view.is_null() {
         return None;

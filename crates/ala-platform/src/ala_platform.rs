@@ -32,7 +32,7 @@ pub mod mobile {
         set_compact_keyboard, set_status_bar_on_dark, show_edit_menu,
     };
     #[cfg(target_os = "android")]
-    pub use crate::android::{can_pick, pick};
+    pub use crate::android::{can_pick, can_scan, pick, scan_code};
     #[cfg(target_os = "ios")]
     pub use crate::ios::{
         Accessibility, accessibility, clipboard_image, display_corner_radius, hardware_keyboard,
@@ -40,7 +40,7 @@ pub mod mobile {
         show_edit_menu, soft_keyboard,
     };
     #[cfg(target_os = "ios")]
-    pub use crate::ios::{can_pick, pick};
+    pub use crate::ios::{can_pick, can_scan, pick, scan_code};
     pub use crate::pick::{PickSource, PickedFile};
 }
 

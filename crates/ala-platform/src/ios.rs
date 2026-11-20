@@ -24,6 +24,8 @@ mod picker;
 #[cfg(target_os = "ios")]
 mod platform;
 #[cfg(target_os = "ios")]
+mod scanner;
+#[cfg(target_os = "ios")]
 mod text_input;
 #[cfg(target_os = "ios")]
 mod window;
@@ -42,6 +44,8 @@ pub use menu::MenuCommand;
 pub use picker::{can_pick, pick};
 #[cfg(target_os = "ios")]
 pub use platform::{IosPlatform, clipboard_image};
+#[cfg(target_os = "ios")]
+pub use scanner::{can_scan, scan_code};
 #[cfg(target_os = "ios")]
 pub(crate) use window::*;
 #[cfg(target_os = "ios")]

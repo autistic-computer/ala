@@ -35,6 +35,16 @@ pub fn can_pick(_: crate::pick::PickSource) -> bool {
 }
 
 #[cfg(target_os = "android")]
+pub fn can_scan() -> bool {
+    false
+}
+
+#[cfg(target_os = "android")]
+pub fn scan_code(done: impl FnOnce(Option<String>) + 'static) {
+    done(None);
+}
+
+#[cfg(target_os = "android")]
 pub fn pick(
     _: crate::pick::PickSource,
     _: u64,
