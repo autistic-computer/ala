@@ -1334,6 +1334,8 @@ pub struct PaintSurface {
     pub image_buffer: Option<core_video::pixel_buffer::CVPixelBuffer>,
     #[cfg(target_os = "macos")]
     pub underlay: bool,
+    #[cfg(target_os = "macos")]
+    pub quarter_turns: u8,
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub texture_view: wgpu::TextureView,
     #[cfg(target_os = "windows")]
@@ -1699,6 +1701,7 @@ mod tests {
             corner_smoothing: 2.,
             image_buffer: Some(buffer.clone()),
             underlay: true,
+            quarter_turns: 0,
         };
         let glass = |x: f32| crate::Glass {
             order: 0,

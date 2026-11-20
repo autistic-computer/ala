@@ -859,6 +859,13 @@ vertex SurfaceVertexOutput surface_vertex(
   float4 clip_distance = distance_from_clip_rect(unit_vertex, surface.bounds,
                                                  surface.content_mask.bounds);
   float2 texture_position = unit_vertex;
+  if (surface.quarter_turns == 1) {
+    texture_position = float2(unit_vertex.y, 1.0 - unit_vertex.x);
+  } else if (surface.quarter_turns == 2) {
+    texture_position = float2(1.0 - unit_vertex.x, 1.0 - unit_vertex.y);
+  } else if (surface.quarter_turns == 3) {
+    texture_position = float2(1.0 - unit_vertex.y, unit_vertex.x);
+  }
   return SurfaceVertexOutput{
       device_position,
       texture_position,

@@ -5690,6 +5690,17 @@ impl Window {
         corner_radii: Corners<Pixels>,
         image_buffer: CVPixelBuffer,
     ) {
+        self.paint_surface_turned(bounds, corner_radii, image_buffer, 0);
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn paint_surface_turned(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        corner_radii: Corners<Pixels>,
+        image_buffer: CVPixelBuffer,
+        quarter_turns: u8,
+    ) {
         use crate::PaintSurface;
 
         self.invalidator.debug_assert_paint();
@@ -5705,6 +5716,7 @@ impl Window {
             corner_smoothing: corner_smoothing.unwrap_or(self.default_corner_smoothing),
             image_buffer: Some(image_buffer),
             underlay: false,
+            quarter_turns: quarter_turns % 4,
         });
     }
 
@@ -5730,6 +5742,7 @@ impl Window {
             corner_smoothing: corner_smoothing.unwrap_or(self.default_corner_smoothing),
             image_buffer: Some(image_buffer),
             underlay: true,
+            quarter_turns: 0,
         });
     }
 

@@ -1849,6 +1849,7 @@ fn write_instances(scene: &Scene, writer: &mut InstanceBufferWriter) -> Result<I
             content_mask: surface.content_mask,
             corner_radii: surface.corner_radii,
             corner_smoothing: surface.corner_smoothing,
+            quarter_turns: u32::from(surface.quarter_turns),
         }))?,
     })
 }
@@ -2186,6 +2187,7 @@ pub struct SurfaceBounds {
     pub content_mask: ClipMask<ScaledPixels>,
     pub corner_radii: ala::Corners<ScaledPixels>,
     pub corner_smoothing: f32,
+    pub quarter_turns: u32,
 }
 
 #[cfg(any(test, feature = "bench-support", feature = "test-support"))]
