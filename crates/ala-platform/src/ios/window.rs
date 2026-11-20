@@ -2739,10 +2739,10 @@ extern "C" fn sync_keyboard(context: *mut c_void) {
     let view = context as id;
     unsafe {
         if let Some(state) = try_window_state(&*view) {
+            let hardware = hardware_keyboard();
             let (visible, toggled, reload, groups, assistant) = {
                 let mut state = state.borrow_mut();
                 state.keyboard_sync_pending = false;
-                let hardware = hardware_keyboard();
                 let visible = state.keyboard_requested
                     && state.text_input.input_mode != TextInputMode::None
                     && !hardware;
@@ -2762,7 +2762,9 @@ extern "C" fn sync_keyboard(context: *mut c_void) {
             if reload {
                 show_input_assistant(view, groups, assistant);
                 let first_responder: BOOL = msg_send![view, isFirstResponder];
-                if first_responder == YES {
+                if first_responder == YES && toggled && !visible && !hardware {
+                    let _: BOOL = msg_send![view, resignFirstResponder];
+                } else if first_responder == YES {
                     let _: () = msg_send![view, reloadInputViews];
                 } else if visible {
                     let _: BOOL = msg_send![view, becomeFirstResponder];
