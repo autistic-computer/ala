@@ -2637,6 +2637,11 @@ impl Window {
         self.platform_window.hide_soft_keyboard();
     }
 
+    pub fn show_edit_menu(&self, position: Point<Pixels>) {
+        self.platform_window
+            .show_edit_menu(position.map(|length| length * self.zoom));
+    }
+
     pub fn set_long_press_delay(&mut self, delay: Duration, cx: &mut App) {
         self.touch_gestures.hold_after(delay);
         self.schedule_long_press_timer(cx);

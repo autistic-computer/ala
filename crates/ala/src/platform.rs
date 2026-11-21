@@ -851,6 +851,8 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
 
     fn hide_soft_keyboard(&self) {}
 
+    fn show_edit_menu(&self, _position: Point<Pixels>) {}
+
     fn text_input_state_changed(&self, _change: TextInputStateChange) {}
 
     fn play_system_bell(&self) {}

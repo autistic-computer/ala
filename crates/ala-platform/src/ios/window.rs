@@ -397,6 +397,11 @@ impl PlatformWindow for IosWindow {
         request_keyboard(view, false);
     }
 
+    fn show_edit_menu(&self, position: Point<Pixels>) {
+        let edit_menu = self.0.borrow().edit_menu;
+        present_edit_menu(edit_menu, position);
+    }
+
     fn text_input_state_changed(&self, change: TextInputStateChange) {
         match change {
             TextInputStateChange::FocusGained => {
@@ -1819,10 +1824,14 @@ pub fn show_edit_menu(x: f32, y: f32) {
         return;
     };
     let edit_menu = state.borrow().edit_menu;
+    present_edit_menu(edit_menu, point(px(x), px(y)));
+}
+
+fn present_edit_menu(edit_menu: id, position: Point<Pixels>) {
     unsafe {
         let point = CGPoint {
-            x: x as f64,
-            y: y as f64,
+            x: f64::from(f32::from(position.x)),
+            y: f64::from(f32::from(position.y)),
         };
         let configuration: id = msg_send![
             class!(UIEditMenuConfiguration),
