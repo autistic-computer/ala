@@ -54,6 +54,7 @@ struct LayerClip {
     rect: vec4<f32>,
     radii: vec4<f32>,
     smoothing: vec4<f32>,
+    origin: vec4<f32>,
 }
 
 @group(0) @binding(0) var layer_output: texture_2d<f32>;
@@ -61,7 +62,7 @@ struct LayerClip {
 
 @fragment
 fn shader_layer_composite(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
-    let color = textureLoad(layer_output, vec2<i32>(position.xy), 0);
+    let color = textureLoad(layer_output, vec2<i32>(position.xy) - vec2<i32>(layer_clip.origin.xy), 0);
     return color * rounded_clip_alpha(position.xy, layer_clip.rect, layer_clip.radii,
         layer_clip.smoothing.x);
 }
@@ -74,6 +75,7 @@ struct LayerClip {
     rect: [f32; 4],
     radii: [f32; 4],
     smoothing: [f32; 4],
+    origin: [f32; 4],
 }
 
 impl From<ala::ClipMask<ScaledPixels>> for LayerClip {
@@ -94,6 +96,7 @@ impl From<ala::ClipMask<ScaledPixels>> for LayerClip {
                 radii.bottom_left.0,
             ],
             smoothing: [mask.corner_smoothing, 0.0, 0.0, 0.0],
+            origin: [0.0; 4],
         }
     }
 }
@@ -349,6 +352,25 @@ struct ShaderLayerResources {
     targets: Vec<RenderTexture>,
     inputs: Vec<RenderTexture>,
     drawn: bool,
+    retained: Vec<RetainedLayer>,
+    placeholder: Option<RenderTexture>,
+    #[cfg(test)]
+    redrawn: u64,
+}
+
+struct RetainedLayer {
+    shader: u64,
+    uniforms: Arc<[u8]>,
+    texture: RenderTexture,
+    used: bool,
+}
+
+impl RetainedLayer {
+    fn shows(&self, layer: &ShaderLayer, size: Size<DevicePixels>) -> bool {
+        self.shader == layer.shader.id()
+            && self.texture.has_size(size)
+            && self.uniforms[..] == layer.uniforms[..]
+    }
 }
 
 #[derive(Clone)]
@@ -468,6 +490,10 @@ impl ShaderLayerResources {
             targets: Vec::new(),
             inputs: Vec::new(),
             drawn: false,
+            retained: Vec::new(),
+            placeholder: None,
+            #[cfg(test)]
+            redrawn: 0,
         }
     }
 
@@ -527,6 +553,7 @@ impl WgpuResources {
         self.path_msaa_texture = None;
         self.path_msaa_view = None;
         self.shader_layers.release_textures();
+        self.shader_layers.retained.clear();
         if let Some(glass) = &mut self.glass {
             glass.release_textures();
         }
@@ -1870,6 +1897,7 @@ impl WgpuRendererCore {
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("main_encoder"),
                 });
+        self.prepare_retained_layers(&mut encoder, scene, size);
         let encoded = self.encode_scene(
             &mut encoder,
             scene,
@@ -2011,8 +2039,12 @@ impl WgpuRendererCore {
                 #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
                 PrimitiveBatch::Surfaces(_) => {}
                 PrimitiveBatch::ShaderLayers(range) => {
-                    drop(pass);
                     for layer in &scene.shader_layers[range] {
+                        if layer.retained {
+                            self.draw_retained_layer(layer, size, &mut pass);
+                            continue;
+                        }
+                        drop(pass);
                         self.draw_shader_layer(
                             encoder,
                             layer,
@@ -2022,13 +2054,13 @@ impl WgpuRendererCore {
                             instance_offset,
                             depth,
                         )?;
+                        pass = begin_pass(
+                            encoder,
+                            frame_view,
+                            wgpu::LoadOp::Load,
+                            "main_pass_continued",
+                        );
                     }
-                    pass = begin_pass(
-                        encoder,
-                        frame_view,
-                        wgpu::LoadOp::Load,
-                        "main_pass_continued",
-                    );
                 }
                 PrimitiveBatch::Glass(range) => {
                     let Some(glass) = self.resources.glass.as_mut() else {
@@ -2191,68 +2223,8 @@ impl WgpuRendererCore {
         else {
             return Ok(());
         };
-        let params = ShaderLayerParams {
-            bounds: [
-                region.origin.x.0 as f32,
-                region.origin.y.0 as f32,
-                region.size.width.0 as f32,
-                region.size.height.0 as f32,
-            ],
-            viewport_size: [size.width.0 as f32, size.height.0 as f32],
-            pad: [0.0; 2],
-        };
-        let params_size = std::mem::size_of::<ShaderLayerParams>() as u64;
-        let uniforms_offset = params_size
-            .next_multiple_of(device.limits().min_uniform_buffer_offset_alignment as u64);
-        let uniforms_size = pipeline.uniform_size.max(16).next_multiple_of(16);
-        let mut uniforms = vec![0u8; uniforms_size as usize];
-        let len = layer.uniforms.len().min(uniforms.len());
-        uniforms[..len].copy_from_slice(&layer.uniforms[..len]);
-        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("shader_layer_uniforms"),
-            size: uniforms_offset + uniforms_size,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let queue = &self.resources.queue;
-        queue.write_buffer(&buffer, 0, bytemuck::bytes_of(&params));
-        queue.write_buffer(&buffer, uniforms_offset, &uniforms);
-
-        let layers = &self.resources.shader_layers;
-        let content = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("shader_layer_content"),
-            layout: &layers.content_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&input_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &buffer,
-                        offset: uniforms_offset,
-                        size: NonZeroU64::new(uniforms_size),
-                    }),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&layers.sampler),
-                },
-            ],
-        });
-        let params = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("shader_layer_params"),
-            layout: &layers.params_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &buffer,
-                    offset: 0,
-                    size: NonZeroU64::new(params_size),
-                }),
-            }],
-        });
+        let content = self.layer_content(&pipeline, &layer.uniforms, &input_view);
+        let params = self.layer_params(region, size);
 
         let rounded = layer.content_mask.is_rounded();
         let (output_view, load) = if rounded {
@@ -2282,35 +2254,7 @@ impl WgpuRendererCore {
             .resources
             .shader_layers
             .composite_pipeline(&device, format);
-        let clip = LayerClip::from(layer.content_mask);
-        let clip_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("shader_layer_clip"),
-            size: std::mem::size_of::<LayerClip>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        self.resources
-            .queue
-            .write_buffer(&clip_buffer, 0, bytemuck::bytes_of(&clip));
-        let layers = &self.resources.shader_layers;
-        let output = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("shader_layer_output"),
-            layout: &layers.content_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&target_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: clip_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&layers.sampler),
-                },
-            ],
-        });
+        let output = self.layer_output(&target_view, LayerClip::from(layer.content_mask));
         let mut pass = begin_pass(
             encoder,
             frame_view,
@@ -2323,6 +2267,269 @@ impl WgpuRendererCore {
         pass.set_scissor_rect(scissor[0], scissor[1], scissor[2], scissor[3]);
         pass.draw(0..4, 0..1);
         Ok(())
+    }
+
+    fn prepare_retained_layers(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        scene: &Scene,
+        size: Size<DevicePixels>,
+    ) {
+        fn collect<'a>(scene: &'a Scene, layers: &mut Vec<&'a ShaderLayer>) {
+            for layer in &scene.shader_layers {
+                if layer.retained {
+                    layers.push(layer);
+                }
+                collect(&layer.scene, layers);
+            }
+        }
+        let mut layers = Vec::new();
+        collect(scene, &mut layers);
+        let retained = &mut self.resources.shader_layers.retained;
+        for entry in retained.iter_mut() {
+            entry.used = false;
+        }
+        let mut missing = Vec::new();
+        for layer in layers {
+            let Some(region) = shader_layer_region(layer.bounds, size) else {
+                continue;
+            };
+            match retained
+                .iter_mut()
+                .find(|entry| entry.shows(layer, region.size))
+            {
+                Some(entry) => entry.used = true,
+                None => missing.push((layer, region.size)),
+            }
+        }
+        for (layer, layer_size) in missing {
+            if self
+                .resources
+                .shader_layers
+                .retained
+                .iter()
+                .any(|entry| entry.shows(layer, layer_size))
+            {
+                continue;
+            }
+            let Some(pipeline) = self.shader_layer_pipeline(&layer.shader) else {
+                continue;
+            };
+            self.render_retained_layer(encoder, layer, layer_size, &pipeline);
+        }
+        self.resources
+            .shader_layers
+            .retained
+            .retain(|entry| entry.used);
+    }
+
+    fn render_retained_layer(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        layer: &ShaderLayer,
+        size: Size<DevicePixels>,
+        pipeline: &ShaderLayerPipeline,
+    ) {
+        let format = self.target_format;
+        let device = self.resources.device.clone();
+        let layers = &mut self.resources.shader_layers;
+        let index = match layers
+            .retained
+            .iter()
+            .position(|entry| !entry.used && entry.texture.has_size(size))
+        {
+            Some(index) => index,
+            None => {
+                layers.retained.push(RetainedLayer {
+                    shader: 0,
+                    uniforms: Arc::from([]),
+                    texture: RenderTexture::new(
+                        &device,
+                        format,
+                        size,
+                        wgpu::TextureUsages::RENDER_ATTACHMENT
+                            | wgpu::TextureUsages::TEXTURE_BINDING,
+                    ),
+                    used: false,
+                });
+                layers.retained.len() - 1
+            }
+        };
+        let entry = &mut layers.retained[index];
+        entry.shader = layer.shader.id();
+        entry.uniforms = layer.uniforms.clone();
+        entry.used = true;
+        let view = entry.texture.view.clone();
+        #[cfg(test)]
+        {
+            layers.redrawn += 1;
+        }
+        let placeholder = layers
+            .placeholder
+            .get_or_insert_with(|| {
+                let one = Size {
+                    width: DevicePixels(1),
+                    height: DevicePixels(1),
+                };
+                RenderTexture::new(&device, format, one, wgpu::TextureUsages::TEXTURE_BINDING)
+            })
+            .view
+            .clone();
+        let content = self.layer_content(pipeline, &layer.uniforms, &placeholder);
+        let params = self.layer_params(
+            Bounds {
+                origin: Point::default(),
+                size,
+            },
+            size,
+        );
+        let mut pass = begin_pass(
+            encoder,
+            &view,
+            wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            "retained_layer_pass",
+        );
+        pass.set_pipeline(&pipeline.pipeline);
+        pass.set_bind_group(0, &content, &[]);
+        pass.set_bind_group(1, &params, &[]);
+        pass.draw(0..4, 0..1);
+    }
+
+    fn draw_retained_layer(
+        &mut self,
+        layer: &ShaderLayer,
+        size: Size<DevicePixels>,
+        pass: &mut wgpu::RenderPass<'_>,
+    ) {
+        let Some(region) = shader_layer_region(layer.bounds, size) else {
+            return;
+        };
+        let Some(scissor) =
+            shader_layer_region(layer.content_mask.bounds.intersect(&layer.bounds), size)
+        else {
+            return;
+        };
+        let Some(view) = self
+            .resources
+            .shader_layers
+            .retained
+            .iter()
+            .find(|entry| entry.shows(layer, region.size))
+            .map(|entry| entry.texture.view.clone())
+        else {
+            return;
+        };
+        let device = self.resources.device.clone();
+        let composite = self
+            .resources
+            .shader_layers
+            .composite_pipeline(&device, self.target_format);
+        let clip = LayerClip {
+            origin: [region.origin.x.0 as f32, region.origin.y.0 as f32, 0.0, 0.0],
+            ..LayerClip::from(layer.content_mask)
+        };
+        let output = self.layer_output(&view, clip);
+        let params = self.layer_params(region, size);
+        pass.set_pipeline(&composite);
+        pass.set_bind_group(0, &output, &[]);
+        pass.set_bind_group(1, &params, &[]);
+        pass.set_scissor_rect(
+            scissor.origin.x.0 as u32,
+            scissor.origin.y.0 as u32,
+            scissor.size.width.0 as u32,
+            scissor.size.height.0 as u32,
+        );
+        pass.draw(0..4, 0..1);
+        pass.set_scissor_rect(0, 0, size.width.0 as u32, size.height.0 as u32);
+    }
+
+    fn layer_buffer(&self, label: &str, bytes: &[u8]) -> wgpu::Buffer {
+        let buffer = self
+            .resources
+            .device
+            .create_buffer(&wgpu::BufferDescriptor {
+                label: Some(label),
+                size: bytes.len() as u64,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+        self.resources.queue.write_buffer(&buffer, 0, bytes);
+        buffer
+    }
+
+    fn layer_params(
+        &self,
+        bounds: Bounds<DevicePixels>,
+        viewport: Size<DevicePixels>,
+    ) -> wgpu::BindGroup {
+        let params = ShaderLayerParams {
+            bounds: [
+                bounds.origin.x.0 as f32,
+                bounds.origin.y.0 as f32,
+                bounds.size.width.0 as f32,
+                bounds.size.height.0 as f32,
+            ],
+            viewport_size: [viewport.width.0 as f32, viewport.height.0 as f32],
+            pad: [0.0; 2],
+        };
+        let buffer = self.layer_buffer("shader_layer_params", bytemuck::bytes_of(&params));
+        self.resources
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("shader_layer_params"),
+                layout: &self.resources.shader_layers.params_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buffer.as_entire_binding(),
+                }],
+            })
+    }
+
+    fn layer_content(
+        &self,
+        pipeline: &ShaderLayerPipeline,
+        uniforms: &[u8],
+        input: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        let mut bytes = vec![0u8; pipeline.uniform_size.max(16).next_multiple_of(16) as usize];
+        let len = uniforms.len().min(bytes.len());
+        bytes[..len].copy_from_slice(&uniforms[..len]);
+        let buffer = self.layer_buffer("shader_layer_uniforms", &bytes);
+        self.layer_bind_group("shader_layer_content", input, &buffer)
+    }
+
+    fn layer_output(&self, output: &wgpu::TextureView, clip: LayerClip) -> wgpu::BindGroup {
+        let buffer = self.layer_buffer("shader_layer_clip", bytemuck::bytes_of(&clip));
+        self.layer_bind_group("shader_layer_output", output, &buffer)
+    }
+
+    fn layer_bind_group(
+        &self,
+        label: &str,
+        texture: &wgpu::TextureView,
+        uniforms: &wgpu::Buffer,
+    ) -> wgpu::BindGroup {
+        let layers = &self.resources.shader_layers;
+        self.resources
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(label),
+                layout: &layers.content_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(texture),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: uniforms.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::Sampler(&layers.sampler),
+                    },
+                ],
+            })
     }
 
     fn shader_layer_pipeline(&mut self, shader: &CustomShader) -> Option<ShaderLayerPipeline> {
@@ -4192,6 +4399,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 .into(),
                 shader: CustomShader::new(shader.to_owned()),
                 uniforms: bytemuck::cast_slice(&tint).into(),
+                retained: false,
                 scene: Rc::new(scene),
             }
         }
@@ -4331,6 +4539,127 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
                 assert_eq!(image.get_pixel(10, 12).0, [255, 0, 0, 255]);
                 assert_eq!(image.get_pixel(20, 12).0, [255, 0, 0, 255]);
                 assert_eq!(image.get_pixel(28, 12).0, [0, 0, 0, 255]);
+            }
+            Ok(())
+        }
+
+        const DITHER: &str = r#"
+@group(0) @binding(1) var<uniform> params: vec4<f32>;
+
+fn hash(cell: vec2<f32>) -> f32 {
+    var h = u32(i32(cell.x)) * 73856093u ^ u32(i32(cell.y)) * 19349663u;
+    h = (h ^ (h >> 13u)) * 1274126177u;
+    return f32(h & 1023u) / 1023.0;
+}
+
+@fragment
+fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
+    if abs(position.x - params.x - position.y * 0.37) < 0.6 {
+        return vec4<f32>(params.y, 0.2, 0.9, 1.0);
+    }
+    let dither = hash(floor(position / 3.0));
+    var alpha = 0.2 + 0.6 * dither;
+    if params.z > 0.5 {
+        alpha = select(0.0, 1.0, dither > 0.5);
+    }
+    if dither < 0.25 {
+        alpha = 0.0;
+    }
+    return vec4<f32>(vec3<f32>(0.9, 0.6 * dither, 0.3) * alpha, alpha);
+}
+"#;
+
+        fn dither_scene(at: (f32, f32), params: [f32; 4], retained: bool, radius: f32) -> Scene {
+            let mut scene = Scene::default();
+            for stripe in 0..8 {
+                scene.insert_primitive(solid_quad(
+                    bounds(stripe as f32 * 8.0, 0.0, 8.0, 64.0),
+                    hsla(stripe as f32 / 8.0, 0.7, 0.5, 1.0),
+                ));
+            }
+            let layer_bounds = bounds(at.0, at.1, 40.0, 32.0);
+            let mut empty = Scene::default();
+            empty.finish();
+            scene.insert_primitive(ShaderLayer {
+                order: 0,
+                bounds: layer_bounds,
+                content_mask: ala::ClipMask::rounded(
+                    layer_bounds,
+                    Corners::all(ScaledPixels(radius)),
+                    2.0,
+                ),
+                shader: CustomShader::new(DITHER),
+                uniforms: bytemuck::cast_slice(&params).into(),
+                retained,
+                scene: Rc::new(empty),
+            });
+            scene.insert_primitive(solid_quad(
+                bounds(0.0, at.1 + 20.0, 64.0, 4.0),
+                hsla(0.3, 1.0, 0.5, 1.0),
+            ));
+            scene.finish();
+            scene
+        }
+
+        fn draw(
+            renderer: &mut WgpuHeadlessRenderer,
+            scene: &Scene,
+        ) -> anyhow::Result<image::RgbaImage> {
+            renderer.render_scene_to_image(scene, device_size(64, 64))
+        }
+
+        #[test]
+        fn retained_layers_reuse_their_output_exactly() -> anyhow::Result<()> {
+            let params = [9.0, 1.0, 0.0, 0.0];
+            let mut renderer = WgpuHeadlessRenderer::new()?;
+            let first = draw(&mut renderer, &dither_scene((8.0, 8.0), params, true, 0.0))?;
+            let again = draw(&mut renderer, &dither_scene((8.0, 8.0), params, true, 0.0))?;
+            assert_eq!(renderer.core.resources.shader_layers.redrawn, 1);
+            assert!(first == again, "a reused layer drew different pixels");
+
+            let moved = draw(&mut renderer, &dither_scene((13.0, 6.0), params, true, 0.0))?;
+            assert_eq!(renderer.core.resources.shader_layers.redrawn, 1);
+            let fresh = draw(
+                &mut WgpuHeadlessRenderer::new()?,
+                &dither_scene((13.0, 6.0), params, true, 0.0),
+            )?;
+            assert!(moved == fresh, "a moved layer differs from a fresh render");
+            assert!(moved != first);
+
+            let mut changed = params;
+            changed[0] = f32::from_bits(params[0].to_bits() ^ 1 << 20);
+            let edited = draw(&mut renderer, &dither_scene((8.0, 8.0), changed, true, 0.0))?;
+            assert_eq!(renderer.core.resources.shader_layers.redrawn, 2);
+            assert!(
+                edited != first,
+                "a changed uniform byte kept the old pixels"
+            );
+            let fresh = draw(
+                &mut WgpuHeadlessRenderer::new()?,
+                &dither_scene((8.0, 8.0), changed, true, 0.0),
+            )?;
+            assert!(edited == fresh);
+            assert_eq!(renderer.core.resources.shader_layers.retained.len(), 1);
+            Ok(())
+        }
+
+        #[test]
+        fn retained_layers_match_the_direct_path_where_it_does_not_blend() -> anyhow::Result<()> {
+            for (params, radius) in [([9.0, 1.0, 1.0, 0.0], 0.0), ([9.0, 1.0, 0.0, 0.0], 10.0)] {
+                let mut renderer = WgpuHeadlessRenderer::new()?;
+                let retained = draw(
+                    &mut renderer,
+                    &dither_scene((8.0, 8.0), params, true, radius),
+                )?;
+                let direct = draw(
+                    &mut renderer,
+                    &dither_scene((8.0, 8.0), params, false, radius),
+                )?;
+                assert!(
+                    retained == direct,
+                    "retained and direct layers differ at radius {radius}"
+                );
+                assert!(renderer.core.resources.shader_layers.retained.is_empty());
             }
             Ok(())
         }

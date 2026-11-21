@@ -115,6 +115,18 @@ CSS-correct spread shadows, per-window content zoom (`Window::set_zoom()`), a us
 liquid glass, the iOS UIKit and Android backends, and the wgpu subpixel offset kept in device
 pixels.
 
+Retained shader layers: `Window::paint_retained_shader_layer` paints a custom shader with no
+children and lets the renderer keep its output. The shader may read only its uniforms and the
+layer position; binding 0 holds an empty texture. The wgpu renderer renders the shader into a
+texture the size of the layer, in the frame's format, and draws that texture inside the open
+render pass on every frame whose shader, uniform bytes and layer size in device pixels match the
+last one, so moving the layer by whole pixels reuses it too. Entries no frame drew are freed at
+the end of the next frame, and resizing the surface frees them all. Because the kept output is
+rounded to the frame's format before it is blended, partly transparent pixels can land 1/255 away
+from the same shader drawn with `paint_shader_layer`; fully opaque and fully transparent pixels
+match it exactly. The Metal renderer ignores the flag and runs the shader on every frame like any
+shader layer.
+
 ## Gotchas when changing renderers or pulling upstream work
 
 - GPU-facing structs must stay a multiple of 8 bytes (const-asserted in `scene.rs`), or every draw

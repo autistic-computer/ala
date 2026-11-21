@@ -442,6 +442,7 @@ impl Scene {
             content_mask: descriptor.content_mask,
             shader: descriptor.shader,
             uniforms: descriptor.uniforms,
+            retained: descriptor.retained,
             scene: Rc::new(scene),
         };
         self.target()
@@ -1547,6 +1548,7 @@ pub(crate) struct ShaderLayerDescriptor {
     pub(crate) content_mask: ClipMask<ScaledPixels>,
     pub(crate) shader: CustomShader,
     pub(crate) uniforms: Arc<[u8]>,
+    pub(crate) retained: bool,
 }
 
 #[derive(Clone)]
@@ -1556,6 +1558,7 @@ pub struct ShaderLayer {
     pub content_mask: ClipMask<ScaledPixels>,
     pub shader: CustomShader,
     pub uniforms: Arc<[u8]>,
+    pub retained: bool,
     pub scene: Rc<Scene>,
 }
 
@@ -1565,6 +1568,7 @@ impl Debug for ShaderLayer {
             .field("order", &self.order)
             .field("bounds", &self.bounds)
             .field("shader", &self.shader)
+            .field("retained", &self.retained)
             .finish_non_exhaustive()
     }
 }
@@ -1684,6 +1688,7 @@ mod tests {
             content_mask: ContentMask { bounds }.into(),
             shader: CustomShader::new("@fragment fn main() {}"),
             uniforms: Arc::from([1u8, 2, 3]),
+            retained: false,
         }
     }
 

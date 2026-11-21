@@ -2456,6 +2456,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             content_mask: ala::ContentMask { bounds }.into(),
             shader: CustomShader::new(shader.to_owned()),
             uniforms: tint.iter().flat_map(|value| value.to_ne_bytes()).collect(),
+            retained: false,
             scene: std::rc::Rc::new(scene),
         }
     }

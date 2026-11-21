@@ -163,6 +163,7 @@ fn primitives(mono: AtlasTile, poly: AtlasTile) -> Vec<(&'static str, Primitive)
                 content_mask,
                 shader: CustomShader::new(RED_SHADER),
                 uniforms: Arc::from([]),
+                retained: false,
                 scene: Rc::new(Scene::default()),
             }
             .into(),

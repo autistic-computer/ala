@@ -4576,8 +4576,30 @@ impl Window {
         uniforms: impl Into<Arc<[u8]>>,
         f: impl FnOnce(&mut Self) -> R,
     ) -> R {
-        self.invalidator.debug_assert_paint();
+        self.push_shader_layer(bounds, shader, uniforms.into(), false);
+        let result = f(self);
+        self.next_frame.scene.pop_shader_layer();
+        result
+    }
 
+    pub fn paint_retained_shader_layer(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        shader: &CustomShader,
+        uniforms: impl Into<Arc<[u8]>>,
+    ) {
+        self.push_shader_layer(bounds, shader, uniforms.into(), true);
+        self.next_frame.scene.pop_shader_layer();
+    }
+
+    fn push_shader_layer(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        shader: &CustomShader,
+        uniforms: Arc<[u8]>,
+        retained: bool,
+    ) {
+        self.invalidator.debug_assert_paint();
         let bounds = self.snap_bounds(bounds);
         let content_mask = self.snapped_content_mask();
         self.next_frame
@@ -4586,11 +4608,9 @@ impl Window {
                 bounds,
                 content_mask,
                 shader: shader.clone(),
-                uniforms: uniforms.into(),
+                uniforms,
+                retained,
             });
-        let result = f(self);
-        self.next_frame.scene.pop_shader_layer();
-        result
     }
 
     pub fn paint_glass(
