@@ -354,8 +354,7 @@ struct ShaderLayerResources {
     drawn: bool,
     retained: Vec<RetainedLayer>,
     placeholder: Option<RenderTexture>,
-    #[cfg(test)]
-    redrawn: u64,
+    shader_runs: u64,
 }
 
 struct RetainedLayer {
@@ -492,8 +491,7 @@ impl ShaderLayerResources {
             drawn: false,
             retained: Vec::new(),
             placeholder: None,
-            #[cfg(test)]
-            redrawn: 0,
+            shader_runs: 0,
         }
     }
 
@@ -1878,6 +1876,11 @@ impl WgpuRendererCore {
         clear_color: wgpu::Color,
     ) -> Result<wgpu::SubmissionIndex> {
         let mut instance_offset = 0;
+        super::gpu_times::begin_frame(
+            &self.resources.device,
+            &self.resources.queue,
+            self.resources.shader_layers.shader_runs,
+        );
         self.prepare_texture_bind_groups(scene);
         self.resources.shader_layers.drawn = false;
         let glasses = glass_count(scene);
@@ -1914,6 +1917,9 @@ impl WgpuRendererCore {
         if let Some(glass) = &mut self.resources.glass {
             glass.finish_frame(&self.resources.queue);
         }
+        if encoded.is_ok() {
+            super::gpu_times::resolve(&mut encoder, self.resources.shader_layers.shader_runs);
+        }
 
         let resources = &mut self.resources;
         let uploads = resources
@@ -1927,6 +1933,7 @@ impl WgpuRendererCore {
                 .chain(encoded.is_ok().then(|| encoder.finish())),
         );
         resources.staging_belt.recall();
+        super::gpu_times::submitted();
         encoded?;
         Ok(submission)
     }
@@ -2040,7 +2047,7 @@ impl WgpuRendererCore {
                 PrimitiveBatch::Surfaces(_) => {}
                 PrimitiveBatch::ShaderLayers(range) => {
                     for layer in &scene.shader_layers[range] {
-                        if layer.retained {
+                        if layer.retained && retaining() {
                             self.draw_retained_layer(layer, size, &mut pass);
                             continue;
                         }
@@ -2138,6 +2145,7 @@ impl WgpuRendererCore {
             );
         };
         self.resources.shader_layers.drawn = true;
+        self.resources.shader_layers.shader_runs += 1;
 
         let format = self.target_format;
         let device = self.resources.device.clone();
@@ -2277,7 +2285,7 @@ impl WgpuRendererCore {
     ) {
         fn collect<'a>(scene: &'a Scene, layers: &mut Vec<&'a ShaderLayer>) {
             for layer in &scene.shader_layers {
-                if layer.retained {
+                if layer.retained && retaining() {
                     layers.push(layer);
                 }
                 collect(&layer.scene, layers);
@@ -2360,10 +2368,7 @@ impl WgpuRendererCore {
         entry.uniforms = layer.uniforms.clone();
         entry.used = true;
         let view = entry.texture.view.clone();
-        #[cfg(test)]
-        {
-            layers.redrawn += 1;
-        }
+        layers.shader_runs += 1;
         let placeholder = layers
             .placeholder
             .get_or_insert_with(|| {
@@ -3503,8 +3508,10 @@ fn begin_pass<'encoder>(
     load: wgpu::LoadOp<wgpu::Color>,
     label: &str,
 ) -> wgpu::RenderPass<'encoder> {
+    let stamp = super::gpu_times::next_pass();
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         label: Some(label),
+        timestamp_writes: super::gpu_times::pass_writes(&stamp),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
             view,
             resolve_target: None,
@@ -3517,6 +3524,11 @@ fn begin_pass<'encoder>(
         depth_stencil_attachment: None,
         ..Default::default()
     })
+}
+
+fn retaining() -> bool {
+    static RETAINING: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *RETAINING.get_or_init(|| std::env::var("ALA_RETAIN_SHADER_LAYERS").as_deref() != Ok("0"))
 }
 
 fn shader_layer_region(
@@ -4614,11 +4626,11 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             let mut renderer = WgpuHeadlessRenderer::new()?;
             let first = draw(&mut renderer, &dither_scene((8.0, 8.0), params, true, 0.0))?;
             let again = draw(&mut renderer, &dither_scene((8.0, 8.0), params, true, 0.0))?;
-            assert_eq!(renderer.core.resources.shader_layers.redrawn, 1);
+            assert_eq!(renderer.core.resources.shader_layers.shader_runs, 1);
             assert!(first == again, "a reused layer drew different pixels");
 
             let moved = draw(&mut renderer, &dither_scene((13.0, 6.0), params, true, 0.0))?;
-            assert_eq!(renderer.core.resources.shader_layers.redrawn, 1);
+            assert_eq!(renderer.core.resources.shader_layers.shader_runs, 1);
             let fresh = draw(
                 &mut WgpuHeadlessRenderer::new()?,
                 &dither_scene((13.0, 6.0), params, true, 0.0),
@@ -4629,7 +4641,7 @@ fn main(@location(0) position: vec2<f32>) -> @location(0) vec4<f32> {
             let mut changed = params;
             changed[0] = f32::from_bits(params[0].to_bits() ^ 1 << 20);
             let edited = draw(&mut renderer, &dither_scene((8.0, 8.0), changed, true, 0.0))?;
-            assert_eq!(renderer.core.resources.shader_layers.redrawn, 2);
+            assert_eq!(renderer.core.resources.shader_layers.shader_runs, 2);
             assert!(
                 edited != first,
                 "a changed uniform byte kept the old pixels"

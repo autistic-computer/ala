@@ -126,6 +126,12 @@ rounded to the frame's format before it is blended, partly transparent pixels ca
 from the same shader drawn with `paint_shader_layer`; fully opaque and fully transparent pixels
 match it exactly. The Metal renderer ignores the flag and runs the shader on every frame like any
 shader layer.
+`ALA_RETAIN_SHADER_LAYERS=0` draws retained layers through the per-frame path, so one build
+measures both. `ALA_GPU_TIMES=1` makes the wgpu renderer print one line per frame with its GPU time
+and the number of custom shaders it ran; the time comes from timestamp queries around every render
+pass where the adapter has them, otherwise from waiting for the GPU after every frame. A frame with
+one render pass reports `NaN`, because Apple GPUs return that pass's start and end samples out of
+order.
 
 ## Gotchas when changing renderers or pulling upstream work
 

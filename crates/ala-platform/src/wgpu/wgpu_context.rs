@@ -393,6 +393,7 @@ impl WgpuContext {
             );
         }
 
+        required_features |= super::gpu_times::features(adapter);
         let color_atlas_texture_format = Self::select_color_texture_format(adapter)?;
         #[cfg(target_family = "wasm")]
         let required_limits = if adapter.get_info().backend == wgpu::Backend::Gl {
