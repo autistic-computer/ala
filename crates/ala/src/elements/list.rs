@@ -1041,9 +1041,16 @@ impl StateInner {
             }
         }
         let layout_start = window.prepaint_index();
-        let (size, accessed) = cx.detect_accessed_entities(|cx| {
-            element.layout_as_root(available_item_space, window, cx)
-        });
+        let (size, accessed) = if view.is_some() {
+            cx.detect_accessed_entities(|cx| {
+                element.layout_as_root(available_item_space, window, cx)
+            })
+        } else {
+            (
+                element.layout_as_root(available_item_space, window, cx),
+                FxHashSet::default(),
+            )
+        };
         let layout = Some(layout_start..window.prepaint_index());
         ItemLayout {
             index: ix,
@@ -1055,7 +1062,7 @@ impl StateInner {
             record,
             accessed,
             bounds: Bounds::default(),
-            key: Some(ReplayKey::new(window)),
+            key: view.map(|_| ReplayKey::new(window)),
             layout,
             prepaint: None,
         }

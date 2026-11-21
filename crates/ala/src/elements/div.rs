@@ -2420,29 +2420,21 @@ impl Interactivity {
             })
         }
 
-        if self.hover_style.is_some()
-            || self.base_style.mouse_cursor.is_some()
-            || cx.active_drag.is_some() && !self.drag_over_styles.is_empty()
-        {
+        if let Some(hover_state) = self.hover_style.as_ref().and_then(|_| {
+            element_state
+                .as_ref()
+                .and_then(|state| state.hover_state.as_ref())
+                .cloned()
+        }) {
             let hitbox = hitbox.clone();
-            let hover_state = self.hover_style.as_ref().and_then(|_| {
-                element_state
-                    .as_ref()
-                    .and_then(|state| state.hover_state.as_ref())
-                    .cloned()
-            });
             let current_view = window.current_view();
 
             window.on_mouse_event(move |_: &MouseMoveEvent, phase, window, cx| {
                 let hovered = hitbox.is_hovered(window);
-                let was_hovered = hover_state
-                    .as_ref()
-                    .is_some_and(|state| state.borrow().element);
+                let was_hovered = hover_state.borrow().element;
                 if phase == DispatchPhase::Capture && hovered != was_hovered {
-                    if let Some(hover_state) = &hover_state {
-                        hover_state.borrow_mut().element = hovered;
-                        cx.notify(current_view);
-                    }
+                    hover_state.borrow_mut().element = hovered;
+                    cx.notify(current_view);
                 }
             });
         }
