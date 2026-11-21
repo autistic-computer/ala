@@ -4,7 +4,7 @@ use calloop::{EventSource, Poll, PostAction, Readiness, Token, TokenFactory};
 use smol::stream::StreamExt;
 use std::time::Duration;
 
-use ala::{BackgroundExecutor, WindowAppearance};
+use ala::{BackgroundExecutor, Hsla, WindowAppearance};
 
 pub enum Event {
     WindowAppearance(WindowAppearance),
@@ -14,6 +14,9 @@ pub enum Event {
     CursorSize(u32),
     ButtonLayout(String),
     SystemFont(Vec<String>),
+    IconTheme(String),
+    GtkTheme(String),
+    NegativeColor(Hsla),
 }
 
 pub struct XDPEventSource {
@@ -40,6 +43,28 @@ impl XDPEventSource {
                         sender.send(Event::SystemFont(parse(&font)))?;
                         break;
                     }
+                }
+                for (namespace, key) in icon_theme_settings() {
+                    if let Ok(theme) = settings.read::<String>(namespace, key).await
+                        && !theme.trim().is_empty()
+                    {
+                        sender.send(Event::IconTheme(theme))?;
+                        break;
+                    }
+                }
+                if let Ok(theme) = settings
+                    .read::<String>("org.gnome.desktop.interface", "gtk-theme")
+                    .await
+                    && !theme.trim().is_empty()
+                {
+                    sender.send(Event::GtkTheme(theme))?;
+                }
+                if let Ok(raw) = settings
+                    .read::<String>("org.kde.kdeglobals.Colors:Window", "ForegroundNegative")
+                    .await
+                    && let Some(color) = crate::linux::icon_theme::parse_kde_rgb(&raw)
+                {
+                    sender.send(Event::NegativeColor(color))?;
                 }
                 if let Ok(initial_theme) = settings
                     .read::<String>("org.gnome.desktop.interface", "cursor-theme")
@@ -136,6 +161,68 @@ impl XDPEventSource {
                     }
                 }
 
+                for (namespace, key) in icon_theme_settings() {
+                    if let Ok(mut icon_theme_changed) = settings
+                        .receive_setting_changed_with_args::<String>(namespace, key)
+                        .await
+                    {
+                        let sender = sender.clone();
+                        background
+                            .spawn(async move {
+                                while let Some(theme) = icon_theme_changed.next().await {
+                                    let theme = theme?;
+                                    if !theme.trim().is_empty() {
+                                        sender.send(Event::IconTheme(theme))?;
+                                    }
+                                }
+                                anyhow::Ok(())
+                            })
+                            .detach();
+                    }
+                }
+
+                if let Ok(mut gtk_theme_changed) = settings
+                    .receive_setting_changed_with_args::<String>(
+                        "org.gnome.desktop.interface",
+                        "gtk-theme",
+                    )
+                    .await
+                {
+                    let sender = sender.clone();
+                    background
+                        .spawn(async move {
+                            while let Some(theme) = gtk_theme_changed.next().await {
+                                let theme = theme?;
+                                if !theme.trim().is_empty() {
+                                    sender.send(Event::GtkTheme(theme))?;
+                                }
+                            }
+                            anyhow::Ok(())
+                        })
+                        .detach();
+                }
+
+                if let Ok(mut negative_changed) = settings
+                    .receive_setting_changed_with_args::<String>(
+                        "org.kde.kdeglobals.Colors:Window",
+                        "ForegroundNegative",
+                    )
+                    .await
+                {
+                    let sender = sender.clone();
+                    background
+                        .spawn(async move {
+                            while let Some(raw) = negative_changed.next().await {
+                                let raw = raw?;
+                                if let Some(color) = crate::linux::icon_theme::parse_kde_rgb(&raw) {
+                                    sender.send(Event::NegativeColor(color))?;
+                                }
+                            }
+                            anyhow::Ok(())
+                        })
+                        .detach();
+                }
+
                 let mut appearance_changed = settings.receive_color_scheme_changed().await?;
                 while let Some(scheme) = appearance_changed.next().await {
                     sender.send(Event::WindowAppearance(
@@ -202,26 +289,69 @@ impl EventSource for XDPEventSource {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct StartupSettings {
+    pub(crate) system_font: Option<Vec<String>>,
+    pub(crate) icon_theme: Option<String>,
+    pub(crate) gtk_theme: Option<String>,
+    pub(crate) negative_color: Option<Hsla>,
+}
+
 #[allow(
     clippy::disallowed_methods,
     reason = "runs while the platform is constructed, before any ala executor can drive a timer"
 )]
-pub(crate) fn read_system_font(timeout: Duration) -> Option<Vec<String>> {
+pub(crate) fn read_startup_settings(timeout: Duration) -> StartupSettings {
     smol::block_on(smol::future::or(
         async {
-            let settings = Settings::new().await.ok()?;
+            let mut startup = StartupSettings::default();
+            let Ok(settings) = Settings::new().await else {
+                return startup;
+            };
             for (namespace, key, parse) in SYSTEM_FONT_SETTINGS {
                 if let Ok(font) = settings.read::<String>(namespace, key).await {
-                    return Some(parse(&font));
+                    startup.system_font = Some(parse(&font));
+                    break;
                 }
             }
-            None
+            for (namespace, key) in icon_theme_settings() {
+                if let Ok(theme) = settings.read::<String>(namespace, key).await
+                    && !theme.trim().is_empty()
+                {
+                    startup.icon_theme = Some(theme);
+                    break;
+                }
+            }
+            if let Ok(theme) = settings
+                .read::<String>("org.gnome.desktop.interface", "gtk-theme")
+                .await
+                && !theme.trim().is_empty()
+            {
+                startup.gtk_theme = Some(theme);
+            }
+            if let Ok(raw) = settings
+                .read::<String>("org.kde.kdeglobals.Colors:Window", "ForegroundNegative")
+                .await
+            {
+                startup.negative_color = crate::linux::icon_theme::parse_kde_rgb(&raw);
+            }
+            startup
         },
         async {
             smol::Timer::after(timeout).await;
-            None
+            StartupSettings::default()
         },
     ))
+}
+
+fn icon_theme_settings() -> [(&'static str, &'static str); 2] {
+    let kde = ("org.kde.kdeglobals.Icons", "Theme");
+    let gnome = ("org.gnome.desktop.interface", "icon-theme");
+    if crate::linux::icon_theme::is_kde_desktop() {
+        [kde, gnome]
+    } else {
+        [gnome, kde]
+    }
 }
 
 type FontSettingParser = fn(&str) -> Vec<String>;

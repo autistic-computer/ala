@@ -988,6 +988,48 @@ impl WaylandClient {
                             }
                         }
                     }
+                    XDPEvent::IconTheme(theme) => {
+                        if let Some(client) = client.0.upgrade() {
+                            let windows = {
+                                let mut client = client.borrow_mut();
+                                if !client.common.set_icon_theme(theme) {
+                                    return;
+                                }
+                                client.windows.values().cloned().collect::<Vec<_>>()
+                            };
+                            for window in windows {
+                                window.request_redraw();
+                            }
+                        }
+                    }
+                    XDPEvent::GtkTheme(theme) => {
+                        if let Some(client) = client.0.upgrade() {
+                            let windows = {
+                                let mut client = client.borrow_mut();
+                                if !client.common.set_gtk_theme(theme) {
+                                    return;
+                                }
+                                client.windows.values().cloned().collect::<Vec<_>>()
+                            };
+                            for window in windows {
+                                window.request_redraw();
+                            }
+                        }
+                    }
+                    XDPEvent::NegativeColor(color) => {
+                        if let Some(client) = client.0.upgrade() {
+                            let windows = {
+                                let mut client = client.borrow_mut();
+                                if !client.common.set_negative_color(color) {
+                                    return;
+                                }
+                                client.windows.values().cloned().collect::<Vec<_>>()
+                            };
+                            for window in windows {
+                                window.request_redraw();
+                            }
+                        }
+                    }
                 }
             })
             .unwrap();

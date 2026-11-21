@@ -158,6 +158,7 @@ struct Node {
 
 struct Icon {
     path: SharedString,
+    data: Option<Arc<[u8]>>,
     color: Hsla,
     size: Pixels,
 }
@@ -378,8 +379,29 @@ impl Ui {
     }
 
     pub fn icon(&mut self, path: &SharedString, size: Pixels, color: Hsla) -> NodeId {
+        self.push_icon(path.clone(), None, size, color)
+    }
+
+    pub fn icon_data(
+        &mut self,
+        path: &SharedString,
+        data: Arc<[u8]>,
+        size: Pixels,
+        color: Hsla,
+    ) -> NodeId {
+        self.push_icon(path.clone(), Some(data), size, color)
+    }
+
+    fn push_icon(
+        &mut self,
+        path: SharedString,
+        data: Option<Arc<[u8]>>,
+        size: Pixels,
+        color: Hsla,
+    ) -> NodeId {
         self.icons.push(Icon {
-            path: path.clone(),
+            path,
+            data,
             color,
             size,
         });
@@ -724,7 +746,7 @@ impl Ui {
                         window.paint_svg(
                             bounds,
                             icon.path.clone(),
-                            None,
+                            icon.data.as_deref(),
                             TransformationMatrix::unit(),
                             icon.color,
                             cx,

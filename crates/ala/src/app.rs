@@ -55,7 +55,7 @@ use crate::{
     RenderablePromptHandle, Reservation, ScreenCaptureSource, SharedString, SubscriberSet,
     Subscription, SvgRenderer, SystemNotification, SystemNotificationResponse, Task,
     TextRenderingMode, TextSystem, ThermalState, Window, WindowAppearance, WindowButtonLayout,
-    WindowHandle, WindowId, WindowInvalidator,
+    WindowControlIcons, WindowHandle, WindowId, WindowInvalidator,
     colors::{Colors, GlobalColors},
     hash, init_app_menus,
 };
@@ -1349,6 +1349,10 @@ impl App {
 
     pub fn button_layout(&self) -> Option<WindowButtonLayout> {
         self.platform.button_layout()
+    }
+
+    pub fn window_control_icons(&self) -> Option<WindowControlIcons> {
+        self.platform.window_control_icons()
     }
 
     pub fn read_from_clipboard(&self) -> Option<ClipboardItem> {

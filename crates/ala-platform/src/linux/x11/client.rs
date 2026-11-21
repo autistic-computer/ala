@@ -504,6 +504,27 @@ impl X11Client {
                             }
                         }
                     }
+                    XDPEvent::IconTheme(theme) => {
+                        if client.with_common(|common| common.set_icon_theme(theme)) {
+                            for window in client.0.borrow().windows.values() {
+                                window.window.state.borrow_mut().force_render_after_recovery = true;
+                            }
+                        }
+                    }
+                    XDPEvent::GtkTheme(theme) => {
+                        if client.with_common(|common| common.set_gtk_theme(theme)) {
+                            for window in client.0.borrow().windows.values() {
+                                window.window.state.borrow_mut().force_render_after_recovery = true;
+                            }
+                        }
+                    }
+                    XDPEvent::NegativeColor(color) => {
+                        if client.with_common(|common| common.set_negative_color(color)) {
+                            for window in client.0.borrow().windows.values() {
+                                window.window.state.borrow_mut().force_render_after_recovery = true;
+                            }
+                        }
+                    }
                 }
             })
             .map_err(|err| anyhow!("Failed to initialize XDP event source: {err:?}"))?;

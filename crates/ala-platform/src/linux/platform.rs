@@ -36,10 +36,10 @@ use ala::{
     DisplayId, ForegroundExecutor, Keymap, Menu, MenuItem, OwnedMenu, PathPromptOptions, Platform,
     PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem,
     PlatformWindow, Result, RunnableVariant, Task, ThermalState, WindowAppearance,
-    WindowButtonLayout, WindowParams, scheduler::MainThreadBusy,
+    WindowButtonLayout, WindowControlIcons, WindowParams, scheduler::MainThreadBusy,
 };
 #[cfg(any(feature = "wayland", feature = "x11"))]
-use ala::{Pixels, Point, px};
+use ala::{Hsla, Pixels, Point, px};
 
 #[cfg(any(feature = "wayland", feature = "x11"))]
 pub(crate) const SCROLL_LINES: f32 = 3.0;
@@ -123,6 +123,13 @@ pub(crate) struct LinuxCommon {
     pub(crate) appearance: WindowAppearance,
     pub(crate) auto_hide_scrollbars: bool,
     pub(crate) button_layout: WindowButtonLayout,
+    #[cfg(any(feature = "wayland", feature = "x11"))]
+    pub(crate) icon_theme: Option<String>,
+    #[cfg(any(feature = "wayland", feature = "x11"))]
+    pub(crate) gtk_theme: Option<String>,
+    #[cfg(any(feature = "wayland", feature = "x11"))]
+    pub(crate) negative_color: Option<Hsla>,
+    pub(crate) window_control_icons: Option<WindowControlIcons>,
     pub(crate) callbacks: PlatformHandlers,
     pub(crate) signal: LoopSignal,
     pub(crate) main_thread_busy: MainThreadBusy,
@@ -151,11 +158,34 @@ impl LinuxCommon {
         #[cfg(any(feature = "wayland", feature = "x11"))]
         let cosmic_text_system = Arc::new(crate::linux::CosmicTextSystem::new("IBM Plex Sans"));
         #[cfg(any(feature = "wayland", feature = "x11"))]
-        if let Some(families) =
-            crate::linux::xdg_desktop_portal::read_system_font(Duration::from_millis(200))
-        {
+        let startup =
+            crate::linux::xdg_desktop_portal::read_startup_settings(Duration::from_millis(200));
+        #[cfg(any(feature = "wayland", feature = "x11"))]
+        if let Some(families) = startup.system_font {
             cosmic_text_system.set_system_font_family(families.iter().map(String::as_str));
         }
+        #[cfg(any(feature = "wayland", feature = "x11"))]
+        let icon_theme = startup
+            .icon_theme
+            .or_else(crate::linux::icon_theme::read_configured_icon_theme);
+        #[cfg(any(feature = "wayland", feature = "x11"))]
+        let gtk_theme = startup
+            .gtk_theme
+            .or_else(crate::linux::icon_theme::read_configured_gtk_theme);
+        #[cfg(any(feature = "wayland", feature = "x11"))]
+        let negative_color = startup
+            .negative_color
+            .or_else(crate::linux::icon_theme::read_configured_negative_color);
+        #[cfg(any(feature = "wayland", feature = "x11"))]
+        let window_control_icons = icon_theme.as_deref().and_then(|theme| {
+            crate::linux::icon_theme::load_window_control_icons(
+                theme,
+                gtk_theme.as_deref(),
+                negative_color,
+            )
+        });
+        #[cfg(not(any(feature = "wayland", feature = "x11")))]
+        let window_control_icons = None;
         #[cfg(any(feature = "wayland", feature = "x11"))]
         let text_system: Arc<dyn PlatformTextSystem> = cosmic_text_system.clone();
         #[cfg(not(any(feature = "wayland", feature = "x11")))]
@@ -182,6 +212,13 @@ impl LinuxCommon {
             appearance: WindowAppearance::Light,
             auto_hide_scrollbars: false,
             button_layout: WindowButtonLayout::linux_default(),
+            #[cfg(any(feature = "wayland", feature = "x11"))]
+            icon_theme,
+            #[cfg(any(feature = "wayland", feature = "x11"))]
+            gtk_theme,
+            #[cfg(any(feature = "wayland", feature = "x11"))]
+            negative_color,
+            window_control_icons,
             callbacks,
             signal: event_loop.get_signal(),
             main_thread_busy,
@@ -221,6 +258,49 @@ impl LinuxCommon {
         if let Some(callback) = callback.as_mut() {
             callback();
         }
+    }
+
+    #[cfg(any(feature = "wayland", feature = "x11"))]
+    pub(crate) fn set_icon_theme(&mut self, theme: String) -> bool {
+        let theme = theme.trim();
+        if theme.is_empty() || self.icon_theme.as_deref() == Some(theme) {
+            return false;
+        }
+        self.icon_theme = Some(theme.to_owned());
+        self.reload_window_control_icons()
+    }
+
+    #[cfg(any(feature = "wayland", feature = "x11"))]
+    pub(crate) fn set_gtk_theme(&mut self, theme: String) -> bool {
+        let theme = theme.trim();
+        if theme.is_empty() || self.gtk_theme.as_deref() == Some(theme) {
+            return false;
+        }
+        self.gtk_theme = Some(theme.to_owned());
+        self.reload_window_control_icons()
+    }
+
+    #[cfg(any(feature = "wayland", feature = "x11"))]
+    pub(crate) fn set_negative_color(&mut self, color: Hsla) -> bool {
+        if self.negative_color == Some(color) {
+            return false;
+        }
+        self.negative_color = Some(color);
+        self.reload_window_control_icons()
+    }
+
+    #[cfg(any(feature = "wayland", feature = "x11"))]
+    fn reload_window_control_icons(&mut self) -> bool {
+        let icons = self.icon_theme.as_deref().and_then(|theme| {
+            crate::linux::icon_theme::load_window_control_icons(
+                theme,
+                self.gtk_theme.as_deref(),
+                self.negative_color,
+            )
+        });
+        let changed = self.window_control_icons != icons;
+        self.window_control_icons = icons;
+        changed
     }
 }
 
@@ -772,6 +852,11 @@ impl<P: LinuxClient + 'static> Platform for LinuxPlatform<P> {
 
     fn button_layout(&self) -> Option<WindowButtonLayout> {
         Some(self.inner.with_common(|common| common.button_layout))
+    }
+
+    fn window_control_icons(&self) -> Option<WindowControlIcons> {
+        self.inner
+            .with_common(|common| common.window_control_icons.clone())
     }
 
     fn register_url_scheme(&self, _: &str) -> Task<anyhow::Result<()>> {

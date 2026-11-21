@@ -171,6 +171,24 @@ pub struct SvgRenderer {
 
 pub struct ParsedSvg(usvg::Tree);
 
+impl ParsedSvg {
+    pub fn ink_ratio(&self) -> f32 {
+        let size = self.0.size();
+        let bounds = self.0.root().abs_bounding_box();
+        let rx = if size.width() > 0.0 {
+            bounds.width() / size.width()
+        } else {
+            0.0
+        };
+        let ry = if size.height() > 0.0 {
+            bounds.height() / size.height()
+        } else {
+            0.0
+        };
+        rx.max(ry)
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum SvgSize {
     Size(Size<DevicePixels>),

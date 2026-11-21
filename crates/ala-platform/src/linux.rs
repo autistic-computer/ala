@@ -11,6 +11,8 @@ mod wayland;
 mod x11;
 
 #[cfg(any(feature = "wayland", feature = "x11"))]
+pub(crate) mod icon_theme;
+#[cfg(any(feature = "wayland", feature = "x11"))]
 pub(crate) mod xdg_desktop_portal;
 
 pub use dispatcher::*;

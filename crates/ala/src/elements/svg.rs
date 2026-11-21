@@ -54,6 +54,12 @@ impl Svg {
         self
     }
 
+    pub fn shared_data(mut self, path: impl Into<SharedString>, data: Arc<[u8]>) -> Self {
+        self.data = Some(data);
+        self.data_path = Some(path.into());
+        self
+    }
+
     pub fn with_transformation(mut self, transformation: Transformation) -> Self {
         self.transformation = Some(transformation);
         self

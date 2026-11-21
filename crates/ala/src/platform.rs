@@ -195,6 +195,10 @@ pub trait Platform: 'static {
         None
     }
 
+    fn window_control_icons(&self) -> Option<WindowControlIcons> {
+        None
+    }
+
     fn open_url(&self, url: &str);
     fn haptic(&self, _kind: Haptic) {}
     fn on_open_urls(&self, callback: Box<dyn FnMut(Vec<String>)>);
@@ -494,6 +498,36 @@ impl WindowButton {
 }
 
 pub const MAX_BUTTONS_PER_SIDE: usize = 3;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WindowControlIcon {
+    pub key: SharedString,
+    pub svg: Arc<[u8]>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum WindowControlHoverStyle {
+    Breeze { negative: Option<Hsla> },
+    Adwaita,
+    Yaru,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WindowControlStyle {
+    pub button_size: Pixels,
+    pub icon_size: Pixels,
+    pub gap: Pixels,
+    pub hover: WindowControlHoverStyle,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct WindowControlIcons {
+    pub minimize: WindowControlIcon,
+    pub maximize: WindowControlIcon,
+    pub restore: WindowControlIcon,
+    pub close: WindowControlIcon,
+    pub style: WindowControlStyle,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WindowButtonLayout {
