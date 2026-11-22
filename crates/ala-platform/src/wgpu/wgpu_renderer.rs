@@ -1456,11 +1456,11 @@ impl WgpuRenderer {
                 panic!("Too many consecutive GPU errors. Last error: {error}");
             } else if self.failed_frame_count > 5 {
                 core.resources.invalidate_intermediate_textures();
-                self.atlas.clear();
-                self.needs_redraw = true;
                 self.failed_frame_count = 0;
-                return false;
             }
+            self.atlas.clear();
+            self.needs_redraw = true;
+            return false;
         } else {
             self.failed_frame_count = 0;
         }
