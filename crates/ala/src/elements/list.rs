@@ -8,7 +8,7 @@ use crate::{
     ScrollKey, ScrollWheelEvent, Size, Style, StyleRefinement, Styled, TextStyle, TouchPhase,
     Window, WindowId, point, px, size,
 };
-use std::{cell::RefCell, mem, ops::Range, rc::Rc};
+use std::{cell::RefCell, mem, ops::Range, rc::Rc, time::Duration};
 
 type RenderItemFn = dyn FnMut(usize, &mut Window, &mut App) -> AnyElement + 'static;
 
@@ -61,6 +61,10 @@ struct StateInner {
     measuring_behavior: ListMeasuringBehavior,
     pending_scroll: Option<PendingScroll>,
     follow_state: FollowState,
+    follow_hold: Option<ListOffset>,
+    follow_slack: Pixels,
+    frozen: bool,
+    glide: Option<Glide>,
     overscroll: RubberBand,
     replays: FxHashMap<usize, ItemReplay>,
     replays_drawn: u64,
@@ -115,6 +119,15 @@ impl ReplayKey {
         }
     }
 }
+
+#[derive(Clone, Copy)]
+struct Glide {
+    from: Pixels,
+    started: Option<crate::scheduler::Instant>,
+}
+
+const GLIDE_DURATION: Duration = Duration::from_millis(280);
+const GLIDE_REACH: f32 = 1.5;
 
 #[derive(Clone)]
 enum PendingScroll {
@@ -350,6 +363,10 @@ impl ListState {
             measuring_behavior: ListMeasuringBehavior::default(),
             pending_scroll: None,
             follow_state: FollowState::default(),
+            follow_hold: None,
+            follow_slack: px(0.),
+            frozen: false,
+            glide: None,
             overscroll: RubberBand::default(),
             replays: FxHashMap::default(),
             replays_drawn: 0,
@@ -385,6 +402,8 @@ impl ListState {
             state.logical_scroll_top = None;
             state.pending_scroll = None;
             state.scrollbar_drag_start_height = None;
+            state.follow_hold = None;
+            state.glide = None;
             state.items.summary().count
         };
 
@@ -568,9 +587,10 @@ impl ListState {
 
         let current_offset = self.logical_scroll_top();
         let state = &mut *self.0.borrow_mut();
+        state.glide = None;
 
         if distance < px(0.) {
-            state.follow_state.stop_following();
+            state.stop_following();
         }
 
         let mut cursor = state.items.cursor::<ListItemSummary>(());
@@ -605,6 +625,8 @@ impl ListState {
 
     pub fn set_follow_mode(&self, mode: FollowMode) {
         let state = &mut *self.0.borrow_mut();
+        state.follow_hold = None;
+        state.glide = None;
 
         match mode {
             FollowMode::Normal => {
@@ -624,7 +646,69 @@ impl ListState {
     }
 
     pub fn pause_following_tail(&self) {
-        self.0.borrow_mut().follow_state.stop_following();
+        let state = &mut *self.0.borrow_mut();
+        state.glide = None;
+        state.stop_following();
+    }
+
+    pub fn set_follow_hold(&self, hold: Option<ListOffset>) {
+        self.0.borrow_mut().follow_hold = hold;
+    }
+
+    pub fn follow_hold(&self) -> Option<ListOffset> {
+        self.0.borrow().follow_hold
+    }
+
+    pub fn hold_here(&self) {
+        let state = &mut *self.0.borrow_mut();
+        if !state.follow_state.is_following() {
+            return;
+        }
+        let top = state.logical_scroll_top();
+        let top = if top.item_ix < state.items.summary().count {
+            top
+        } else {
+            state.offset_at(state.scroll_max())
+        };
+        state.follow_hold = Some(top);
+    }
+
+    pub fn set_follow_slack(&self, slack: Pixels) {
+        self.0.borrow_mut().follow_slack = slack;
+    }
+
+    pub fn set_frozen(&self, frozen: bool) {
+        self.0.borrow_mut().frozen = frozen;
+    }
+
+    pub fn is_gliding(&self) -> bool {
+        self.0.borrow().glide.is_some()
+    }
+
+    pub fn glide_to_end(&self) {
+        let state = &mut *self.0.borrow_mut();
+        state.follow_hold = None;
+        let Some(bounds) = state.last_layout_bounds else {
+            state.follow_state = FollowState::Tail { is_following: true };
+            state.glide = None;
+            return;
+        };
+        let max = state.scroll_max();
+        let current = state.scroll_top(&state.logical_scroll_top()).min(max);
+        let from = current.max(max - bounds.size.height * GLIDE_REACH);
+        if max - from <= px(1.) {
+            state.follow_state = FollowState::Tail { is_following: true };
+            state.glide = None;
+            return;
+        }
+        state.follow_state = FollowState::Tail {
+            is_following: false,
+        };
+        state.pending_scroll = None;
+        state.glide = Some(Glide {
+            from,
+            started: None,
+        });
     }
 
     pub fn is_following_tail(&self) -> bool {
@@ -642,8 +726,9 @@ impl ListState {
             scroll_top.offset_in_item = px(0.);
         }
 
+        state.glide = None;
         if scroll_top.item_ix < item_count {
-            state.follow_state.stop_following();
+            state.stop_following();
         }
 
         state.rebase_pending_scroll(scroll_top);
@@ -780,6 +865,29 @@ impl ListState {
 }
 
 impl StateInner {
+    fn stop_following(&mut self) {
+        self.follow_hold = None;
+        self.follow_state.stop_following();
+    }
+
+    fn scroll_max(&self) -> Pixels {
+        let height = self
+            .last_layout_bounds
+            .map_or(px(0.), |bounds| bounds.size.height);
+        let padding = self.last_padding.unwrap_or_default();
+        (self.items.summary().height + padding.top + padding.bottom - height).max(px(0.))
+    }
+
+    fn offset_at(&self, scroll_top: Pixels) -> ListOffset {
+        let (start, ..) =
+            self.items
+                .find::<ListItemSummary, _>((), &Height(scroll_top), Bias::Right);
+        ListOffset {
+            item_ix: start.count,
+            offset_in_item: scroll_top - start.height,
+        }
+    }
+
     fn rebase_pending_scroll(&mut self, scroll_top: ListOffset) {
         let Some(pending) = self.pending_scroll.take() else {
             return;
@@ -845,6 +953,12 @@ impl StateInner {
         if self.reset {
             return;
         }
+        if delta.y != px(0.) {
+            self.glide = None;
+            if self.follow_hold.is_some() && self.follow_state.is_following() {
+                self.stop_following();
+            }
+        }
 
         let padding = self.last_padding.unwrap_or_default();
         let scroll_max =
@@ -884,7 +998,12 @@ impl StateInner {
         }
 
         if delta.y > px(0.) {
-            self.follow_state.stop_following();
+            self.stop_following();
+        } else if delta.y < px(0.)
+            && self.follow_state.has_stopped_following()
+            && new_scroll_top >= scroll_max - self.follow_slack
+        {
+            self.follow_state.start_following();
         }
 
         if let Some(handler) = self.scroll_handler.as_mut() {
@@ -1084,12 +1203,44 @@ impl StateInner {
         let mut max_item_width = px(0.);
         let mut scroll_top = self.logical_scroll_top();
 
-        if self.follow_state.is_following() {
-            scroll_top = ListOffset {
-                item_ix: self.items.summary().count,
-                offset_in_item: px(0.),
-            };
-            self.logical_scroll_top = Some(scroll_top);
+        if !self.frozen {
+            if let Some(glide) = self.glide {
+                let now = cx.background_executor().now();
+                let started = glide.started.unwrap_or(now);
+                let progress = if cx.reduce_motion() {
+                    1.0
+                } else {
+                    crate::animation_time(now - started).as_secs_f32()
+                        / GLIDE_DURATION.as_secs_f32()
+                };
+                if progress >= 1.0 {
+                    self.glide = None;
+                    self.follow_state = FollowState::Tail { is_following: true };
+                } else {
+                    let target = (self.items.summary().height + padding.top + padding.bottom
+                        - available_height)
+                        .max(px(0.));
+                    let eased = 1.0 - (1.0 - progress).powi(3);
+                    scroll_top = self.offset_at(glide.from + (target - glide.from) * eased);
+                    self.logical_scroll_top = Some(scroll_top);
+                    self.glide = Some(Glide {
+                        started: Some(started),
+                        ..glide
+                    });
+                    window.request_animation_frame();
+                }
+            }
+            if self.glide.is_none() && self.follow_state.is_following() {
+                let count = self.items.summary().count;
+                scroll_top = self
+                    .follow_hold
+                    .filter(|hold| hold.item_ix < count)
+                    .unwrap_or(ListOffset {
+                        item_ix: count,
+                        offset_in_item: px(0.),
+                    });
+                self.logical_scroll_top = Some(scroll_top);
+            }
         }
 
         let mut rendered_focused_item = false;
@@ -1244,7 +1395,7 @@ impl StateInner {
         new_items.append(cursor.suffix(), ());
         self.items = new_items;
 
-        if self.follow_state.has_stopped_following() {
+        if self.glide.is_none() && !self.frozen && self.follow_state.has_stopped_following() {
             let padding = self.last_padding.unwrap_or_default();
             let total_height = self.items.summary().height + padding.top + padding.bottom;
             let scroll_offset = self.scroll_top(&scroll_top);
@@ -1412,7 +1563,9 @@ impl StateInner {
 
         let dragged_to_end =
             scroll_max > px(0.) && new_scroll_top >= (scroll_max - px(1.0)).max(px(0.));
+        self.glide = None;
         if dragged_to_end && matches!(self.follow_state, FollowState::Tail { .. }) {
+            self.follow_hold = None;
             self.follow_state = FollowState::Tail { is_following: true };
             let item_count = self.items.summary().count;
             self.pending_scroll = None;
@@ -1423,7 +1576,7 @@ impl StateInner {
             return;
         }
 
-        self.follow_state.stop_following();
+        self.stop_following();
 
         if self.alignment == ListAlignment::Bottom && new_scroll_top == scroll_max {
             self.pending_scroll = None;
@@ -1452,7 +1605,7 @@ impl std::fmt::Debug for ListItem {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct ListOffset {
     pub item_ix: usize,
     pub offset_in_item: Pixels,
@@ -1894,9 +2047,9 @@ mod test {
 
     use crate::{
         self as ala, AppContext, Bounds, Context, Element, FollowMode, InteractiveElement,
-        IntoElement, ListState, ParentElement, Render, ScrollHandle, StatefulInteractiveElement,
-        Styled, TestAppContext, TouchPhase, VisualTestContext, Window, canvas, div, list, point,
-        px, size,
+        IntoElement, ListOffset, ListState, ParentElement, Render, ScrollHandle,
+        StatefulInteractiveElement, Styled, TestAppContext, TouchPhase, VisualTestContext, Window,
+        canvas, div, list, point, px, size,
     };
 
     #[ala::test]
@@ -2609,6 +2762,93 @@ mod test {
         assert!(
             state.is_following_tail(),
             "pausing while at the bottom must re-engage follow-tail on the next layout"
+        );
+    }
+
+    #[ala::test]
+    fn follow_hold_stops_the_tail_and_a_wheel_hands_it_back(cx: &mut TestAppContext) {
+        let cx = cx.add_empty_window();
+        let state = ListState::new(10, crate::ListAlignment::Top, px(0.));
+
+        struct TestView(ListState);
+        impl Render for TestView {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                list(self.0.clone(), |_, _, _| {
+                    div().h(px(50.)).w_full().into_any()
+                })
+                .w_full()
+                .h_full()
+            }
+        }
+
+        let view = cx.update(|_, cx| cx.new(|_| TestView(state.clone())));
+        let draw = |cx: &mut crate::VisualTestContext| {
+            cx.draw(point(px(0.), px(0.)), size(px(100.), px(200.)), |_, _| {
+                view.clone().into_any_element()
+            });
+        };
+        state.set_follow_mode(FollowMode::Tail);
+        state.set_follow_slack(px(40.));
+        state.set_follow_hold(Some(ListOffset {
+            item_ix: 3,
+            offset_in_item: px(0.),
+        }));
+        draw(cx);
+        assert_eq!(
+            state.logical_scroll_top(),
+            ListOffset {
+                item_ix: 3,
+                offset_in_item: px(0.)
+            }
+        );
+        assert!(state.is_following_tail());
+
+        state.set_follow_hold(Some(ListOffset {
+            item_ix: 8,
+            offset_in_item: px(0.),
+        }));
+        draw(cx);
+        assert_eq!(
+            state.logical_scroll_top(),
+            ListOffset {
+                item_ix: 6,
+                offset_in_item: px(0.)
+            }
+        );
+
+        state.set_follow_hold(Some(ListOffset {
+            item_ix: 3,
+            offset_in_item: px(0.),
+        }));
+        draw(cx);
+        cx.simulate_event(ScrollWheelEvent {
+            position: point(px(50.), px(100.)),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-30.))),
+            ..Default::default()
+        });
+        assert_eq!(state.follow_hold(), None);
+        assert!(!state.is_following_tail());
+        assert_eq!(
+            state.logical_scroll_top(),
+            ListOffset {
+                item_ix: 3,
+                offset_in_item: px(30.)
+            }
+        );
+
+        cx.simulate_event(ScrollWheelEvent {
+            position: point(px(50.), px(100.)),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-90.))),
+            ..Default::default()
+        });
+        assert!(state.is_following_tail());
+        draw(cx);
+        assert_eq!(
+            state.logical_scroll_top(),
+            ListOffset {
+                item_ix: 6,
+                offset_in_item: px(0.)
+            }
         );
     }
 
