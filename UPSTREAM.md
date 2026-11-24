@@ -30,7 +30,7 @@ The ios and android backends have no upstream counterpart.
 
 | Upstream | ala |
 |---|---|
-| `crates/gpui/src/` | `crates/ala/src/` |
+| `crates/gpui/src/` | `crates/ala/src/`, with `gpui.rs` renamed to `ala.rs` |
 | `crates/gpui_macros/src/` | `crates/ala-macros/src/` |
 | `crates/refineable/derive_refineable/src/` | `crates/ala-macros/src/derive_refineable.rs` |
 | `crates/gpui_platform/src/` | `crates/ala-platform/src/ala_platform.rs` |
@@ -50,7 +50,9 @@ root file moved down one directory, so a patch to `crates/gpui_wgpu/src/gpui_wgp
 
 ```bash
 git -C <upstream-checkout> format-patch -1 <sha> --stdout -- crates/gpui crates/gpui_wgpu \
-  | sed -e 's#crates/gpui_wgpu/src/#crates/ala-platform/src/wgpu/#g' -e 's#crates/gpui/#crates/ala/#g' \
+  | sed -e 's#crates/gpui_wgpu/src/gpui_wgpu\.rs#crates/ala-platform/src/wgpu.rs#g' \
+        -e 's#crates/gpui_wgpu/src/#crates/ala-platform/src/wgpu/#g' \
+        -e 's#crates/gpui/src/gpui\.rs#crates/ala/src/ala.rs#g' -e 's#crates/gpui/#crates/ala/#g' \
         -e 's/\bgpui_wgpu::/ala_platform::wgpu::/g' -e 's/\bgpui::/ala::/g' > fix.patch
 git am -3 fix.patch
 ```
