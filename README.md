@@ -10,7 +10,7 @@
 ---<br>
 name: ala<br>
 description: ui framework<br>
-status: alpha<br>
+status: slopware<br>
 license: apache-2.0<br>
 version: 0.1.0<br>
 ---
